@@ -21,52 +21,56 @@ local ProtectGui = protectgui or (syn and syn.protect_gui) or function(f) end
 local CoreGui = game:GetService("CoreGui")
 local SizeUI = UDim2.fromOffset(550, 330)
 local function MakeDraggable(topbarobject, object)
-	local function CustomPos(topbarobject, object)
-		object.Size = UDim2.new(0, 400, 0, 300)
+	local function CustomPos(tbObject, obj) -- Renamed parameters for clarity
+		obj.Size = UDim2.new(0, 400, 0, 300) -- Default size, can be overridden later
 		local Dragging = nil
 		local DragInput = nil
 		local DragStart = nil
 		local StartPosition = nil
-		local LastPosition = nil
-		local Tween = nil
+		local DragTween = nil -- Renamed from Tween to avoid conflict
 
 		local function UpdatePos(input)
 			local Delta = input.Position - DragStart
 			local pos = UDim2.new(StartPosition.X.Scale, StartPosition.X.Offset + Delta.X, StartPosition.Y.Scale, StartPosition.Y.Offset + Delta.Y)
-			if Tween then Tween:Cancel() end
-			Tween = TweenService:Create(object,TweenInfo.new(0.03, Enum.EasingStyle.Linear),{Position = pos})Tween:Play()
+			if DragTween then DragTween:Cancel() end
+			DragTween = TweenService:Create(obj, TweenInfo.new(0.05, Enum.EasingStyle.Linear), {Position = pos}) -- Slightly longer tween
+			DragTween:Play()
 		end
 
-		topbarobject.InputBegan:Connect(function(input)
+		tbObject.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				Dragging = true
 				DragStart = input.Position
-				StartPosition = object.Position
-				if Tween then Tween:Cancel() end
-				input.Changed:Connect(function()
+				StartPosition = obj.Position
+				if DragTween then DragTween:Cancel() end
+				
+				local changedConnection
+				changedConnection = input.Changed:Connect(function()
 					if input.UserInputState == Enum.UserInputState.End then
 						Dragging = false
+						if changedConnection then changedConnection:Disconnect() end -- Disconnect self
 					end
 				end)
 			end
 		end)
 
-		topbarobject.InputChanged:Connect(function(input)
+		tbObject.InputChanged:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-				DragInput = input
+				DragInput = input -- Store the input object itself
 			end
 		end)
 
 		UserInputService.InputChanged:Connect(function(input)
-			if input == DragInput and Dragging then
+			if input == DragInput and Dragging then -- Compare input objects
 				UpdatePos(input)
 			end
 		end)
 	end
 	CustomPos(topbarobject, object)
 end
+
 function CircleClick(Button, X, Y)
-	spawn(function()
+	task.spawn(function()
 		Button.ClipsDescendants = true
 		local Circle = Instance.new("ImageLabel")
 		Circle.Image = "rbxassetid://266543268"
@@ -94,7 +98,7 @@ function CircleClick(Button, X, Y)
 		Circle:TweenSizeAndPosition(UDim2.new(0, Size, 0, Size), UDim2.new(0.5, -Size/2, 0.5, -Size/2), "Out", "Quad", Time, false, nil)
 		for i=1,10 do
 			Circle.ImageTransparency = Circle.ImageTransparency + 0.01
-			wait(Time/10)
+			task.wait(Time/10)
 		end
 		Circle:Destroy()
 	end)
@@ -110,7 +114,7 @@ function UBHubLib:MakeNotify(NotifyConfig)
 	NotifyConfig.Time = NotifyConfig.Time or 0.5
 	NotifyConfig.Delay = NotifyConfig.Delay or 5
 	local NotifyFunction = {}
-	spawn(function()
+	task.spawn(function()
 		if not CoreGui:FindFirstChild("NotifyGui") then
 			local NotifyGui = Instance.new("ScreenGui");
 			NotifyGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -131,19 +135,23 @@ function UBHubLib:MakeNotify(NotifyConfig)
 			local Count = 0
 			CoreGui.NotifyGui.NotifyLayout.ChildRemoved:Connect(function()
 				Count = 0
-				for i, v in CoreGui.NotifyGui.NotifyLayout:GetChildren() do
-					TweenService:Create(
-						v,
-						TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-						{Position = UDim2.new(0, 0, 1, -((v.Size.Y.Offset + 12)*Count))}
-					):Play()
-					Count = Count + 1
+				for i, v in ipairs(CoreGui.NotifyGui.NotifyLayout:GetChildren()) do 
+					if v:IsA("GuiObject") then 
+						TweenService:Create(
+							v,
+							TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+							{Position = UDim2.new(0, 0, 1, -((v.Size.Y.Offset + 12)*Count))}
+						):Play()
+						Count = Count + 1
+					end
 				end
 			end)
 		end
 		local NotifyPosHeigh = 0
-		for i, v in CoreGui.NotifyGui.NotifyLayout:GetChildren() do
-			NotifyPosHeigh = -(v.Position.Y.Offset) + v.Size.Y.Offset + 12
+		for i, v in ipairs(CoreGui.NotifyGui.NotifyLayout:GetChildren()) do
+            if v:IsA("GuiObject") then
+			    NotifyPosHeigh = -(v.Position.Y.Offset) + v.Size.Y.Offset + 12
+            end
 		end
 		local NotifyFrame = Instance.new("Frame");
 		local NotifyFrameReal = Instance.new("Frame");
@@ -153,9 +161,9 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		local Top = Instance.new("Frame");
 		local TextLabel = Instance.new("TextLabel");
 		local UIStroke = Instance.new("UIStroke");
-		local UICorner1 = Instance.new("UICorner");
+		local UICorner1_Notify = Instance.new("UICorner");
 		local TextLabel1 = Instance.new("TextLabel");
-		local UIStroke1 = Instance.new("UIStroke");
+		local UIStroke1_Notify = Instance.new("UIStroke");
 		local Close = Instance.new("TextButton");
 		local ImageLabel = Instance.new("ImageLabel");
 		local TextLabel2 = Instance.new("TextLabel");
@@ -227,8 +235,8 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		UIStroke.Thickness = 0.30000001192092896
 		UIStroke.Parent = TextLabel
 
-		UICorner1.Parent = Top
-		UICorner1.CornerRadius = UDim.new(0, 5)
+		UICorner1_Notify.Parent = Top
+		UICorner1_Notify.CornerRadius = UDim.new(0, 5)
 
 		TextLabel1.Font = Enum.Font.GothamBold
 		TextLabel1.Text = NotifyConfig.Description
@@ -243,9 +251,9 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		TextLabel1.Position = UDim2.new(0, TextLabel.TextBounds.X + 15, 0, 0)
 		TextLabel1.Parent = Top
 
-		UIStroke1.Color = NotifyConfig.Color
-		UIStroke1.Thickness = 0.4000000059604645
-		UIStroke1.Parent = TextLabel1
+		UIStroke1_Notify.Color = NotifyConfig.Color
+		UIStroke1_Notify.Thickness = 0.4000000059604645
+		UIStroke1_Notify.Parent = TextLabel1
 
 		Close.Font = Enum.Font.SourceSans
 		Close.Text = ""
@@ -286,8 +294,10 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		TextLabel2.Parent = NotifyFrameReal
 		TextLabel2.Size = UDim2.new(1, -20, 0, 13)
 
-		TextLabel2.Size = UDim2.new(1, -20, 0, 13 + (13 * (TextLabel2.TextBounds.X // TextLabel2.AbsoluteSize.X)))
 		TextLabel2.TextWrapped = true
+		task.wait() -- Allow TextBounds to update
+		TextLabel2.Size = UDim2.new(1, -20, 0, TextLabel2.TextBounds.Y) -- Dynamic height
+
 
 		if TextLabel2.AbsoluteSize.Y < 27 then
 			NotifyFrame.Size = UDim2.new(1, 0, 0, 65)
@@ -337,11 +347,12 @@ function UBHubLib:MakeGui(GuiConfig)
 			return false
 		end
 		local valueToSave = Value
-		if type(Value) == "table" and not (Value[1] and not next(Value)) then
-			valueToSave = nil
-		elseif type(Value) == "table" and #Value == 1 then
+		if type(Value) == "table" and not (Value[1] and not next(Value)) then 
+			valueToSave = nil 
+		elseif type(Value) == "table" and #Value == 1 and not GuiConfig.Multi then 
 			valueToSave = Value[1]
 		end
+
 		Flags[Name] = valueToSave
 		local success, err = pcall(function()
 			local path = GuiConfig.SaveFolder
@@ -378,8 +389,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	local UICorner1 = Instance.new("UICorner");
 	local TextLabel1 = Instance.new("TextLabel");
 	local UIStroke1 = Instance.new("UIStroke");
-	local MaxRestore = Instance.new("TextButton");
-	local ImageLabel = Instance.new("ImageLabel");
+	-- local MaxRestore = Instance.new("TextButton"); -- MaxRestore seems unused, can be removed
+	-- local ImageLabel = Instance.new("ImageLabel"); -- For MaxRestore, also unused
 	local Close = Instance.new("TextButton");
 	local ImageLabel1 = Instance.new("ImageLabel");
 	local Min = Instance.new("TextButton");
@@ -387,7 +398,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	local LayersTab = Instance.new("Frame");
 	local UICorner2 = Instance.new("UICorner");
 	local DecideFrame = Instance.new("Frame");
-	local UIStroke3 = Instance.new("UIStroke");
+	-- local UIStroke3 = Instance.new("UIStroke"); -- For DecideFrame, if needed, now using BG color
 	local Layers = Instance.new("Frame");
 	local UICorner6 = Instance.new("UICorner");
 	local NameTab = Instance.new("TextLabel");
@@ -406,20 +417,20 @@ function UBHubLib:MakeGui(GuiConfig)
 	DropShadowHolder.Name = "DropShadowHolder"
 	DropShadowHolder.Parent = UBHubGui
 	DropShadowHolder.Size = SizeUI
-  DropShadowHolder.Position = UDim2.new(0, (UBHubGui.AbsoluteSize.X // 2 - DropShadowHolder.Size.X.Offset // 2), 0, (UBHubGui.AbsoluteSize.Y // 2 - DropShadowHolder.Size.Y.Offset // 2))
-  DropShadow.Image = ""
-  DropShadow.ImageColor3 = Color3.fromRGB(15, 15, 15)
-  DropShadow.ImageTransparency = 0.5
-  DropShadow.ScaleType = Enum.ScaleType.Slice
-  DropShadow.SliceCenter = Rect.new(49, 49, 450, 450)
-  DropShadow.AnchorPoint = Vector2.new(0.5, 0.5)
-  DropShadow.BackgroundTransparency = 1
-  DropShadow.BorderSizePixel = 0
-  DropShadow.Position = UDim2.new(0.5, 0, 0.5, 0)
-  DropShadow.Size = UDim2.new(1, 47, 1, 47)
-  DropShadow.ZIndex = 0
-  DropShadow.Name = "DropShadow"
-  DropShadow.Parent = DropShadowHolder
+    DropShadowHolder.Position = UDim2.new(0, (UBHubGui.AbsoluteSize.X / 2 - DropShadowHolder.Size.X.Offset / 2), 0, (UBHubGui.AbsoluteSize.Y / 2 - DropShadowHolder.Size.Y.Offset / 2))
+    DropShadow.Image = "rbxassetid://6015897843" 
+    DropShadow.ImageColor3 = Color3.fromRGB(15, 15, 15)
+    DropShadow.ImageTransparency = 0.5
+    DropShadow.ScaleType = Enum.ScaleType.Slice
+    DropShadow.SliceCenter = Rect.new(49, 49, 450, 450)
+    DropShadow.AnchorPoint = Vector2.new(0.5, 0.5)
+    DropShadow.BackgroundTransparency = 1
+    DropShadow.BorderSizePixel = 0
+    DropShadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    DropShadow.Size = UDim2.new(1, 47, 1, 47)
+    DropShadow.ZIndex = 0
+    DropShadow.Name = "DropShadow"
+    DropShadow.Parent = DropShadowHolder
 
 	Main.AnchorPoint = Vector2.new(0.5, 0.5)
 	Main.BackgroundColor3 = Colours.Background
@@ -442,7 +453,11 @@ function UBHubLib:MakeGui(GuiConfig)
 	BackgroundVideo.Size = UDim2.new(1,0,1,0)
 	BackgroundVideo.BackgroundTransparency = 1
 	BackgroundVideo.Looped = true
+    BackgroundVideo.Playing = true 
 	BackgroundVideo.Parent = Main
+    local BGImage = false 
+    local BGVideo = false 
+
 	function ChangeAsset(type, input, name)
 		local mediaFolder = "Asset"
 		if not isfolder(mediaFolder) then
@@ -460,23 +475,26 @@ function UBHubLib:MakeGui(GuiConfig)
 				writefile(filePath, data)
 				asset = getcustomasset(filePath)
 			elseif input == "Reset" then
-				return
+				return 
 			else
 				asset = getcustomasset(input)
 			end
 		end)
 		if not success then
-			warn("There have error to load asset:", err)
+			warn("There was an error loading the asset:", err)
 			return
 		end
 		if type == "Image" then
 			BackgroundImage.Image = asset or ""
 			BackgroundVideo.Video = ""
-			BGImage = true
+			BGImage = asset ~= "" and asset ~= nil
+            BGVideo = false
 		elseif type == "Video" then
 			BackgroundVideo.Video = asset or ""
 			BackgroundImage.Image = ""
-			BGVideo = true
+			BGVideo = asset ~= "" and asset ~= nil
+            BGImage = false
+            BackgroundVideo.Playing = BGVideo 
 		end
 	end
 	function Reset()
@@ -485,14 +503,13 @@ function UBHubLib:MakeGui(GuiConfig)
 		BGVideo = false
 		BGImage = false
 	end
-		function ChangeTransparency(Trans)
-			Main.BackgroundTransparency = Trans
-			if BGVideo or BGImage then
-				BackgroundImage.ImageTransparency = Trans
-				BackgroundVideo.BackgroundTransparency = Trans
-			end
-		end
+	function ChangeTransparency(Trans)
+		Main.BackgroundTransparency = Trans
+		BackgroundImage.ImageTransparency = Trans 
+		BackgroundVideo.BackgroundTransparency = Trans 
+	end
 	UICorner.Parent = Main
+    UICorner.CornerRadius = UDim.new(0, 8) 
 
 	UIStroke.Color = Color3.fromRGB(50, 50, 50)
 	UIStroke.Thickness = 1.600000023841858
@@ -511,8 +528,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	TextLabel.TextColor3 = Colours.Accent
 	TextLabel.TextSize = 14
 	TextLabel.TextXAlignment = Enum.TextXAlignment.Left
-	TextLabel.BackgroundColor3 = Colours.Accent
-	TextLabel.BackgroundTransparency = 0.9990000128746033
+	TextLabel.BackgroundColor3 = Colours.Accent 
+	TextLabel.BackgroundTransparency = 1 
 	TextLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	TextLabel.BorderSizePixel = 0
 	TextLabel.Size = UDim2.new(1, -100, 1, 0)
@@ -520,14 +537,15 @@ function UBHubLib:MakeGui(GuiConfig)
 	TextLabel.Parent = Top
 
 	UICorner1.Parent = Top
+    UICorner1.CornerRadius = UDim.new(0,5) 
 
 	TextLabel1.Font = Enum.Font.GothamBold
 	TextLabel1.Text = GuiConfig.Description
 	TextLabel1.TextColor3 = Colours.Text
 	TextLabel1.TextSize = 14
 	TextLabel1.TextXAlignment = Enum.TextXAlignment.Left
-	TextLabel1.BackgroundColor3 = Colours.Accent
-	TextLabel1.BackgroundTransparency = 0.9990000128746033
+	TextLabel1.BackgroundColor3 = Colours.Accent 
+	TextLabel1.BackgroundTransparency = 1 
 	TextLabel1.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	TextLabel1.BorderSizePixel = 0
 	TextLabel1.Size = UDim2.new(1, -(TextLabel.TextBounds.X + 104), 1, 0)
@@ -571,7 +589,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	Min.BackgroundTransparency = 0.9990000128746033
 	Min.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	Min.BorderSizePixel = 0
-	Min.Position = UDim2.new(1, -78, 0.5, 0)
+	Min.Position = UDim2.new(1, -38, 0.5, 0) -- Adjusted position because MaxRestore is gone
 	Min.Size = UDim2.new(0, 25, 0, 25)
 	Min.Name = "Min"
 	Min.Parent = Top
@@ -600,8 +618,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	UICorner2.Parent = LayersTab
 
 	DecideFrame.AnchorPoint = Vector2.new(0.5, 0)
-	DecideFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	DecideFrame.BackgroundTransparency = 0.85
+	DecideFrame.BackgroundColor3 = Colours.Stroke 
+	DecideFrame.BackgroundTransparency = 0.5 
 	DecideFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	DecideFrame.BorderSizePixel = 0
 	DecideFrame.Position = UDim2.new(0.5, 0, 0, 38)
@@ -677,8 +695,8 @@ function UBHubLib:MakeGui(GuiConfig)
 
 	local function UpdateSize1()
 		local OffsetY = 0
-		for _, child in ScrollTab:GetChildren() do
-			if child.Name ~= "UIListLayout" then
+		for _, child in ipairs(ScrollTab:GetChildren()) do
+			if child:IsA("GuiObject") and child ~= UIListLayout then
 				OffsetY = OffsetY + 3 + child.Size.Y.Offset
 			end
 		end
@@ -688,11 +706,11 @@ function UBHubLib:MakeGui(GuiConfig)
 	ScrollTab.ChildRemoved:Connect(UpdateSize1)
 
 	local Info = Instance.new("Frame");
-	local UICorner = Instance.new("UICorner");
+	local InfoUICorner = Instance.new("UICorner"); 
 	local LogoPlayerFrame = Instance.new("Frame")
-	local UICorner1 = Instance.new("UICorner");
+	local LogoPlayerFrameUICorner = Instance.new("UICorner"); 
 	local LogoPlayer = Instance.new("ImageLabel");
-	local UICorner2 = Instance.new("UICorner");
+	local LogoPlayerUICorner = Instance.new("UICorner"); 
 	local NamePlayer = Instance.new("TextLabel");
 		
 	Info.AnchorPoint = Vector2.new(1, 1)
@@ -705,8 +723,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	Info.Name = "Info"
 	Info.Parent = LayersTab
 
-	UICorner.CornerRadius = UDim.new(0, 5)
-	UICorner.Parent = Info
+	InfoUICorner.CornerRadius = UDim.new(0, 5)
+	InfoUICorner.Parent = Info
 
 	LogoPlayerFrame.AnchorPoint = Vector2.new(0, 0.5)
 	LogoPlayerFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -718,8 +736,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	LogoPlayerFrame.Name = "LogoPlayerFrame"
 	LogoPlayerFrame.Parent = Info
 
-	UICorner1.CornerRadius = UDim.new(0, 1000)
-	UICorner1.Parent = LogoPlayerFrame
+	LogoPlayerFrameUICorner.CornerRadius = UDim.new(0, 1000)
+	LogoPlayerFrameUICorner.Parent = LogoPlayerFrame
 
 	LogoPlayer.Image = GuiConfig["Logo Player"]
 	LogoPlayer.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -732,8 +750,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	LogoPlayer.Name = "LogoPlayer"
 	LogoPlayer.Parent = LogoPlayerFrame
 
-	UICorner2.CornerRadius = UDim.new(0, 1000)
-	UICorner2.Parent = LogoPlayer
+	LogoPlayerUICorner.CornerRadius = UDim.new(0, 1000)
+	LogoPlayerUICorner.Parent = LogoPlayer
 
 	NamePlayer.Font = Enum.Font.GothamBold
 	NamePlayer.Text = GuiConfig["Name Player"]
@@ -754,6 +772,10 @@ function UBHubLib:MakeGui(GuiConfig)
 		if CoreGui:FindFirstChild("UBHubGui") then 
 			UBHubGui:Destroy()
 		end
+        local openCloseGui = CoreGui:FindFirstChild("OpenClose") or (LocalPlayer.PlayerGui:FindFirstChild("OpenClose"))
+        if openCloseGui then
+            openCloseGui:Destroy()
+        end
 	end
 	local OldPos = DropShadowHolder.Position
 	local OldSize = DropShadowHolder.Size
@@ -763,12 +785,13 @@ function UBHubLib:MakeGui(GuiConfig)
 		ProtectGui(ScreenGui)
 	end
 	ScreenGui.Name = "OpenClose"
-	ScreenGui.Parent = RunService:IsStudio() and LocalPlayer.PlayerGui or (gethui() or cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui"))
+	ScreenGui.Parent = RunService:IsStudio() and LocalPlayer.PlayerGui or (gethui and gethui()) or CoreGui 
 	ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	MinimizedIcon.Image = _G.MinIcon or "rbxassetid://94513440833543"
 	MinimizedIcon.Size = UDim2.new(0, 55, 0, 50)
 	MinimizedIcon.Position = UDim2.new(0.1021, 0, 0.0743, 0)
-	MinimizedIcon.BackgroundTransparency = 0
+	MinimizedIcon.BackgroundTransparency = 1 
+    MinimizedIcon.BackgroundColor3 = Colours.ThemeHighlight 
 	MinimizedIcon.Parent = ScreenGui
 	MinimizedIcon.Draggable = true
 	MinimizedIcon.Visible = false
@@ -776,13 +799,11 @@ function UBHubLib:MakeGui(GuiConfig)
 	Min.Activated:Connect(function()
 		CircleClick(Min, Mouse.X, Mouse.Y)
 		DropShadowHolder.Visible = false
-		DropShadow.Visible = false
         MinimizedIcon.Visible = true
 	end)
 
 	MinimizedIcon.MouseButton1Click:Connect(function()
 		DropShadowHolder.Visible = true
-		DropShadow.Visible = true
 		MinimizedIcon.Visible = false
 	end)
 
@@ -791,19 +812,26 @@ function UBHubLib:MakeGui(GuiConfig)
 		GuiFunc:DestroyGui()
 	end)
 	function GuiFunc:ToggleUI()
-        game:GetService("VirtualInputManager"):SendKeyEvent(true, "RightShift",false,game)
-        game:GetService("VirtualInputManager"):SendKeyEvent(false, "RightShift",false,game)
+        if UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
+             game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.RightShift, false, game)
+        else
+            game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.RightShift, false, game)
+            task.wait() 
+            game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.RightShift, false, game)
+        end
 	end
 	UserInputService.InputBegan:Connect(function(input)
 		if input.KeyCode == Enum.KeyCode.RightShift then
 			if DropShadowHolder.Visible then
 				DropShadowHolder.Visible = false
+                MinimizedIcon.Visible = true 
 			else
 				DropShadowHolder.Visible = true
+                MinimizedIcon.Visible = false 
 			end
 		end
 	end)
-	DropShadowHolder.Size = UDim2.new(0, 150 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X, 0, 450)
+	DropShadowHolder.Size = UDim2.new(0, 150 + TextLabel.TextBounds.X + 1 + (TextLabel1.Text and TextLabel1.TextBounds.X or 0), 0, 450)
 	MakeDraggable(Top, DropShadowHolder)
 	--// Blur
 	local MoreBlur = Instance.new("Frame");
@@ -830,7 +858,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	DropShadowHolder1.ZIndex = 0
 	DropShadowHolder1.Name = "DropShadowHolder"
 	DropShadowHolder1.Parent = MoreBlur
-	DropShadowHolder1.Visible = false
+	DropShadowHolder1.Visible = false 
 
 	DropShadow1.Image = "rbxassetid://6015897843"
 	DropShadow1.ImageColor3 = Color3.fromRGB(0, 0, 0)
@@ -845,9 +873,10 @@ function UBHubLib:MakeGui(GuiConfig)
 	DropShadow1.ZIndex = 0
 	DropShadow1.Name = "DropShadow"
 	DropShadow1.Parent = DropShadowHolder1
-	DropShadow1.Visible = false
+	DropShadow1.Visible = false 
 
 	UICorner28.Parent = MoreBlur
+    UICorner28.CornerRadius = UDim.new(0,8) 
 
 	ConnectButton.Font = Enum.Font.SourceSans
 	ConnectButton.Text = ""
@@ -1021,20 +1050,24 @@ function UBHubLib:MakeGui(GuiConfig)
 			UIStroke2.Parent = ChooseFrame
 
 			UICorner4.Parent = ChooseFrame
+            UICorner4.CornerRadius = UDim.new(0,2) 
 		end
 		TabButton.Activated:Connect(function()
 			CircleClick(TabButton, Mouse.X, Mouse.Y)
 			local FrameChoose
-			for a, s in ScrollTab:GetChildren() do
-				for i, v in s:GetChildren() do
-					if v.Name == "ChooseFrame" then
-						FrameChoose = v
-						break
-					end
-				end
+			for _, s in ipairs(ScrollTab:GetChildren()) do
+                if s:IsA("GuiObject") then
+				    for _, v in ipairs(s:GetChildren()) do
+					    if v.Name == "ChooseFrame" then
+						    FrameChoose = v
+						    break
+					    end
+				    end
+                end
+                if FrameChoose then break end
 			end
 			if FrameChoose ~= nil and Tab.LayoutOrder ~= LayersPageLayout.CurrentPage.LayoutOrder then
-				for _, TabFrame in ScrollTab:GetChildren() do
+				for _, TabFrame in ipairs(ScrollTab:GetChildren()) do
 					if TabFrame.Name == "Tab" then
 						TweenService:Create(TabFrame,TweenInfo.new(0.001, Enum.EasingStyle.Linear),{BackgroundTransparency = 0.9990000128746033}):Play()
 					end    
@@ -1053,7 +1086,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			local Title = Title or "Title"
 			local Section = Instance.new("Frame");
 			local SectionDecideFrame = Instance.new("Frame");
-			local UICorner1 = Instance.new("UICorner");
+			local UICorner1_Section = Instance.new("UICorner"); 
 			local UIGradient = Instance.new("UIGradient");
 
 			Section.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1062,17 +1095,16 @@ function UBHubLib:MakeGui(GuiConfig)
 			Section.BorderSizePixel = 0
 			Section.LayoutOrder = CountSection
 			Section.ClipsDescendants = true
-			--Section.LayoutOrder = 1
 			Section.Size = UDim2.new(1, 0, 0, 30)
 			Section.Name = "Section"
 			Section.Parent = ScrolLayers
 
 			local SectionReal = Instance.new("Frame");
-			local UICorner = Instance.new("UICorner");
-			local UIStroke = Instance.new("UIStroke");
+			local UICorner_SectionReal = Instance.new("UICorner"); 
+			-- local UIStroke_SectionReal = Instance.new("UIStroke"); -- Seems unused
 			local SectionButton = Instance.new("TextButton");
 			local FeatureFrame = Instance.new("Frame");
-			local FeatureImg = Instance.new("ImageLabel");
+			local FeatureImg_Section = Instance.new("ImageLabel"); 
 			local SectionTitle = Instance.new("TextLabel");
 
 			SectionReal.AnchorPoint = Vector2.new(0.5, 0)
@@ -1086,8 +1118,8 @@ function UBHubLib:MakeGui(GuiConfig)
 			SectionReal.Name = "SectionReal"
 			SectionReal.Parent = Section
 
-			UICorner.CornerRadius = UDim.new(0, 4)
-			UICorner.Parent = SectionReal
+			UICorner_SectionReal.CornerRadius = UDim.new(0, 4)
+			UICorner_SectionReal.Parent = SectionReal
 
 			SectionButton.Font = Enum.Font.SourceSans
 			SectionButton.Text = ""
@@ -1111,17 +1143,17 @@ function UBHubLib:MakeGui(GuiConfig)
 			FeatureFrame.Name = "FeatureFrame"
 			FeatureFrame.Parent = SectionReal
 
-			FeatureImg.Image = "rbxassetid://16851841101"
-			FeatureImg.AnchorPoint = Vector2.new(0.5, 0.5)
-			FeatureImg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			FeatureImg.BackgroundTransparency = 0.9990000128746033
-			FeatureImg.BorderColor3 = Color3.fromRGB(0, 0, 0)
-			FeatureImg.BorderSizePixel = 0
-			FeatureImg.Position = UDim2.new(0.5, 0, 0.5, 0)
-			FeatureImg.Rotation = -90
-			FeatureImg.Size = UDim2.new(1, 6, 1, 6)
-			FeatureImg.Name = "FeatureImg"
-			FeatureImg.Parent = FeatureFrame
+			FeatureImg_Section.Image = "rbxassetid://16851841101"
+			FeatureImg_Section.AnchorPoint = Vector2.new(0.5, 0.5)
+			FeatureImg_Section.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			FeatureImg_Section.BackgroundTransparency = 0.9990000128746033
+			FeatureImg_Section.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			FeatureImg_Section.BorderSizePixel = 0
+			FeatureImg_Section.Position = UDim2.new(0.5, 0, 0.5, 0)
+			FeatureImg_Section.Rotation = -90
+			FeatureImg_Section.Size = UDim2.new(1, 6, 1, 6)
+			FeatureImg_Section.Name = "FeatureImg"
+			FeatureImg_Section.Parent = FeatureFrame
 
 			SectionTitle.Font = Enum.Font.GothamBold
 			SectionTitle.Text = Title
@@ -1148,7 +1180,8 @@ function UBHubLib:MakeGui(GuiConfig)
 			SectionDecideFrame.Name = "SectionDecideFrame"
 			SectionDecideFrame.Parent = Section
 
-			UICorner1.Parent = SectionDecideFrame
+			UICorner1_Section.Parent = SectionDecideFrame
+            UICorner1_Section.CornerRadius = UDim.new(0,2) 
 
 			UIGradient.Color = ColorSequence.new{
 				ColorSequenceKeypoint.new(0, Colours.Primary),
@@ -1169,7 +1202,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			SectionAdd.ClipsDescendants = true
 			SectionAdd.LayoutOrder = 1
 			SectionAdd.Position = UDim2.new(0.5, 0, 0, 38)
-			SectionAdd.Size = UDim2.new(1, 0, 0, 100)
+			SectionAdd.Size = UDim2.new(1, 0, 0, 100) 
 			SectionAdd.Name = "SectionAdd"
 			SectionAdd.Parent = Section
 
@@ -1181,66 +1214,103 @@ function UBHubLib:MakeGui(GuiConfig)
 			UIListLayout2.Parent = SectionAdd
 			local OpenSection = true
 			local function UpdateSizeScroll()
-				game:GetService("RunService").Heartbeat:Wait()
+				task.wait() 
 				local totalHeight = 0
 				for _, child in ipairs(ScrolLayers:GetChildren()) do
-					if child:IsA("Frame") and child ~= UIListLayout then
-						totalHeight += child.Size.Y.Offset + 3 --padding
+					if child:IsA("Frame") and child ~= UIListLayout1 then 
+						totalHeight += child.AbsoluteSize.Y + UIListLayout1.Padding.Offset
 					end
 				end
 				ScrolLayers.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
 			end
+            local isUpdatingSectionSize = false
 			local function UpdateSizeSection()
+                if isUpdatingSectionSize then return end
+                isUpdatingSectionSize = true
+                task.wait() 
+
 				if OpenSection then
-					UIListLayout2:GetPropertyChangedSignal("AbsoluteContentSize"):Wait()
 					local contentHeight = UIListLayout2.AbsoluteContentSize.Y
-					local newHeight = math.max(38 + contentHeight + 3, 30)
-					FeatureFrame.Rotation = 90
-					Section.Size = UDim2.new(1, 1, 0, newHeight)
-					SectionAdd.Size = UDim2.new(1, 0, 0, contentHeight)
-					SectionDecideFrame.Size = UDim2.new(1, 0, 0, 2)
-					UpdateSizeScroll()
+					local newHeight = 38 + contentHeight + (contentHeight > 0 and 3 or 0) 
+					newHeight = math.max(newHeight, 30) 
+
+					TweenService:Create(FeatureImg_Section, TweenInfo.new(0.3), {Rotation = -90}):Play()
+					TweenService:Create(Section, TweenInfo.new(0.3), {Size = UDim2.new(1, 1, 0, newHeight)}):Play()
+					TweenService:Create(SectionAdd, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, contentHeight)}):Play()
+					TweenService:Create(SectionDecideFrame, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, 2)}):Play()
 				else
-					FeatureFrame.Rotation = 0
-					Section.Size = UDim2.new(1, 1, 0, 30)
-					SectionDecideFrame.Size = UDim2.new(0, 0, 0, 2)
-					UpdateSizeScroll()
+					TweenService:Create(FeatureImg_Section, TweenInfo.new(0.3), {Rotation = 0}):Play()
+					TweenService:Create(Section, TweenInfo.new(0.3), {Size = UDim2.new(1, 1, 0, 30)}):Play()
+					TweenService:Create(SectionAdd, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, 0)}):Play()
+					TweenService:Create(SectionDecideFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 0, 0, 2)}):Play()
 				end
+                task.delay(0.3, function() 
+                    isUpdatingSectionSize = false
+                    UpdateSizeScroll()
+                end)
 			end
 			SectionButton.Activated:Connect(function()
 				CircleClick(SectionButton, Mouse.X, Mouse.Y)
 				OpenSection = not OpenSection
-				if OpenSection then
-					TweenService:Create(FeatureImg, TweenInfo.new(0.3), {Rotation = -90}):Play()
-					local contentHeight = 0
-					for _, child in ipairs(SectionAdd:GetChildren()) do
-						if child:IsA("Frame") then
-							contentHeight = contentHeight + child.AbsoluteSize.Y + 3
-						end
-					end
-					SectionAdd.Size = UDim2.new(1, 0, 0, contentHeight)
-					Section.Size = UDim2.new(1, 1, 0, 38 + contentHeight)
-					SectionDecideFrame.Size = UDim2.new(1, 0, 0, 2)
-					SectionAdd.Visible = true
-					TweenService:Create(SectionAdd, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, contentHeight)}):Play()
-				else
-					TweenService:Create(FeatureImg, TweenInfo.new(0.3), {Rotation = 0}):Play()
-					TweenService:Create(SectionAdd, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, 0)}):Play()
-					task.delay(0.31, function()
-						SectionAdd.Visible = false
-						Section.Size = UDim2.new(1, 1, 0, 30)
-						SectionDecideFrame.Size = UDim2.new(0, 0, 0, 2)
-						UpdateSizeScroll()
-					end)
-				end
-				UpdateSizeScroll()
+                SectionAdd.Visible = true 
+				UpdateSizeSection()
+                if not OpenSection then
+                    task.delay(0.3, function() SectionAdd.Visible = false end) 
+                end
 			end)
 			SectionAdd.ChildAdded:Connect(UpdateSizeSection)
 			SectionAdd.ChildRemoved:Connect(UpdateSizeSection)
-			UpdateSizeScroll()
+            UIListLayout2:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateSizeSection) 
+			UpdateSizeSection() 
 			
 			local Items = {}
 			local CountItem = 0
+            function Items:AddDivider(DividerConfig)
+                DividerConfig = DividerConfig or {}
+                local text = DividerConfig.Text or DividerConfig.Title or ""
+                local thickness = DividerConfig.Thickness or 1
+                local vPadding = DividerConfig.VerticalPadding or 5 -- Default vertical padding for text
+                local lineColor = DividerConfig.Color or Colours.Accent
+                local textColor = DividerConfig.TextColor or Colours.Text
+                local textSize = DividerConfig.TextSize or 12
+                local lineEndsPadding = DividerConfig.LineEndsPadding or 10
+                local textToLineSpacing = DividerConfig.TextToLineSpacing or 5
+
+                local DivParent = Instance.new("Frame")
+                DivParent.Name = "DividerContainer"
+                DivParent.BackgroundTransparency = 1
+                DivParent.Size = UDim2.new(1, 0, 0, thickness + vPadding * 2)
+                DivParent.LayoutOrder = CountItem
+                DivParent.Parent = SectionAdd
+                
+                if text ~= "" then
+                    local DividerText = Instance.new("TextLabel")
+                    DividerText.Name = "DividerText"
+                    DividerText.Font = Enum.Font.GothamBold
+                    DividerText.Text = "- [ " .. text .. " ] -"
+                    DividerText.TextColor3 = textColor
+                    DividerText.TextSize = textSize
+                    DividerText.TextXAlignment = Enum.TextXAlignment.Center
+                    DividerText.TextYAlignment = Enum.TextYAlignment.Center
+                    DividerText.BackgroundTransparency = 1
+                    DividerText.Size = UDim2.new(1, 0, 1, 0)
+                    DividerText.Position = UDim2.new(0.5, 0, 0.5, 0)
+                    DividerText.AnchorPoint = Vector2.new(0.5, 0.5)
+                    DividerText.Parent = DivParent
+                    DivParent.Size = UDim2.new(1,0,0, DividerText.TextBounds.Y + vPadding * 2)
+                else
+                    local DividerLine = Instance.new("Frame")
+                    DividerLine.Name = "DividerLine"
+                    DividerLine.BackgroundColor3 = lineColor
+                    DividerLine.BorderSizePixel = 0
+                    DividerLine.Size = UDim2.new(1, -lineEndsPadding * 2, 0, thickness)
+                    DividerLine.Position = UDim2.new(0, lineEndsPadding, 0.5, 0)
+                    DividerLine.AnchorPoint = Vector2.new(0, 0.5)
+                    DividerLine.Parent = DivParent
+                end
+
+                CountItem = CountItem + 1
+            end
 			function Items:AddParagraph(ParagraphConfig)
 				local ParagraphConfig = ParagraphConfig or {}
 				ParagraphConfig.Title = ParagraphConfig.Title or "Title"
@@ -1250,14 +1320,13 @@ function UBHubLib:MakeGui(GuiConfig)
 				local Paragraph = Instance.new("Frame");
 				local UICorner14 = Instance.new("UICorner");
 				local ParagraphTitle = Instance.new("TextLabel");
-				local ParagraphContent = Instance.new("TextLabel");
 
 				Paragraph.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 				Paragraph.BackgroundTransparency = 0.9350000023841858
 				Paragraph.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Paragraph.BorderSizePixel = 0
 				Paragraph.LayoutOrder = CountItem
-				Paragraph.Size = UDim2.new(1, 0, 0, 46)
+				Paragraph.Size = UDim2.new(1, 0, 0, 46) 
 				Paragraph.Name = "Paragraph"
 				Paragraph.Parent = SectionAdd
 
@@ -1268,6 +1337,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				ParagraphTitle.Text = ParagraphConfig.Title .. " | " .. ParagraphConfig.Content
 				ParagraphTitle.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
 				ParagraphTitle.TextSize = 13
+                ParagraphTitle.TextWrapped = true
 				ParagraphTitle.TextXAlignment = Enum.TextXAlignment.Left
 				ParagraphTitle.TextYAlignment = Enum.TextYAlignment.Top
 				ParagraphTitle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1275,28 +1345,28 @@ function UBHubLib:MakeGui(GuiConfig)
 				ParagraphTitle.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				ParagraphTitle.BorderSizePixel = 0
 				ParagraphTitle.Position = UDim2.new(0, 10, 0, 10)
-				ParagraphTitle.Size = UDim2.new(1, -16, 0, 13)
+				ParagraphTitle.Size = UDim2.new(1, -20, 0, 13) 
 				ParagraphTitle.Name = "ParagraphTitle"
 				ParagraphTitle.Parent = Paragraph
-				ParagraphTitle.Size = UDim2.new(1, -16, 0, 12 + (12 * (ParagraphTitle.TextBounds.X // ParagraphTitle.AbsoluteSize.X)))
-				Paragraph.Size = UDim2.new(1, 0, 0, ParagraphTitle.AbsoluteSize.Y + 30)
-				ParagraphTitle:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-					ParagraphTitle.TextWrapped = false
-					ParagraphTitle.Size = UDim2.new(1, -16, 0, 12 + (12 * (ParagraphTitle.TextBounds.X // ParagraphTitle.AbsoluteSize.X)))
-					Paragraph.Size = UDim2.new(1, 0, 0, ParagraphTitle.AbsoluteSize.Y + 30)
-					ParagraphTitle.TextWrapped = true
-					UpdateSizeSection()
-				end)
+				
+                local function UpdateParagraphSize()
+                    task.wait()
+                    local textBounds = ParagraphTitle.TextBounds
+                    local newHeight = textBounds.Y + 20 
+                    Paragraph.Size = UDim2.new(1, 0, 0, math.max(newHeight, 46))
+                    ParagraphTitle.Size = UDim2.new(1, -20, 0, textBounds.Y) 
+                    UpdateSizeSection()
+                end
+                
+                ParagraphTitle:GetPropertyChangedSignal("TextBounds"):Connect(UpdateParagraphSize)
+                UpdateParagraphSize() 
 
-				function ParagraphFunc:Set(ParagraphConfig)
-					local ParagraphConfig = ParagraphConfig or {}
-					ParagraphConfig.Title = ParagraphConfig.Title or "Title"
-					ParagraphConfig.Content = ParagraphConfig.Content or "Content"
-					ParagraphTitle.Text = ParagraphConfig.Title " | " .. ParagraphConfig.Content
-					ParagraphTitle.TextWrapped = false
-					ParagraphTitle.Size = UDim2.new(1, -16, 0, 12 + (12 // ParagraphTitle.AbsoluteSize.X))
-					ParagraphTitle.TextWrapped = true
-					Paragraph.Size = UDim2.new(1, 0, 0, ParagraphTitle.AbsoluteSize.Y + 30)
+				function ParagraphFunc:Set(NewParagraphConfig) 
+					NewParagraphConfig = NewParagraphConfig or {}
+					ParagraphConfig.Title = NewParagraphConfig.Title or ParagraphConfig.Title 
+					ParagraphConfig.Content = NewParagraphConfig.Content or ParagraphConfig.Content
+					ParagraphTitle.Text = ParagraphConfig.Title .. " | " .. ParagraphConfig.Content
+                    UpdateParagraphSize() 
 				end
 				CountItem = CountItem + 1
 				return ParagraphFunc
@@ -1351,6 +1421,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				ButtonContent.TextTransparency = 0.6000000238418579
 				ButtonContent.TextXAlignment = Enum.TextXAlignment.Left
 				ButtonContent.TextYAlignment = Enum.TextYAlignment.Bottom
+                ButtonContent.TextWrapped = true
 				ButtonContent.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 				ButtonContent.BackgroundTransparency = 0.9990000128746033
 				ButtonContent.BorderColor3 = Color3.fromRGB(0, 0, 0)
@@ -1360,17 +1431,16 @@ function UBHubLib:MakeGui(GuiConfig)
 				ButtonContent.Parent = Button
 				ButtonContent.Size = UDim2.new(1, -100, 0, 12)
 
-				ButtonContent.Size = UDim2.new(1, -100, 0, 12 + (12 * (ButtonContent.TextBounds.X // ButtonContent.AbsoluteSize.X)))
-				ButtonContent.TextWrapped = true
-				Button.Size = UDim2.new(1, 0, 0, ButtonContent.AbsoluteSize.Y + 33)
+                local function UpdateButtonFrameSize()
+                    task.wait()
+                    local contentHeight = ButtonContent.TextBounds.Y
+                    Button.Size = UDim2.new(1, 0, 0, math.max(46, 23 + contentHeight + 10)) 
+                    ButtonContent.Size = UDim2.new(1, -100, 0, contentHeight)
+                    UpdateSizeSection()
+                end
+                ButtonContent:GetPropertyChangedSignal("TextBounds"):Connect(UpdateButtonFrameSize)
+                UpdateButtonFrameSize()
 
-				ButtonContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-					ButtonContent.TextWrapped = false
-					ButtonContent.Size = UDim2.new(1, -100, 0, 12 + (12 * (ButtonContent.TextBounds.X // ButtonContent.AbsoluteSize.X)))
-					Button.Size = UDim2.new(1, 0, 0, ButtonContent.AbsoluteSize.Y + 33)
-					ButtonContent.TextWrapped = true
-					UpdateSizeSection()
-				end)
 
 				ButtonButton.Font = Enum.Font.SourceSans
 				ButtonButton.Text = ""
@@ -1418,17 +1488,13 @@ function UBHubLib:MakeGui(GuiConfig)
 				ToggleConfig.Content = ToggleConfig.Content or ""
 				ToggleConfig.Default = (ToggleConfig.Flag and Flags[ToggleConfig.Flag] ~= nil) and Flags[ToggleConfig.Flag] or ToggleConfig.Default or false                    
 				ToggleConfig.Callback = ToggleConfig.Callback or function() end
-				local ToggleFunc = {Value = ToggleConfig.Default, Options = ToggleConfig.Options, Selecting = ToggleConfig.Selecting}
+				local ToggleFunc = {Value = ToggleConfig.Default}
 
 				local Toggle = Instance.new("Frame");
 				local UICorner20 = Instance.new("UICorner");
 				local ToggleTitle = Instance.new("TextLabel");
 				local ToggleContent = Instance.new("TextLabel");
 				local ToggleButton = Instance.new("TextButton");
-				local Frame = Instance.new("Frame");
-				local ImageLabel3 = Instance.new("ImageLabel");
-				local UICorner21 = Instance.new("UICorner");
-				local TextButton = Instance.new("TextButton");
 				local FeatureFrame2 = Instance.new("Frame");
 				local UICorner22 = Instance.new("UICorner");
 				local UIStroke8 = Instance.new("UIStroke");
@@ -1469,6 +1535,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				ToggleContent.TextTransparency = 0.6000000238418579
 				ToggleContent.TextXAlignment = Enum.TextXAlignment.Left
 				ToggleContent.TextYAlignment = Enum.TextYAlignment.Bottom
+                ToggleContent.TextWrapped = true
 				ToggleContent.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 				ToggleContent.BackgroundTransparency = 0.9990000128746033
 				ToggleContent.BorderColor3 = Color3.fromRGB(0, 0, 0)
@@ -1478,17 +1545,16 @@ function UBHubLib:MakeGui(GuiConfig)
 				ToggleContent.Name = "ToggleContent"
 				ToggleContent.Parent = Toggle
 				
-				ToggleContent.Size = UDim2.new(1, -100, 0, 12 + (12 * (ToggleContent.TextBounds.X // ToggleContent.AbsoluteSize.X)))
-				ToggleContent.TextWrapped = true
-				Toggle.Size = UDim2.new(1, 0, 0, ToggleContent.AbsoluteSize.Y + 33)
+                local function UpdateToggleFrameSize()
+                    task.wait()
+                    local contentHeight = ToggleContent.TextBounds.Y
+                    Toggle.Size = UDim2.new(1, 0, 0, math.max(46, 23 + contentHeight + 10))
+                    ToggleContent.Size = UDim2.new(1, -100, 0, contentHeight)
+                    UpdateSizeSection()
+                end
+                ToggleContent:GetPropertyChangedSignal("TextBounds"):Connect(UpdateToggleFrameSize)
+                UpdateToggleFrameSize()
 
-				ToggleContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-					ToggleContent.TextWrapped = false
-					ToggleContent.Size = UDim2.new(1, -100, 0, 12 + (12 * (ToggleContent.TextBounds.X // ToggleContent.AbsoluteSize.X)))
-					Toggle.Size = UDim2.new(1, 0, 0, ToggleContent.AbsoluteSize.Y + 33)
-					ToggleContent.TextWrapped = true
-					UpdateSizeSection()
-				end)
 
 				ToggleButton.Font = Enum.Font.SourceSans
 				ToggleButton.Text = ""
@@ -1513,6 +1579,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				FeatureFrame2.Parent = Toggle
 
 				UICorner22.Parent = FeatureFrame2
+                UICorner22.CornerRadius = UDim.new(0,8) 
 
 				UIStroke8.Color = Color3.fromRGB(255, 255, 255)
 				UIStroke8.Thickness = 2
@@ -1522,8 +1589,9 @@ function UBHubLib:MakeGui(GuiConfig)
 				ToggleCircle.BackgroundColor3 = Color3.fromRGB(230.00000149011612, 230.00000149011612, 230.00000149011612)
 				ToggleCircle.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				ToggleCircle.BorderSizePixel = 0
-				ToggleCircle.Position = UDim2.new(0, 0, 0, 0)
 				ToggleCircle.Size = UDim2.new(0, 14, 0, 14)
+                ToggleCircle.AnchorPoint = Vector2.new(0,0.5)
+                ToggleCircle.Position = UDim2.new(0,0.5,0.5,0) 
 				ToggleCircle.Name = "ToggleCircle"
 				ToggleCircle.Parent = FeatureFrame2
 
@@ -1540,48 +1608,17 @@ function UBHubLib:MakeGui(GuiConfig)
 				end)
 				function ToggleFunc:Set(Value)
 					ToggleConfig.Callback(Value)
+                    local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 					if Value then
-						TweenService:Create(
-							ToggleTitle,
-							TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-							{TextColor3 = GuiConfig.Color}
-						):Play()
-						TweenService:Create(
-							ToggleCircle,
-							TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-							{Position = UDim2.new(0, 15, 0, 0)}
-						):Play()
-						TweenService:Create(
-							UIStroke8,
-							TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-							{Color = GuiConfig.Color, Transparency = 0}
-						):Play()
-						TweenService:Create(
-							FeatureFrame2,
-							TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-							{BackgroundColor3 = GuiConfig.Color, BackgroundTransparency = 0} 
-						):Play()
+						TweenService:Create(ToggleTitle, tweenInfo, {TextColor3 = GuiConfig.Color}):Play()
+						TweenService:Create(ToggleCircle, tweenInfo, {Position = UDim2.new(1, -ToggleCircle.AbsoluteSize.X - 0.5, 0.5, 0)}):Play()
+						TweenService:Create(UIStroke8, tweenInfo, {Color = GuiConfig.Color, Transparency = 0}):Play()
+						TweenService:Create(FeatureFrame2, tweenInfo, {BackgroundColor3 = GuiConfig.Color, BackgroundTransparency = 0}):Play()
 					else
-						TweenService:Create(
-							ToggleTitle,
-							TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-							{TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)}
-						):Play()
-						TweenService:Create(
-							ToggleCircle,
-							TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-							{Position = UDim2.new(0, 0, 0, 0)}
-						):Play()
-						TweenService:Create(
-							UIStroke8,
-							TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-							{Color = Color3.fromRGB(255, 255, 255), Transparency = 0.9}
-						):Play()
-						TweenService:Create(
-							FeatureFrame2,
-							TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-							{BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.9200000166893005}
-						):Play()
+						TweenService:Create(ToggleTitle, tweenInfo, {TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)}):Play()
+						TweenService:Create(ToggleCircle, tweenInfo, {Position = UDim2.new(0, 0.5, 0.5, 0)}):Play()
+						TweenService:Create(UIStroke8, tweenInfo, {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.9}):Play()
+						TweenService:Create(FeatureFrame2, tweenInfo, {BackgroundColor3 = Colours.Secondary, BackgroundTransparency = 0.9200000166893005}):Play()
 					end
 				end
 				ToggleFunc:Set(ToggleFunc.Value)
@@ -1595,7 +1632,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				SliderConfig.Increment = SliderConfig.Increment or 1
 				SliderConfig.Min = SliderConfig.Min or 0
 				SliderConfig.Max = SliderConfig.Max or 100
-				SliderConfig.Default = SliderConfig.Default or 50
+				SliderConfig.Default = (SliderConfig.Flag and Flags[SliderConfig.Flag] ~= nil) and Flags[SliderConfig.Flag] or SliderConfig.Default or SliderConfig.Min
 				SliderConfig.Callback = SliderConfig.Callback or function() end
 				local SliderFunc = {Value = SliderConfig.Default}
 	
@@ -1606,15 +1643,13 @@ function UBHubLib:MakeGui(GuiConfig)
 				local SliderInput = Instance.new("Frame");
 				local UICorner16 = Instance.new("UICorner");
 				local TextBox = Instance.new("TextBox");
-				local SliderFrame = Instance.new("Frame");
+				local SliderFrame = Instance.new("Frame"); 
 				local UICorner17 = Instance.new("UICorner");
-				local SliderDraggable = Instance.new("Frame");
+				local SliderDraggable = Instance.new("Frame"); 
 				local UICorner18 = Instance.new("UICorner");
-				local UIStroke5 = Instance.new("UIStroke");
-				local SliderCircle = Instance.new("Frame");
+				local SliderCircle = Instance.new("Frame"); 
 				local UICorner19 = Instance.new("UICorner");
-				local UIStroke6 = Instance.new("UIStroke");
-				local UIStroke7 = Instance.new("UIStroke");
+				local UIStroke6 = Instance.new("UIStroke"); 
 
 				Slider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 				Slider.BackgroundTransparency = 0.9350000023841858
@@ -1648,6 +1683,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				SliderContent.TextColor3 = Color3.fromRGB(255, 255, 255)
 				SliderContent.TextSize = 12
 				SliderContent.TextTransparency = 0.6000000238418579
+                SliderContent.TextWrapped = true
 				SliderContent.TextXAlignment = Enum.TextXAlignment.Left
 				SliderContent.TextYAlignment = Enum.TextYAlignment.Bottom
 				SliderContent.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1659,17 +1695,16 @@ function UBHubLib:MakeGui(GuiConfig)
 				SliderContent.Name = "SliderContent"
 				SliderContent.Parent = Slider
 
-				SliderContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (SliderContent.TextBounds.X // SliderContent.AbsoluteSize.X)))
-				SliderContent.TextWrapped = true
-				Slider.Size = UDim2.new(1, 0, 0, SliderContent.AbsoluteSize.Y + 33)
+                local function UpdateSliderFrameSize()
+                    task.wait()
+                    local contentHeight = SliderContent.TextBounds.Y
+                    Slider.Size = UDim2.new(1, 0, 0, math.max(46, 23 + contentHeight + 10))
+                    SliderContent.Size = UDim2.new(1, -180, 0, contentHeight)
+                    UpdateSizeSection()
+                end
+                SliderContent:GetPropertyChangedSignal("TextBounds"):Connect(UpdateSliderFrameSize)
+                UpdateSliderFrameSize()
 
-				SliderContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-					SliderContent.TextWrapped = false
-					SliderContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (SliderContent.TextBounds.X // SliderContent.AbsoluteSize.X)))
-					Slider.Size = UDim2.new(1, 0, 0, SliderContent.AbsoluteSize.Y + 33)
-					SliderContent.TextWrapped = true
-					UpdateSizeSection()
-				end)
 
 				SliderInput.AnchorPoint = Vector2.new(0, 0.5)
 				SliderInput.BackgroundColor3 = Colours.Accent
@@ -1684,7 +1719,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				UICorner16.Parent = SliderInput
 
 				TextBox.Font = Enum.Font.GothamBold
-				TextBox.Text = SliderConfig.Default
+				TextBox.Text = tostring(SliderConfig.Default)
 				TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 				TextBox.TextSize = 13
 				TextBox.TextWrapped = true
@@ -1707,17 +1742,19 @@ function UBHubLib:MakeGui(GuiConfig)
 				SliderFrame.Parent = Slider
 
 				UICorner17.Parent = SliderFrame
+                UICorner17.CornerRadius = UDim.new(0,3) 
 
 				SliderDraggable.AnchorPoint = Vector2.new(0, 0.5)
 				SliderDraggable.BackgroundColor3 = Colours.Accent
 				SliderDraggable.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				SliderDraggable.BorderSizePixel = 0
 				SliderDraggable.Position = UDim2.new(0, 0, 0.5, 0)
-				SliderDraggable.Size = UDim2.new(0.899999976, 0, 0, 1)
+				SliderDraggable.Size = UDim2.new(0.899999976, 0, 1, 0) 
 				SliderDraggable.Name = "SliderDraggable"
 				SliderDraggable.Parent = SliderFrame
 
 				UICorner18.Parent = SliderDraggable
+                UICorner18.CornerRadius = UDim.new(0,3) 
 
 				SliderCircle.AnchorPoint = Vector2.new(1, 0.5)
 				SliderCircle.BackgroundColor3 = Colours.ThemeHighlight
@@ -1729,23 +1766,23 @@ function UBHubLib:MakeGui(GuiConfig)
 				SliderCircle.Parent = SliderDraggable
 
 				UICorner19.Parent = SliderCircle
+                UICorner19.CornerRadius = UDim.new(0,8) 
 
 				UIStroke6.Color = GuiConfig.Color
 				UIStroke6.Parent = SliderCircle
 
 				local Dragging = false
-				local LastPos = nil
+                local DragInputObject = nil 
+
 				local function Round(Number, Factor)
-					local Result = math.floor(Number/Factor + (math.sign(Number) * 0.5)) * Factor
-					if Result < 0 then 
-						Result = Result + Factor 
-					end
-					return Result
+					return math.floor(Number/Factor + 0.5) * Factor
 				end
-				function SliderFunc:Set(Value)
+                
+				function SliderFunc:Set(Value, fromInput)
+                    fromInput = fromInput or false
 					Value = math.clamp(Round(Value, SliderConfig.Increment), SliderConfig.Min, SliderConfig.Max)
-					if self.Value ~= Value then
-						self.Value = Value
+					if SliderFunc.Value ~= Value or fromInput then
+						SliderFunc.Value = Value
 						local formatValue = Value
 						if SliderConfig.Increment < 1 then
 							local decimalPlaces = math.max(0, -math.floor(math.log10(SliderConfig.Increment)))
@@ -1753,40 +1790,58 @@ function UBHubLib:MakeGui(GuiConfig)
 						end
 						TextBox.Text = tostring(formatValue)
 						local scale = (Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
-						if Dragging then
+                        scale = math.clamp(scale,0,1) 
+
+						if Dragging or fromInput then 
 							SliderDraggable.Size = UDim2.fromScale(scale, 1)
 						else
 							TweenService:Create(SliderDraggable,TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{Size = UDim2.fromScale(scale, 1)}):Play()
 						end
-						SliderConfig.Callback(self.Value)
+						SliderConfig.Callback(SliderFunc.Value)
+                        if SliderConfig.Flag and typeof(SliderConfig.Flag) == "string" then
+                            SaveFile(SliderConfig.Flag, SliderFunc.Value)
+                        end
 					end
 				end
+
 				SliderFrame.InputBegan:Connect(function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
+					if not Dragging and (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then 
 						Dragging = true
-						local SizeScale
-						if Input.UserInputType == Enum.UserInputType.Touch then
-							SizeScale = math.clamp((Input.Position.X - SliderFrame.AbsolutePosition.X) / SliderFrame.AbsoluteSize.X, 0, 1)
-						else
-							SizeScale = math.clamp((Input.Position.X - SliderFrame.AbsolutePosition.X) / SliderFrame.AbsoluteSize.X, 0, 1)
-						end
+                        DragInputObject = Input
+
+						local frameAbsPos = SliderFrame.AbsolutePosition
+						local frameAbsSizeX = SliderFrame.AbsoluteSize.X
+						local pressPosX = Input.Position.X
+						local relativeX = pressPosX - frameAbsPos.X
+						local SizeScale = math.clamp(relativeX / frameAbsSizeX, 0, 1)
 						SliderFunc:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * SizeScale))
 					end 
 				end)
-				SliderFrame.InputEnded:Connect(function(Input) 
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
-						Dragging = false 
-						SliderConfig.Callback(SliderFunc.Value)
-					end 
-				end)
-				UserInputService.InputChanged:Connect(function(Input)
-					if Dragging and Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch then 
-						local SizeScale = math.clamp((Input.Position.X - SliderFrame.AbsolutePosition.X) / SliderFrame.AbsoluteSize.X, 0, 1)
-						SliderFunc:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * SizeScale)) 
+                
+                UserInputService.InputChanged:Connect(function(Input)
+					if Dragging and Input == DragInputObject then 
+						if Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch then 
+							local frameAbsPos = SliderFrame.AbsolutePosition
+							local frameAbsSizeX = SliderFrame.AbsoluteSize.X
+							local currentPosX = Input.Position.X
+							local relativeX = currentPosX - frameAbsPos.X
+							local SizeScale = math.clamp(relativeX / frameAbsSizeX, 0, 1)
+							SliderFunc:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * SizeScale))
+						end
 					end
 				end)
+
+				UserInputService.InputEnded:Connect(function(Input) 
+					if Dragging and Input == DragInputObject then 
+						if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
+							Dragging = false 
+                            DragInputObject = nil
+						end 
+					end 
+				end)
+
 				TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-					local pattern = SliderConfig.Min < 0 and "[^-%d.]" or "[^%d.]"
+					local pattern = SliderConfig.Min < 0 and "[^-%d%.]" or "[^%d%.]" 
 					local Valid = TextBox.Text:gsub(pattern, "")
 					local decimalCount = select(2, Valid:gsub("%.", ""))
 					if decimalCount > 1 then
@@ -1795,16 +1850,21 @@ function UBHubLib:MakeGui(GuiConfig)
 					if Valid:match("^0%d") and not Valid:match("^0%.") then
 						Valid = Valid:sub(2)
 					end
-					TextBox.Text = Valid
+                    if Valid ~= TextBox.Text then 
+					    TextBox.Text = Valid
+                    end
 				end)
-				TextBox.FocusLost:Connect(function()
-					if TextBox.Text ~= "" then
-						SliderFunc:Set(tonumber(TextBox.Text) or SliderConfig.Min)
-					else
-						SliderFunc:Set(SliderConfig.Min)
-					end
+				TextBox.FocusLost:Connect(function(enterPressed)
+                    if enterPressed or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then 
+                        local numVal = tonumber(TextBox.Text)
+                        if numVal ~= nil then
+                            SliderFunc:Set(numVal, true)
+                        else
+                            SliderFunc:Set(SliderConfig.Min, true) 
+                        end
+                    end
 				end)
-				SliderFunc:Set(tonumber(SliderConfig.Default))
+				SliderFunc:Set(tonumber(SliderConfig.Default), true) 
 				CountItem = CountItem + 1
 				return SliderFunc
 			end
@@ -1812,8 +1872,9 @@ function UBHubLib:MakeGui(GuiConfig)
 				local InputConfig = InputConfig or {}
 				InputConfig.Title = InputConfig.Title or "Title"
 				InputConfig.Content = InputConfig.Content or "Content"
+                InputConfig.Default = (InputConfig.Flag and Flags[InputConfig.Flag] ~= nil) and Flags[InputConfig.Flag] or InputConfig.Default or ""
 				InputConfig.Callback = InputConfig.Callback or function() end
-				local InputFunc = {Value = InputConfig.Default, Options = InputConfig.Options, Selecting = InputConfig.Selecting}
+				local InputFunc = {Value = InputConfig.Default}
 				local Input = Instance.new("Frame");
 				local UICorner12 = Instance.new("UICorner");
 				local InputTitle = Instance.new("TextLabel");
@@ -1866,17 +1927,16 @@ function UBHubLib:MakeGui(GuiConfig)
 				InputContent.Name = "InputContent"
 				InputContent.Parent = Input
 
-				InputContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (InputContent.TextBounds.X // InputContent.AbsoluteSize.X)))
-				InputContent.TextWrapped = true
-				Input.Size = UDim2.new(1, 0, 0, InputContent.AbsoluteSize.Y + 33)
+                local function UpdateInputFrameSize()
+                    task.wait()
+                    local contentHeight = InputContent.TextBounds.Y
+                    Input.Size = UDim2.new(1, 0, 0, math.max(46, 23 + contentHeight + 10))
+                    InputContent.Size = UDim2.new(1, -180, 0, contentHeight)
+                    UpdateSizeSection()
+                end
+                InputContent:GetPropertyChangedSignal("TextBounds"):Connect(UpdateInputFrameSize)
+                UpdateInputFrameSize()
 
-				InputContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-					InputContent.TextWrapped = false
-					InputContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (InputContent.TextBounds.X // InputContent.AbsoluteSize.X)))
-					Input.Size = UDim2.new(1, 0, 0, InputContent.AbsoluteSize.Y + 33)
-					InputContent.TextWrapped = true
-					UpdateSizeSection()
-				end)
 
 				InputFrame.AnchorPoint = Vector2.new(1, 0.5)
 				InputFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1896,7 +1956,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				InputTextBox.Font = Enum.Font.GothamBold
 				InputTextBox.PlaceholderColor3 = Color3.fromRGB(120.00000044703484, 120.00000044703484, 120.00000044703484)
 				InputTextBox.PlaceholderText = "Write your input there"
-				InputTextBox.Text = tostring((InputConfig.Flag and Flags[InputConfig.Flag] ~= nil) and Flags[InputConfig.Flag] or InputConfig.Default or "Not Set")
+				InputTextBox.Text = tostring(InputFunc.Value)
 				InputTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 				InputTextBox.TextSize = 12
 				InputTextBox.TextXAlignment = Enum.TextXAlignment.Left
@@ -1910,15 +1970,17 @@ function UBHubLib:MakeGui(GuiConfig)
 				InputTextBox.Name = "InputTextBox"
 				InputTextBox.Parent = InputFrame
 				function InputFunc:Set(Value)
-					InputTextBox.Text = Value
-					InputFunc.Value = Value
+					InputTextBox.Text = tostring(Value) 
+					InputFunc.Value = Value 
 					InputConfig.Callback(Value)
 					if InputConfig.Flag and typeof(InputConfig.Flag) == "string" then
 						SaveFile(InputConfig.Flag,InputFunc.Value)
 					end
 				end
-				InputTextBox.FocusLost:Connect(function()
-					InputFunc:Set(InputTextBox.Text)
+				InputTextBox.FocusLost:Connect(function(enterPressed)
+                    if enterPressed then
+					    InputFunc:Set(InputTextBox.Text)
+                    end
 				end)
 				CountItem = CountItem + 1
 				return InputFunc
@@ -1930,11 +1992,12 @@ function UBHubLib:MakeGui(GuiConfig)
 				DropdownConfig.Multi = DropdownConfig.Multi or false
 				DropdownConfig.Options = DropdownConfig.Options or {}
 				local savedValue = DropdownConfig.Flag and Flags[DropdownConfig.Flag]
-				local isMulti = DropdownConfig.Multi
-				if isMulti then
+
+				if DropdownConfig.Multi then
 					DropdownConfig.Default = (savedValue and type(savedValue) == "table") and savedValue or (type(DropdownConfig.Default) == "table" and DropdownConfig.Default or {})
 				else
-					DropdownConfig.Default = savedValue or DropdownConfig.Default
+                    local defaultSingle = type(savedValue) == "table" and savedValue[1] or savedValue
+					DropdownConfig.Default = defaultSingle or DropdownConfig.Default
 				end
 				DropdownConfig.Callback = DropdownConfig.Callback or function() end
 
@@ -1968,7 +2031,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				DropdownButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				DropdownButton.BorderSizePixel = 0
 				DropdownButton.Size = UDim2.new(1, 0, 1, 0)
-				DropdownButton.Name = "ToggleButton"
+				DropdownButton.Name = "DropdownActivationButton"
 				DropdownButton.Parent = Dropdown
 
 				UICorner10.CornerRadius = UDim.new(0, 4)
@@ -2006,17 +2069,16 @@ function UBHubLib:MakeGui(GuiConfig)
 				DropdownContent.Name = "DropdownContent"
 				DropdownContent.Parent = Dropdown
 
-				DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (DropdownContent.TextBounds.X // DropdownContent.AbsoluteSize.X)))
-				DropdownContent.TextWrapped = true
-				Dropdown.Size = UDim2.new(1, 0, 0, DropdownContent.AbsoluteSize.Y + 33)
+                local function UpdateDropdownFrameSize()
+                    task.wait()
+                    local contentHeight = DropdownContent.TextBounds.Y
+                    Dropdown.Size = UDim2.new(1, 0, 0, math.max(46, 23 + contentHeight + 10))
+                    DropdownContent.Size = UDim2.new(1, -180, 0, contentHeight)
+                    UpdateSizeSection()
+                end
+                DropdownContent:GetPropertyChangedSignal("TextBounds"):Connect(UpdateDropdownFrameSize)
+                UpdateDropdownFrameSize()
 
-				DropdownContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-					DropdownContent.TextWrapped = false
-					DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (DropdownContent.TextBounds.X // DropdownContent.AbsoluteSize.X)))
-					Dropdown.Size = UDim2.new(1, 0, 0, DropdownContent.AbsoluteSize.Y + 33)
-					DropdownContent.TextWrapped = true
-					UpdateSizeSection()
-				end)
 
 				SelectOptionsFrame.AnchorPoint = Vector2.new(1, 0.5)
 				SelectOptionsFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -2032,42 +2094,17 @@ function UBHubLib:MakeGui(GuiConfig)
 				UICorner11.CornerRadius = UDim.new(0, 4)
 				UICorner11.Parent = SelectOptionsFrame
 
+				local ScrollSelect = Instance.new("ScrollingFrame"); -- Moved up for SearchBar access
+				local SearchBar = Instance.new("TextBox") -- Moved up
+
 				DropdownButton.Activated:Connect(function()
 					if not MoreBlur.Visible then
 						MoreBlur.Visible = true 
 						DropPageLayout:JumpToIndex(SelectOptionsFrame.LayoutOrder)
+                        SearchBar.Text = "" -- Clear search bar
+                        ScrollSelect.CanvasPosition = Vector2.new(0,0) -- Reset scroll
 						TweenService:Create(MoreBlur, TweenInfo.new(0.01), {BackgroundTransparency = 0.7}):Play()
 						TweenService:Create(DropdownSelect, TweenInfo.new(0.01), {Position = UDim2.new(1, -11, 0.5, 0)}):Play()
-						if DropdownConfig.Flag and typeof(DropdownConfig.Flag) == "string" then
-							local valueToSave
-							if DropdownConfig.Multi then
-								valueToSave = {}
-								if typeof(DropdownFunc.Value) == "table" then
-									for _, v in pairs(DropdownFunc.Value) do
-										if v ~= nil then
-											table.insert(valueToSave, tostring(v))
-										end
-									end
-								end
-							else
-								valueToSave = {}
-								if typeof(DropdownFunc.Value) == "table" and #DropdownFunc.Value > 0 then
-									table.insert(valueToSave, tostring(DropdownFunc.Value[1]))
-								end
-							end
-							Flags[DropdownConfig.Flag] = valueToSave
-							local success, err = pcall(function()
-								local jsonData = HttpService:JSONEncode(Flags)
-								print("[JSON|SAVER] Prepare:", jsonData)
-								writefile(GuiConfig.SaveFolder, jsonData)
-								if isfile(GuiConfig.SaveFolder) then
-									local content = readfile(GuiConfig.SaveFolder)
-								end
-							end)
-							if not success then
-								warn("[Save Failed]", err)
-							end
-						end
 					end
 				end)
 
@@ -2100,7 +2137,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				OptionImg.Name = "OptionImg"
 				OptionImg.Parent = SelectOptionsFrame
 
-				local ScrollSelect = Instance.new("ScrollingFrame");
+				-- local ScrollSelect = Instance.new("ScrollingFrame"); -- Already declared above
 				local UIListLayout4 = Instance.new("UIListLayout");
 
 				ScrollSelect.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -2116,28 +2153,37 @@ function UBHubLib:MakeGui(GuiConfig)
 				ScrollSelect.Name = "ScrollSelect"
 				ScrollSelect.Parent = DropdownFolder
 
-				local SearchBar = Instance.new("TextBox")
+				-- local SearchBar = Instance.new("TextBox") -- Already declared above
 				SearchBar.Font = Enum.Font.GothamBold
-				SearchBar.PlaceholderText = "Search There"
-				SearchBar.PlaceholderColor3 = Color3.fromRGB(255, 255, 255)
+				SearchBar.PlaceholderText = "Search 🔎" 
+				SearchBar.PlaceholderColor3 = Color3.fromRGB(150, 150, 150) 
 				SearchBar.Text = ""
 				SearchBar.TextColor3 = Color3.fromRGB(255, 255, 255)
 				SearchBar.TextSize = 12
-				SearchBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-				SearchBar.BackgroundTransparency = 0.9
-				SearchBar.BorderColor3 = Color3.fromRGB(255, 255, 255)
+				SearchBar.BackgroundColor3 = Colours.Secondary 
+				SearchBar.BackgroundTransparency = 0.5
+				SearchBar.BorderColor3 = Colours.Stroke
 				SearchBar.BorderSizePixel = 1
 				SearchBar.Size = UDim2.new(1, 0, 0, 20)
+                SearchBar.LayoutOrder = -1 
 				SearchBar.Parent = ScrollSelect
 
 				SearchBar:GetPropertyChangedSignal("Text"):Connect(function()
 					local searchText = SearchBar.Text:lower()
-					for _, optionFrame in pairs(ScrollSelect:GetChildren()) do
+					for _, optionFrame in ipairs(ScrollSelect:GetChildren()) do
 						if optionFrame:IsA("Frame") and optionFrame.Name == "Option" then
 							local optionText = optionFrame.OptionText.Text:lower()
 							optionFrame.Visible = optionText:find(searchText) ~= nil
 						end
 					end
+                    task.wait()
+                    local visibleOffsetY = SearchBar.AbsoluteSize.Y + UIListLayout4.Padding.Offset
+                    for _, child in ipairs(ScrollSelect:GetChildren()) do
+                        if child:IsA("GuiObject") and child ~= SearchBar and child ~= UIListLayout4 and child.Visible then
+                            visibleOffsetY = visibleOffsetY + child.AbsoluteSize.Y + UIListLayout4.Padding.Offset
+                        end
+                    end
+                    ScrollSelect.CanvasSize = UDim2.new(0,0,0, visibleOffsetY)
 				end)
 				UIListLayout4.Padding = UDim.new(0, 3)
 				UIListLayout4.SortOrder = Enum.SortOrder.LayoutOrder
@@ -2145,18 +2191,21 @@ function UBHubLib:MakeGui(GuiConfig)
 
 				local DropCount = 0
 				function DropdownFunc:Clear()
-					for _, DropFrame in ScrollSelect:GetChildren() do
+					for _, DropFrame in ipairs(ScrollSelect:GetChildren()) do
 						if DropFrame.Name == "Option" then
-							DropdownFunc.Value = {}
-							DropdownFunc.Options = {}
-							OptionSelecting.Text = "Select Options"
 							DropFrame:Destroy()
 						end
 					end
+                    DropdownFunc.Value = DropdownConfig.Multi and {} or nil
+					DropdownFunc.Options = {}
+					OptionSelecting.Text = "Select Options"
+                    DropCount = 0
+                    ScrollSelect.CanvasSize = UDim2.new(0,0,0,SearchBar.AbsoluteSize.Y + UIListLayout4.Padding.Offset) 
 				end
-				function DropdownFunc:AddOption(OptionName)
+				function DropdownFunc:AddOption(OptionName, IsDefault)
 					OptionName = OptionName or "Option"
 					local Option = Instance.new("Frame");
+                    Option.InitialLayoutOrder = DropCount 
 					local UICorner37 = Instance.new("UICorner");
 					local OptionButton = Instance.new("TextButton");
 					local OptionText = Instance.new("TextLabel")
@@ -2168,7 +2217,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					Option.BackgroundTransparency = 0.999
 					Option.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					Option.BorderSizePixel = 0
-					Option.LayoutOrder = DropCount
+					Option.LayoutOrder = Option.InitialLayoutOrder 
 					Option.Size = UDim2.new(1, 0, 0, 30)
 					Option.Name = "Option"
 					Option.Parent = ScrollSelect
@@ -2194,12 +2243,13 @@ function UBHubLib:MakeGui(GuiConfig)
 					OptionText.TextSize = 13
 					OptionText.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
 					OptionText.TextXAlignment = Enum.TextXAlignment.Left
-					OptionText.TextYAlignment = Enum.TextYAlignment.Top
+					OptionText.TextYAlignment = Enum.TextYAlignment.Center 
+                    OptionText.Position = UDim2.new(0, 8, 0.5, 0) 
+                    OptionText.AnchorPoint = Vector2.new(0, 0.5)
 					OptionText.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					OptionText.BackgroundTransparency = 0.9990000128746033
 					OptionText.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					OptionText.BorderSizePixel = 0
-					OptionText.Position = UDim2.new(0, 8, 0, 8)
 					OptionText.Size = UDim2.new(1, -100, 0, 13)
 					OptionText.Name = "OptionText"
 					OptionText.Parent = Option
@@ -2219,71 +2269,108 @@ function UBHubLib:MakeGui(GuiConfig)
 					UIStroke15.Parent = ChooseFrame
 				
 					UICorner38.Parent = ChooseFrame
+                    UICorner38.CornerRadius = UDim.new(0,2) 
+
 					OptionButton.Activated:Connect(function()
 						CircleClick(OptionButton, Mouse.X, Mouse.Y) 
 						if DropdownConfig.Multi then
-							if Option.BackgroundTransparency > 0.95 then
+                            local foundIndex = table.find(DropdownFunc.Value, OptionName)
+							if not foundIndex then
 								table.insert(DropdownFunc.Value, OptionName)
-								DropdownFunc:Set(DropdownFunc.Value)
 							else
-								for i, value in pairs(DropdownFunc.Value) do
-									if value == OptionName then
-										table.remove(DropdownFunc.Value, i)
-										break
-									end
-								end
-								DropdownFunc:Set(DropdownFunc.Value)
+								table.remove(DropdownFunc.Value, foundIndex)
 							end
-						else
-							DropdownFunc.Value = {OptionName}
 							DropdownFunc:Set(DropdownFunc.Value)
+						else
+							DropdownFunc.Value = OptionName 
+							DropdownFunc:Set(DropdownFunc.Value)
+                            if MoreBlur.Visible then
+                                ConnectButton.Activated:Fire() 
+                            end
 						end
 					end)
-					local OffsetY = 0
-					for _, child in ScrollSelect:GetChildren() do
-						if child.Name ~= "UIListLayout" then
-							OffsetY = OffsetY + 3 + child.Size.Y.Offset
+					local OffsetY = SearchBar.AbsoluteSize.Y + UIListLayout4.Padding.Offset
+					for _, child in ipairs(ScrollSelect:GetChildren()) do
+						if child:IsA("GuiObject") and child ~= SearchBar and child ~= UIListLayout4 and child.Visible then
+							OffsetY = OffsetY + child.AbsoluteSize.Y + UIListLayout4.Padding.Offset
 						end
 					end
 					ScrollSelect.CanvasSize = UDim2.new(0, 0, 0, OffsetY)
 					DropCount = DropCount + 1
 				end
 				function DropdownFunc:Set(Value)
-					DropdownFunc.Value = Value or DropdownFunc.Value
-					for _, Drop in pairs(ScrollSelect:GetChildren()) do
+					DropdownFunc.Value = Value
+
+					for _, Drop in ipairs(ScrollSelect:GetChildren()) do
 						if Drop:IsA("Frame") and Drop.Name == "Option" then
-							local isTextFound = table.find(DropdownFunc.Value, Drop.OptionText.Text)
+                            local isSelected
+                            if DropdownConfig.Multi then
+                                isSelected = table.find(DropdownFunc.Value, Drop.OptionText.Text)
+                            else
+                                isSelected = (DropdownFunc.Value == Drop.OptionText.Text)
+                            end
+
 							local tweenInfoInOut = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
-							local Size = isTextFound and UDim2.new(0, 1, 0, 12) or UDim2.new(0, 0, 0, 0)
-							local BackgroundTransparency = isTextFound and 0.935 or 0.999
-							local Transparency = isTextFound and 0 or 0.999
+							local Size = isSelected and UDim2.new(0, 1, 0, 12) or UDim2.new(0, 0, 0, 0)
+							local BackgroundTransparency = isSelected and 0.935 or 0.999
+							local StrokeTransparency = isSelected and 0 or 0.999
 							TweenService:Create(Drop.ChooseFrame, tweenInfoInOut, {Size = Size}):Play()
-							TweenService:Create(Drop.ChooseFrame.UIStroke, tweenInfoInOut, {Transparency = Transparency}):Play()
+							TweenService:Create(Drop.ChooseFrame.UIStroke, tweenInfoInOut, {Transparency = StrokeTransparency}):Play()
 							TweenService:Create(Drop, tweenInfoInOut, {BackgroundTransparency = BackgroundTransparency}):Play()
+
+                            if DropdownConfig.Multi then 
+                                if isSelected then
+                                    Drop.LayoutOrder = -10000 + Drop.InitialLayoutOrder 
+                                else
+                                    Drop.LayoutOrder = Drop.InitialLayoutOrder 
+                                end
+                            end
 						end
 					end
-					local DropdownValueTable = table.concat(DropdownFunc.Value, ", ")
-					if DropdownValueTable == "" then
-						OptionSelecting.Text = "Select Options"
-					else
-						OptionSelecting.Text = tostring(DropdownValueTable)
-					end
+                    
+                    if DropdownConfig.Multi then
+                        local selectedCount = #DropdownFunc.Value
+                        if selectedCount == 0 then
+                            OptionSelecting.Text = "Select Options"
+                        else
+                            OptionSelecting.Text = selectedCount .. (selectedCount == 1 and " item selected" or " items selected")
+                        end
+                    else 
+                        if DropdownFunc.Value and DropdownFunc.Value ~= "" then
+                            OptionSelecting.Text = tostring(DropdownFunc.Value)
+                        else
+                            OptionSelecting.Text = "Select Options"
+                        end
+                    end
+
 					DropdownConfig.Callback(DropdownFunc.Value)
+                    if DropdownConfig.Flag and typeof(DropdownConfig.Flag) == "string" then
+                        local valueToSave
+                        if DropdownConfig.Multi then
+                            valueToSave = DropdownFunc.Value 
+                        else
+                            valueToSave = {DropdownFunc.Value} 
+                        end
+                        SaveFile(DropdownConfig.Flag, valueToSave)
+                    end
 				end
 				function DropdownFunc:Refresh(RefreshList, Selecting)
-					local currentValue = savedValue or DropdownConfig.Default
+                    local currentValue
+                    if DropdownConfig.Multi then
+                        currentValue = (savedValue and type(savedValue) == "table") and savedValue or (type(DropdownConfig.Default) == "table" and DropdownConfig.Default or {})
+                    else
+                         local defaultSingle = type(savedValue) == "table" and savedValue[1] or savedValue
+					    currentValue = defaultSingle or DropdownConfig.Default
+                    end
+
 					RefreshList = RefreshList or {}
 					Selecting = Selecting or currentValue
-					local children = ScrollSelect:GetChildren()
-					for i = #children, 1, -1 do
-						if children[i].Name == "Option" then
-							children[i]:Destroy()
-						end
-					end
-					DropdownFunc.Value = nil
-					DropdownFunc.Options = {}
-					for _, Drop in pairs(RefreshList) do
-						DropdownFunc:AddOption(Drop)
+
+                    DropdownFunc:Clear() 
+                    DropdownFunc.Value = DropdownConfig.Multi and {} or nil 
+
+					for _, DropName in ipairs(RefreshList) do
+						DropdownFunc:AddOption(DropName)
 					end
 					DropdownFunc.Options = RefreshList
 					DropdownFunc:Set(Selecting)
