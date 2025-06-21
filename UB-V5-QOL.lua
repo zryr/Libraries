@@ -5,6 +5,52 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Mouse = LocalPlayer:GetMouse()
 
+-- Lucide Icon Library Loading & GetIcon Helper
+local LucideLib = nil
+local HttpServiceForLucide = game:GetService("HttpService") -- Use a distinct name
+
+if HttpServiceForLucide and type(game.HttpGet) == "function" then
+    local HttpGetSuccess, LucideScript = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jules/Lucide-Source.lua")
+    if HttpGetSuccess and type(LucideScript) == "string" and LucideScript ~= "" then
+        local LoadSuccess, LoadedFunc = pcall(loadstring(LucideScript))
+        if LoadSuccess and type(LoadedFunc) == "function" then
+            local ExecSuccess, ReturnedMod = pcall(LoadedFunc)
+            if ExecSuccess and type(ReturnedMod) == "table" and type(ReturnedMod.GetIcon) == "function" then
+                LucideLib = ReturnedMod
+                print("UB Hub: Lucide icon library loaded successfully.")
+            else
+                warn("UB Hub: Lucide script execution failed or returned invalid module. Error:", ReturnedMod)
+            end
+        else
+            warn("UB Hub: Failed to loadstring Lucide script. Error:", LoadedFunc)
+        end
+    else
+        warn("UB Hub: Failed to HttpGet Lucide script. Success:", HttpGetSuccess, "Script:", LucideScript)
+    end
+else
+    warn("UB Hub: HttpService or game:HttpGet is not available. Lucide icons will not be loaded.")
+end
+
+local function GetIcon(iconName)
+    if not iconName or type(iconName) ~= "string" or iconName == "" then
+        return ""
+    end
+
+    if string.sub(iconName, 1, 7):lower() == "lucide:" then
+        if LucideLib and type(LucideLib.GetIcon) == "function" then
+            local actualName = string.sub(iconName, 8)
+            if actualName == "" then return "" end -- Handle "lucide:" with no name
+            local assetId = LucideLib:GetIcon(actualName)
+            return assetId or "" -- Return assetId or empty string if Lucide:GetIcon fails
+        else
+            -- Lucide prefix used, but library not loaded or GetIcon method missing
+            return ""
+        end
+    end
+    -- Not a "lucide:" string, assume it's a direct asset ID or other.
+    return iconName
+end
+
 local OldStaticColours = Colours
 if type(OldStaticColours) ~= "table" then OldStaticColours = nil end
 
@@ -251,7 +297,8 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		CloseButton.Parent = Top
 
 		NotifyCloseIconImage.Name = "NotifyCloseIconImage"
-		NotifyCloseIconImage.Image = "rbxassetid://9886659671"
+		local notifyCloseIcon = GetIcon("lucide:x")
+		NotifyCloseIconImage.Image = (notifyCloseIcon ~= "") and notifyCloseIcon or "rbxassetid://9886659671" -- Fallback
 		NotifyCloseIconImage.ImageColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
 		NotifyCloseIconImage.AnchorPoint = Vector2.new(0.5, 0.5)
 		NotifyCloseIconImage.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1258,41 +1305,921 @@ function UBHubLib:MakeGui(GuiConfig)
 	-- All icon parameters should use GetIcon().
 	-- All Color3.fromRGB should be replaced by Colours.Key.
 
-	-- Placeholder for the extensive Tabs/Sections/Items structure
-	function Tabs:CreateTab(TabConfig)
-		-- ... Full CreateTab implementation ...
-		local tabReturnData = { Sections = {}, TabButton = Instance.new("TextButton"), TabFrame = Instance.new("Frame"), ScrollFramePage = Instance.new("ScrollingFrame") }
-		-- Simplified for this placeholder:
-		local Tab = tabReturnData.TabFrame
-		Tab.Name = TabConfig.Name or "Tab"
-		Tab.Size = UDim2.new(1,0,0,30)
+	local UBHubInstance = {} -- New return object
+	local InternalTabManager = {} -- Was 'Tabs', now for internal use
+	local CountTab = 0
+	local CountDropdown = 0
+
+	-- Internal function to create a tab's UI and return an object to add sections/items
+	local function CreateTabInternal(TabConfig)
+		TabConfig = TabConfig or {}
+		local tabName = TabConfig.Name or "Unnamed Tab"
+		local tabIcon = GetIcon(TabConfig.Icon or "") -- GetIcon is now defined at the top
+
+		local Tab = Instance.new("Frame")
+		local TabName = Instance.new("TextLabel")
+		local FeatureImg = Instance.new("ImageLabel")
+		local ChooseFrame = Instance.new("Frame")
+		local TabButton = Instance.new("TextButton")
+
+		Tab.BackgroundColor3 = Colours.TabBackground or Color3.fromRGB(30,30,30)
+		Tab.BackgroundTransparency = 0
+		Tab.BorderColor3 = Colours.Stroke or Color3.fromRGB(50,50,50)
+		Tab.BorderSizePixel = 0
+		Tab.LayoutOrder = CountTab
+		Tab.Size = UDim2.new(1, 0, 0, 30)
+		Tab.Name = "Tab"
 		Tab.Parent = TabScroll
-		tabReturnData.Sections.AddSection = function(title)
-			warn("AddSection called on placeholder tab: " .. Title)
-			return {
-				AddButton = function() warn("AddButton on placeholder section") end,
-				AddSlider = function() warn("AddSlider on placeholder section") end,
-				AddToggle = function() warn("AddToggle on placeholder section") end,
-				AddDropdown = function() warn("AddDropdown on placeholder section") end,
-				AddInput = function() warn("AddInput on placeholder section") end,
-				AddParagraph = function() warn("AddParagraph on placeholder section") end,
-				AddDivider = function() warn("AddDivider on placeholder section") end
-			}
+
+		TabName.Font = Enum.Font.GothamBold
+		TabName.Text = tabName
+		TabName.TextColor3 = Colours.TabTextColor or Color3.fromRGB(180,180,180)
+		TabName.TextSize = 12
+		TabName.TextWrapped = true
+		TabName.TextXAlignment = Enum.TextXAlignment.Left
+		TabName.AnchorPoint = Vector2.new(0, 0.5)
+		TabName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TabName.BackgroundTransparency = 1
+		TabName.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TabName.BorderSizePixel = 0
+		TabName.Position = UDim2.new(0, 33, 0.5, 0)
+		TabName.Size = UDim2.new(1, -36, 0.8, 0)
+		TabName.Name = "TabName"
+		TabName.Parent = Tab
+
+		FeatureImg.Image = tabIcon
+		FeatureImg.ImageColor3 = Colours.TabTextColor or Color3.fromRGB(180,180,180)
+		FeatureImg.AnchorPoint = Vector2.new(0.5, 0.5)
+		FeatureImg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		FeatureImg.BackgroundTransparency = 1
+		FeatureImg.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		FeatureImg.BorderSizePixel = 0
+		FeatureImg.Position = UDim2.new(0, 15, 0.5, 0)
+		FeatureImg.Size = UDim2.new(0, 18, 0, 18)
+		FeatureImg.Name = "FeatureImg"
+		FeatureImg.Parent = Tab
+        FeatureImg.Visible = (tabIcon ~= "")
+
+		ChooseFrame.BackgroundColor3 = Colours.ThemeHighlight or Color3.fromRGB(255,80,0)
+		ChooseFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		ChooseFrame.BorderSizePixel = 0
+		ChooseFrame.Position = UDim2.new(0, 2, 0, 9 + (33 * CountTab))
+		ChooseFrame.Size = UDim2.new(0, 1, 0, 20)
+		ChooseFrame.Name = "ChooseFrame"
+		ChooseFrame.Parent = TabScroll
+		ChooseFrame.ZIndex = 2
+		ChooseFrame.Visible = (CountTab == 0) -- Only visible for the first tab initially
+
+		TabButton.Text = ""
+		TabButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+		TabButton.TextSize = 14
+		TabButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TabButton.BackgroundTransparency = 1
+		TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TabButton.BorderSizePixel = 0
+		TabButton.Size = UDim2.new(1, 0, 1, 0)
+		TabButton.Name = "TabButton"
+		TabButton.Parent = Tab
+
+		local ScrollFramePage = Instance.new("ScrollingFrame")
+		ScrollFramePage.Active = true
+		ScrollFramePage.BackgroundColor3 = Colours.Background or Color3.fromRGB(30,30,30)
+		ScrollFramePage.BackgroundTransparency = 1
+		ScrollFramePage.BorderColor3 = Colours.Stroke or Color3.fromRGB(50,50,50)
+		ScrollFramePage.BorderSizePixel = 0
+		ScrollFramePage.LayoutOrder = CountTab
+		ScrollFramePage.Size = UDim2.new(1, 0, 1, 0)
+		ScrollFramePage.CanvasSize = UDim2.new(0,0,0,0) -- Will be updated by UIListLayout
+		ScrollFramePage.ScrollBarImageColor3 = Colours.SecondaryElementBackground or Color3.fromRGB(40,40,40)
+		ScrollFramePage.ScrollBarThickness = 4
+		ScrollFramePage.Name = tabName .. "Page"
+		ScrollFramePage.Parent = LayersFolderInstance
+		ScrollFramePage.Visible = (CountTab == 0)
+
+		local UIListLayout = Instance.new("UIListLayout")
+		UIListLayout.Padding = UDim.new(0, 5)
+		UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		UIListLayout.Parent = ScrollFramePage
+        UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+        local function UpdateCanvasSize()
+            local offsetY = 0
+            for _, child in ipairs(ScrollFramePage:GetChildren()) do
+                if child:IsA("GuiObject") and child ~= UIListLayout then
+                    offsetY = offsetY + child.Size.Y.Offset + UIListLayout.Padding.Offset
+                end
+            end
+            ScrollFramePage.CanvasSize = UDim2.new(0,0,0,offsetY)
+        end
+        ScrollFramePage.ChildAdded:Connect(UpdateCanvasSize)
+        ScrollFramePage.ChildRemoved:Connect(UpdateCanvasSize)
+
+		TabButton.Activated:Connect(function()
+			CircleClick(TabButton, Mouse.X, Mouse.Y)
+			if LayersPageLayoutInstance.CurrentPage ~= ScrollFramePage then
+				for _, tabUiElement in ipairs(TabScroll:GetChildren()) do
+					if tabUiElement.Name == "Tab" and tabUiElement:IsA("Frame") then
+						tabUiElement.BackgroundColor3 = Colours.TabBackground or Color3.fromRGB(30,30,30)
+						local tn = tabUiElement:FindFirstChild("TabName")
+						if tn and tn:IsA("TextLabel") then tn.TextColor3 = Colours.TabTextColor or Color3.fromRGB(180,180,180) end
+						local fi = tabUiElement:FindFirstChild("FeatureImg")
+						if fi and fi:IsA("ImageLabel") then fi.ImageColor3 = Colours.TabTextColor or Color3.fromRGB(180,180,180) end
+
+						local cf = tabUiElement.Parent:FindFirstChild("ChooseFrame", true) -- Search in TabScroll for ChooseFrame
+						if cf then cf.Visible = false end
+					end
+				end
+				Tab.BackgroundColor3 = Colours.TabBackgroundSelected or Color3.fromRGB(45,45,45)
+				TabName.TextColor3 = Colours.SelectedTabTextColor or Color3.fromRGB(221,221,221)
+				FeatureImg.ImageColor3 = Colours.SelectedTabTextColor or Color3.fromRGB(221,221,221)
+
+				ChooseFrame.Position = UDim2.new(0, 2, 0, 9 + (33 * Tab.LayoutOrder))
+				ChooseFrame.Visible = true
+
+				LayersPageLayoutInstance:JumpToPage(ScrollFramePage)
+				if ActiveTabNameLabel then ActiveTabNameLabel.Text = tabName end
+			end
+		end)
+
+		if CountTab == 0 and ActiveTabNameLabel then
+			ActiveTabNameLabel.Text = tabName
+			Tab.BackgroundColor3 = Colours.TabBackgroundSelected or Color3.fromRGB(45,45,45)
+			TabName.TextColor3 = Colours.SelectedTabTextColor or Color3.fromRGB(221,221,221)
+			FeatureImg.ImageColor3 = Colours.SelectedTabTextColor or Color3.fromRGB(221,221,221)
 		end
-		if TabConfig.Name == "Themes" and UBHubLib.TabReferences then
+		CountTab = CountTab + 1
+
+		local TabControls = {}
+		function TabControls:AddSectionInternal(SectionTitle)
+			SectionTitle = SectionTitle or "Unnamed Section"
+
+			local SectionFrame = Instance.new("Frame")
+			SectionFrame.Name = SectionTitle
+			SectionFrame.BackgroundTransparency = 1
+			SectionFrame.Size = UDim2.new(1, -10, 0, 0) -- Width -10 for padding, height autosizes
+			SectionFrame.AutomaticSize = Enum.AutomaticSize.Y
+			SectionFrame.Parent = ScrollFramePage -- Parent to the tab's content page
+			SectionFrame.LayoutOrder = ScrollFramePage:GetChildren(#ScrollFramePage:GetChildren()) and ScrollFramePage:GetChildren(#ScrollFramePage:GetChildren()).LayoutOrder + 1 or 0
+
+			local SectionListLayout = Instance.new("UIListLayout")
+			SectionListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			SectionListLayout.Padding = UDim.new(0, 3)
+            SectionListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			SectionListLayout.Parent = SectionFrame
+            SectionListLayout.Name = "SectionListLayout"
+
+			if SectionTitle ~= "" and SectionTitle ~= " " then -- Don't create title for empty/spacing sections
+				local SectionText = Instance.new("TextLabel")
+				SectionText.Font = Enum.Font.GothamBold
+				SectionText.Text = SectionTitle
+				SectionText.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+				SectionText.TextSize = 16
+				SectionText.TextXAlignment = Enum.TextXAlignment.Left
+				SectionText.BackgroundTransparency = 1
+				SectionText.Size = UDim2.new(1, 0, 0, 20)
+				SectionText.Name = "SectionTitle"
+				SectionText.Parent = SectionFrame
+                SectionText.LayoutOrder = 0
+			end
+
+			-- Auto-update canvas size of parent ScrollFramePage when section size changes
+            SectionFrame.Changed:Connect(function(property)
+                if property == "AbsoluteSize" then
+                    UpdateCanvasSize() -- Call the UpdateCanvasSize of the parent tab's ScrollFramePage
+                end
+            end)
+
+			local SectionControls = {}
+			local currentSectionFrame = SectionFrame -- Default to the main section frame
+
+			-- This internal function will be the core item adder.
+			-- It needs to know where to parent items (SectionFrame or a SubSectionFrame)
+			local function AddItemToFrame(TargetFrame, itemType, itemConfig)
+				itemConfig = itemConfig or {}
+				local layoutOrder = TargetFrame:GetChildren(#TargetFrame:GetChildren()) and TargetFrame:GetChildren(#TargetFrame:GetChildren()).LayoutOrder + 1 or 0
+
+				if itemType == "Button" then
+					local Button = Instance.new("TextButton")
+					local ButtonStroke = Instance.new("UIStroke")
+					local ButtonCorner = Instance.new("UICorner")
+					local ButtonName = Instance.new("TextLabel")
+					local ButtonImg = Instance.new("ImageLabel")
+
+					Button.Text = ""
+					Button.TextColor3 = Color3.fromRGB(0,0,0)
+					Button.TextSize = 14
+					Button.BackgroundColor3 = Colours.ElementBackground or Color3.fromRGB(45,45,45)
+					Button.BorderColor3 = Colours.Stroke or Color3.fromRGB(60,60,60)
+					Button.BorderSizePixel = 0
+					Button.Size = UDim2.new(1, 0, 0, 30)
+					Button.Name = itemConfig.Title or "Button"
+					Button.Parent = TargetFrame
+					Button.LayoutOrder = layoutOrder
+
+					ButtonStroke.Color = Colours.ElementStroke or Color3.fromRGB(60,60,60)
+					ButtonStroke.Thickness = 1
+					ButtonStroke.Parent = Button
+
+					ButtonCorner.CornerRadius = UDim.new(0, 3)
+					ButtonCorner.Parent = Button
+
+					ButtonName.Font = Enum.Font.GothamBold
+					ButtonName.Text = itemConfig.Title or "Button"
+					ButtonName.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+					ButtonName.TextSize = 13
+					ButtonName.TextXAlignment = Enum.TextXAlignment.Left
+					ButtonName.BackgroundTransparency = 1
+					ButtonName.Position = UDim2.new(0, (itemConfig.Icon and 35) or 10, 0, 0)
+					ButtonName.Size = UDim2.new(1, -((itemConfig.Icon and 35) or 10) - 5, 1, 0)
+					ButtonName.Name = "ButtonName"
+					ButtonName.Parent = Button
+
+					local btnIconStr = GetIcon(itemConfig.Icon or "")
+					ButtonImg.Image = btnIconStr
+					ButtonImg.ImageColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+					ButtonImg.Visible = (btnIconStr ~= "") -- Check if GetIcon returned a valid asset ID
+					ButtonImg.AnchorPoint = Vector2.new(0.5,0.5)
+					ButtonImg.Position = UDim2.new(0, (ButtonImg.Visible and 17) or 0, 0.5, 0) -- Adjust position based on visibility for ButtonName
+					ButtonImg.Size = UDim2.new(0,16,0,16)
+					ButtonImg.BackgroundTransparency = 1
+					ButtonImg.Name = "ButtonImg"
+					ButtonImg.Parent = Button
+
+					Button.MouseEnter:Connect(function() TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundColor3 = Colours.ElementBackgroundHover or Color3.fromRGB(55,55,55)}):Play() end)
+					Button.MouseLeave:Connect(function() TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundColor3 = Colours.ElementBackground or Color3.fromRGB(45,45,45)}):Play() end)
+
+					if itemConfig.Callback and type(itemConfig.Callback) == "function" then
+						Button.Activated:Connect(function()
+							UBHubInstance.CircleClick(Button, Mouse.X, Mouse.Y)
+							itemConfig.Callback()
+						end)
+					end
+					return Button
+
+				elseif itemType == "Slider" then
+					local SliderFrame = Instance.new("Frame")
+					local SliderTitle = Instance.new("TextLabel")
+					local SliderValueText = Instance.new("TextLabel")
+					local SliderBarBackground = Instance.new("Frame")
+					local SliderBarProgress = Instance.new("Frame")
+					local SliderBarCorner = Instance.new("UICorner")
+					local SliderBarProgressCorner = Instance.new("UICorner")
+					local SliderDragger = Instance.new("TextButton") -- Using TextButton for easier click detection
+					local DraggerCorner = Instance.new("UICorner")
+					local SliderInput = Instance.new("TextBox")
+					local SliderInputCorner = Instance.new("UICorner")
+
+					SliderFrame.Name = itemConfig.Title or "Slider"
+					SliderFrame.Size = UDim2.new(1,0,0,55) -- Increased height for input box
+					SliderFrame.BackgroundTransparency = 1
+					SliderFrame.LayoutOrder = layoutOrder
+					SliderFrame.Parent = TargetFrame
+
+					SliderTitle.Name = "SliderTitle"
+					SliderTitle.Text = itemConfig.Title or "Slider"
+					SliderTitle.Font = Enum.Font.GothamBold
+					SliderTitle.TextSize = 13
+					SliderTitle.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+					SliderTitle.TextXAlignment = Enum.TextXAlignment.Left
+					SliderTitle.BackgroundTransparency = 1
+					SliderTitle.Size = UDim2.new(0.7, -5, 0, 20)
+					SliderTitle.Position = UDim2.new(0,0,0,0)
+					SliderTitle.Parent = SliderFrame
+
+					SliderValueText.Name = "SliderValueText"
+					SliderValueText.Font = Enum.Font.GothamBold
+					SliderValueText.TextSize = 12
+					SliderValueText.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+					SliderValueText.TextXAlignment = Enum.TextXAlignment.Right
+					SliderValueText.BackgroundTransparency = 1
+					SliderValueText.Size = UDim2.new(0.3, -5, 0, 20)
+					SliderValueText.Position = UDim2.new(1, -SliderValueText.AbsoluteSize.X - 5, 0,0) -- Anchor to right
+                                        SliderValueText.AnchorPoint = Vector2.new(1,0)
+                                        SliderValueText.Position = UDim2.new(1,0,0,0)
+					SliderValueText.Parent = SliderFrame
+
+					SliderInput.Name = "SliderInput"
+					SliderInput.PlaceholderText = "Value"
+					SliderInput.Text = tostring(itemConfig.Default or itemConfig.Min or 0)
+					SliderInput.Font = Enum.Font.Gotham
+					SliderInput.TextSize = 12
+					SliderInput.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+					SliderInput.BackgroundColor3 = Colours.InputBackground or Color3.fromRGB(35,35,35)
+					SliderInput.Size = UDim2.new(0.3, -5, 0, 20)
+                                        SliderInput.AnchorPoint = Vector2.new(1,0)
+					SliderInput.Position = UDim2.new(1,0,0,22) -- Position below value text
+					SliderInput.Parent = SliderFrame
+					SliderInputCorner.CornerRadius = UDim.new(0,3)
+					SliderInputCorner.Parent = SliderInput
+
+					SliderBarBackground.Name = "SliderBarBackground"
+					SliderBarBackground.BackgroundColor3 = Colours.SliderBackground or Color3.fromRGB(40,40,40)
+					SliderBarBackground.Size = UDim2.new(1,- (SliderInput.AbsoluteSize.X + 5) ,0,6) -- Adjust width to not overlap input
+                                        SliderBarBackground.Size = UDim2.new(1, -65 ,0,6) -- Temp fix for width
+					SliderBarBackground.Position = UDim2.new(0,0,0,45) -- Position at bottom
+					SliderBarBackground.Parent = SliderFrame
+					SliderBarCorner.CornerRadius = UDim.new(0,3)
+					SliderBarCorner.Parent = SliderBarBackground
+
+					local Min, Max, Default, Increment = itemConfig.Min or 0, itemConfig.Max or 100, itemConfig.Default or 0, itemConfig.Increment or 1
+					if itemConfig.Flag and UBHubInstance.Flags and UBHubInstance.Flags[itemConfig.Flag] then Default = UBHubInstance.Flags[itemConfig.Flag] end
+					Default = math.clamp(Default, Min, Max)
+					local CurrentValue = Default
+
+					local function UpdateSlider(newValue, fromInput)
+						newValue = math.clamp(tonumber(newValue) or CurrentValue, Min, Max)
+						CurrentValue = math.floor(newValue / Increment + 0.5) * Increment -- Snap to increment
+
+						local percentage = (CurrentValue - Min) / (Max - Min)
+						SliderBarProgress.Size = UDim2.new(percentage, 0, 1, 0)
+						SliderDragger.Position = UDim2.new(percentage, 0, 0.5, 0)
+						SliderValueText.Text = tostring(CurrentValue)
+						if not fromInput then SliderInput.Text = tostring(CurrentValue) end
+
+						if itemConfig.Flag and UBHubInstance.SaveFile then UBHubInstance.SaveFile(itemConfig.Flag, CurrentValue) end
+						if itemConfig.Callback then itemConfig.Callback(CurrentValue) end
+                        if AllCreatedItemControls.Sliders[itemConfig.InternalFlagKey] and AllCreatedItemControls.Sliders[itemConfig.InternalFlagKey][itemConfig.InternalFlagComponent] then
+                           AllCreatedItemControls.Sliders[itemConfig.InternalFlagKey][itemConfig.InternalFlagComponent].Value = CurrentValue
+                        end
+					end
+
+					SliderBarProgress.Name = "SliderBarProgress"
+					SliderBarProgress.BackgroundColor3 = Colours.SliderProgress or Color3.fromRGB(0,122,204)
+					SliderBarProgress.Parent = SliderBarBackground
+					SliderBarProgressCorner.CornerRadius = UDim.new(0,3)
+					SliderBarProgressCorner.Parent = SliderBarProgress
+
+					SliderDragger.Name = "SliderDragger"
+					SliderDragger.Text = ""
+					SliderDragger.Size = UDim2.new(0,10,0,10)
+					SliderDragger.AnchorPoint = Vector2.new(0.5,0.5)
+					SliderDragger.BackgroundColor3 = Colours.ThemeHighlight or Color3.fromRGB(255,80,0)
+					SliderDragger.Parent = SliderBarBackground
+					DraggerCorner.CornerRadius = UDim.new(0,5)
+					DraggerCorner.Parent = SliderDragger
+
+					UpdateSlider(Default) -- Initialize
+
+					local dragging = false
+					SliderDragger.InputBegan:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+					end)
+					SliderDragger.InputEnded:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+					end)
+					UserInputService.InputChanged:Connect(function(input)
+						if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+							local relativePos = Mouse.X - SliderBarBackground.AbsolutePosition.X
+							local percentage = math.clamp(relativePos / SliderBarBackground.AbsoluteSize.X, 0, 1)
+							UpdateSlider(Min + percentage * (Max - Min))
+						end
+					end)
+					SliderInput.FocusLost:Connect(function(enterPressed)
+						UpdateSlider(tonumber(SliderInput.Text) or CurrentValue, true)
+					end)
+
+                    local sliderApi = { Value = CurrentValue, Set = UpdateSlider }
+                    if itemConfig.InternalFlagKey and itemConfig.InternalFlagComponent then
+                         AllCreatedItemControls.Sliders[itemConfig.InternalFlagKey] = AllCreatedItemControls.Sliders[itemConfig.InternalFlagKey] or {}
+                         AllCreatedItemControls.Sliders[itemConfig.InternalFlagKey][itemConfig.InternalFlagComponent] = sliderApi
+                    end
+					return sliderApi
+
+				elseif itemType == "Toggle" then
+					local ToggleFrame = Instance.new("Frame")
+					local ToggleTitle = Instance.new("TextLabel")
+					local ToggleButton = Instance.new("TextButton")
+					local ToggleUICorner = Instance.new("UICorner")
+					local ToggleUIStroke = Instance.new("UIStroke")
+					local ToggleCircle = Instance.new("Frame")
+					local CircleCorner = Instance.new("UICorner")
+
+					ToggleFrame.Name = itemConfig.Title or "Toggle"
+					ToggleFrame.Size = UDim2.new(1,0,0,25)
+					ToggleFrame.BackgroundTransparency = 1
+					ToggleFrame.LayoutOrder = layoutOrder
+					ToggleFrame.Parent = TargetFrame
+
+					ToggleTitle.Name = "ToggleTitle"
+					ToggleTitle.Text = itemConfig.Title or "Toggle"
+					ToggleTitle.Font = Enum.Font.GothamBold
+					ToggleTitle.TextSize = 13
+					ToggleTitle.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+					ToggleTitle.TextXAlignment = Enum.TextXAlignment.Left
+					ToggleTitle.BackgroundTransparency = 1
+					ToggleTitle.Size = UDim2.new(1, -50, 1, 0)
+					ToggleTitle.Parent = ToggleFrame
+
+					ToggleButton.Name = "ToggleButton"
+					ToggleButton.Text = ""
+					ToggleButton.Size = UDim2.new(0,40,0,18)
+					ToggleButton.Position = UDim2.new(1,-40,0.5,0)
+					ToggleButton.AnchorPoint = Vector2.new(0,0.5)
+					ToggleButton.Parent = ToggleFrame
+
+					ToggleUICorner.CornerRadius = UDim.new(0,100)
+					ToggleUICorner.Parent = ToggleButton
+					ToggleUIStroke.Thickness = 1.5
+					ToggleUIStroke.Parent = ToggleButton
+
+					ToggleCircle.Name = "ToggleCircle"
+					ToggleCircle.Size = UDim2.new(0,12,0,12)
+					ToggleCircle.BackgroundColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+					ToggleCircle.Position = UDim2.new(0,3,0.5,0)
+					ToggleCircle.AnchorPoint = Vector2.new(0,0.5)
+					ToggleCircle.Parent = ToggleButton
+					CircleCorner.CornerRadius = UDim.new(0,100)
+					CircleCorner.Parent = ToggleCircle
+
+					local Default = itemConfig.Default or false
+					if itemConfig.Flag and UBHubInstance.Flags and UBHubInstance.Flags[itemConfig.Flag] ~= nil then Default = UBHubInstance.Flags[itemConfig.Flag] end
+					local CurrentValue = Default
+
+					local function UpdateToggleVisuals()
+						if CurrentValue then
+							ToggleButton.BackgroundColor3 = Colours.ToggleEnabled or Color3.fromRGB(0,122,204)
+							ToggleUIStroke.Color = Colours.ToggleEnabledOuterStroke or Colours.ToggleEnabled or Color3.fromRGB(0,122,204)
+							ToggleCircle.Position = UDim2.new(1,-3-12,0.5,0) -- right side (1 - padding - circlewidth)
+						else
+							ToggleButton.BackgroundColor3 = Colours.ToggleDisabled or Color3.fromRGB(60,60,60)
+							ToggleUIStroke.Color = Colours.ToggleDisabledOuterStroke or Colours.ToggleDisabled or Color3.fromRGB(50,50,50)
+							ToggleCircle.Position = UDim2.new(0,3,0.5,0) -- left side
+						end
+					end
+					UpdateToggleVisuals()
+
+					ToggleButton.Activated:Connect(function()
+						CurrentValue = not CurrentValue
+						UpdateToggleVisuals()
+						if itemConfig.Flag and UBHubInstance.SaveFile then UBHubInstance.SaveFile(itemConfig.Flag, CurrentValue) end
+						if itemConfig.Callback then itemConfig.Callback(CurrentValue) end
+					end)
+					return { Value = function() return CurrentValue end, Set = function(val) CurrentValue = val; UpdateToggleVisuals(); if itemConfig.Callback then itemConfig.Callback(CurrentValue) end end }
+
+				elseif itemType == "Input" then
+					local InputFrame = Instance.new("Frame")
+					local InputTitle = Instance.new("TextLabel")
+					local TextBox = Instance.new("TextBox")
+					local TextStroke = Instance.new("UIStroke")
+					local TextCorner = Instance.new("UICorner")
+
+					InputFrame.Name = itemConfig.Title or "Input"
+					InputFrame.Size = UDim2.new(1,0,0, (itemConfig.Title and itemConfig.Title ~= "") and 50 or 30)
+					InputFrame.BackgroundTransparency = 1
+					InputFrame.LayoutOrder = layoutOrder
+					InputFrame.Parent = TargetFrame
+
+					if itemConfig.Title and itemConfig.Title ~= "" then
+						InputTitle.Name = "InputTitle"
+						InputTitle.Text = itemConfig.Title
+						InputTitle.Font = Enum.Font.GothamBold
+						InputTitle.TextSize = 13
+						InputTitle.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+						InputTitle.TextXAlignment = Enum.TextXAlignment.Left
+						InputTitle.BackgroundTransparency = 1
+						InputTitle.Size = UDim2.new(1,0,0,20)
+						InputTitle.Parent = InputFrame
+					end
+
+					TextBox.Name = "TextBox"
+					TextBox.Text = itemConfig.Default or ""
+					if itemConfig.Flag and UBHubInstance.Flags and UBHubInstance.Flags[itemConfig.Flag] then TextBox.Text = UBHubInstance.Flags[itemConfig.Flag] end
+					TextBox.PlaceholderText = itemConfig.Placeholder or "Enter text..."
+					TextBox.Font = Enum.Font.Gotham
+					TextBox.TextSize = 13
+					TextBox.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+					TextBox.BackgroundColor3 = Colours.InputBackground or Color3.fromRGB(35,35,35)
+					TextBox.PlaceholderColor3 = Colours.PlaceholderColor or Color3.fromRGB(120,120,120)
+					TextBox.Size = UDim2.new(1,0,0,30)
+					TextBox.Position = UDim2.new(0,0,1,-30)
+					TextBox.AnchorPoint = Vector2.new(0,1)
+					TextBox.Parent = InputFrame
+
+					TextStroke.Color = Colours.InputStroke or Color3.fromRGB(55,55,55)
+					TextStroke.Thickness = 1
+					TextStroke.Parent = TextBox
+					TextCorner.CornerRadius = UDim.new(0,3)
+					TextCorner.Parent = TextBox
+
+					if itemConfig.Callback then
+						TextBox.FocusLost:Connect(function(enterPressed)
+							if enterPressed then itemConfig.Callback(TextBox.Text) end
+						end)
+						if itemConfig.InstantCallback then
+							TextBox:GetPropertyChangedSignal("Text"):Connect(function() itemConfig.Callback(TextBox.Text) end)
+						end
+					end
+					if itemConfig.Flag and UBHubInstance.SaveFile then
+						TextBox.FocusLost:Connect(function() UBHubInstance.SaveFile(itemConfig.Flag, TextBox.Text) end)
+					end
+
+					return { Value = function() return TextBox.Text end, Set = function(val) TextBox.Text = val end, Instance = TextBox }
+
+				elseif itemType == "Paragraph" then
+					local ParagraphText = Instance.new("TextLabel")
+					ParagraphText.Name = itemConfig.Title or "Paragraph"
+					ParagraphText.Text = itemConfig.Content or itemConfig.Title or "Paragraph text"
+					ParagraphText.Font = itemConfig.Font or Enum.Font.Gotham
+					ParagraphText.TextSize = itemConfig.TextSize or 13
+					ParagraphText.TextColor3 = itemConfig.TextColor or Colours.TextColor or Color3.fromRGB(200,200,200)
+					ParagraphText.TextWrapped = true
+					ParagraphText.TextXAlignment = itemConfig.TextXAlignment or Enum.TextXAlignment.Left
+					ParagraphText.TextYAlignment = Enum.TextYAlignment.Top
+					ParagraphText.BackgroundTransparency = 1
+					ParagraphText.Size = UDim2.new(1,0,0,0) -- Width is full, height is automatic
+					ParagraphText.AutomaticSize = Enum.AutomaticSize.Y
+					ParagraphText.LayoutOrder = layoutOrder
+					ParagraphText.Parent = TargetFrame
+					return ParagraphText
+
+				elseif itemType == "Divider" then
+					local DividerFrame = Instance.new("Frame")
+					DividerFrame.Name = "Divider"
+					DividerFrame.BackgroundColor3 = itemConfig.Color or Colours.Stroke or Color3.fromRGB(80,80,80)
+					DividerFrame.BorderSizePixel = 0
+					DividerFrame.Size = UDim2.new(1,0,0, itemConfig.Thickness or 1)
+					DividerFrame.LayoutOrder = layoutOrder
+					DividerFrame.Parent = TargetFrame
+
+					if itemConfig.Title and itemConfig.Title ~= "" then -- Optional title for divider
+						local DividerTitle = Instance.new("TextLabel")
+						DividerTitle.Name = "DividerTitle"
+						DividerTitle.Text = itemConfig.Title
+						DividerTitle.Font = Enum.Font.GothamSemibold
+						DividerTitle.TextSize = 12
+						DividerTitle.TextColor3 = Colours.SecondaryTextColor or Colours.TextColor or Color3.fromRGB(180,180,180)
+						DividerTitle.BackgroundTransparency = 1
+						DividerTitle.Size = UDim2.new(0,0,0,15) -- Autosize X
+                        DividerTitle.AutomaticSize = Enum.AutomaticSize.X
+						DividerTitle.Position = UDim2.new(0.5,0,0.5,0)
+						DividerTitle.AnchorPoint = Vector2.new(0.5,0.5)
+						DividerTitle.Parent = DividerFrame
+
+                        local Padding = Instance.new("UIPadding")
+                        Padding.PaddingLeft = UDim.new(0,5)
+                        Padding.PaddingRight = UDim.new(0,5)
+                        Padding.Parent = DividerTitle
+                        DividerFrame.BackgroundColor3 = Color3.fromRGB(255,255,255) -- Make main divider transparent if title exists
+                        DividerFrame.BackgroundTransparency = 1
+
+                        local LeftLine = Instance.new("Frame")
+                        LeftLine.Name = "LeftLine"
+                        LeftLine.BackgroundColor3 = itemConfig.Color or Colours.Stroke or Color3.fromRGB(80,80,80)
+                        LeftLine.BorderSizePixel = 0
+                        LeftLine.Size = UDim2.new(0.5, -DividerTitle.AbsoluteSize.X/2 - 5, 0, itemConfig.Thickness or 1)
+                        LeftLine.Position = UDim2.new(0,0,0.5,0)
+                        LeftLine.AnchorPoint = Vector2.new(0,0.5)
+                        LeftLine.Parent = DividerFrame
+
+                        local RightLine = Instance.new("Frame")
+                        RightLine.Name = "RightLine"
+                        RightLine.BackgroundColor3 = itemConfig.Color or Colours.Stroke or Color3.fromRGB(80,80,80)
+                        RightLine.BorderSizePixel = 0
+                        RightLine.Size = UDim2.new(0.5, -DividerTitle.AbsoluteSize.X/2 - 5, 0, itemConfig.Thickness or 1)
+                        RightLine.Position = UDim2.new(1,0,0.5,0)
+                        RightLine.AnchorPoint = Vector2.new(1,0.5)
+                        RightLine.Parent = DividerFrame
+                        DividerFrame.Size = UDim2.new(1,0,0,15) -- Increase height for title
+					end
+					return DividerFrame
+
+				elseif itemType == "Dropdown" then
+					local DropdownFrame = Instance.new("Frame")
+					local DropdownTitle = Instance.new("TextLabel")
+					local DropdownButton = Instance.new("TextButton")
+					local ButtonCorner = Instance.new("UICorner")
+					local ButtonStroke = Instance.new("UIStroke")
+					local DropdownText = Instance.new("TextLabel")
+					local DropdownImage = Instance.new("ImageLabel")
+
+					DropdownFrame.Name = itemConfig.Title or "Dropdown"
+					DropdownFrame.Size = UDim2.new(1,0,0, (itemConfig.Title and itemConfig.Title ~= "") and 55 or 35)
+					DropdownFrame.BackgroundTransparency = 1
+					DropdownFrame.LayoutOrder = layoutOrder
+					DropdownFrame.Parent = TargetFrame
+
+					if itemConfig.Title and itemConfig.Title ~= "" then
+						DropdownTitle.Name = "DropdownTitle"
+						DropdownTitle.Text = itemConfig.Title
+						DropdownTitle.Font = Enum.Font.GothamBold
+						DropdownTitle.TextSize = 13
+						DropdownTitle.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+						DropdownTitle.TextXAlignment = Enum.TextXAlignment.Left
+						DropdownTitle.BackgroundTransparency = 1
+						DropdownTitle.Size = UDim2.new(1,0,0,20)
+						DropdownTitle.Parent = DropdownFrame
+					end
+
+					DropdownButton.Name = "DropdownButton"
+					DropdownButton.Text = ""
+					DropdownButton.BackgroundColor3 = Colours.ElementBackground or Color3.fromRGB(45,45,45)
+					DropdownButton.Size = UDim2.new(1,0,0,30)
+					DropdownButton.Position = UDim2.new(0,0,1,-30)
+					DropdownButton.AnchorPoint = Vector2.new(0,1)
+					DropdownButton.Parent = DropdownFrame
+					ButtonCorner.CornerRadius = UDim.new(0,3)
+					ButtonCorner.Parent = DropdownButton
+					ButtonStroke.Color = Colours.ElementStroke or Color3.fromRGB(60,60,60)
+					ButtonStroke.Thickness = 1
+					ButtonStroke.Parent = DropdownButton
+
+					DropdownText.Name = "DropdownText"
+					DropdownText.Font = Enum.Font.Gotham
+					DropdownText.TextSize = 13
+					DropdownText.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+					DropdownText.TextXAlignment = Enum.TextXAlignment.Left
+					DropdownText.BackgroundTransparency = 1
+					DropdownText.Position = UDim2.new(0,10,0,0)
+					DropdownText.Size = UDim2.new(1,-30,1,0)
+					DropdownText.Parent = DropdownButton
+
+					DropdownImage.Name = "DropdownImage"
+					DropdownImage.Image = "rbxassetid://9886657334" -- Chevron down icon
+					DropdownImage.ImageColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+					DropdownImage.BackgroundTransparency = 1
+					DropdownImage.Size = UDim2.new(0,12,0,12)
+					DropdownImage.Position = UDim2.new(1,-20,0.5,0)
+					DropdownImage.AnchorPoint = Vector2.new(0.5,0.5)
+					DropdownImage.Parent = DropdownButton
+
+					local Options = itemConfig.Options or {"Default Option"}
+					local CurrentValue = itemConfig.Default or Options[1]
+					if itemConfig.Flag and UBHubInstance.Flags and UBHubInstance.Flags[itemConfig.Flag] then CurrentValue = UBHubInstance.Flags[itemConfig.Flag] end
+					DropdownText.Text = tostring(CurrentValue)
+
+					local displayOrder = UBHubInstance.DisplayOrderCounter.Value
+					UBHubInstance.DisplayOrderCounter.Value = UBHubInstance.DisplayOrderCounter.Value + 1
+
+					local function UpdateOptions()
+						for _, child in ipairs(UBHubInstance.DropdownFolderInstance:GetChildren()) do
+							if child:IsA("TextButton") then child:Destroy() end
+						end
+						for i, optionName in ipairs(Options) do
+							local OptionButton = Instance.new("TextButton")
+							OptionButton.Name = "Option_" .. tostring(optionName)
+							OptionButton.Text = tostring(optionName)
+							OptionButton.Font = Enum.Font.Gotham
+							OptionButton.TextSize = 13
+							OptionButton.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+							OptionButton.BackgroundColor3 = Colours.DropdownUnselected or Color3.fromRGB(40,40,40)
+							OptionButton.Size = UDim2.new(1,0,0,25)
+							OptionButton.LayoutOrder = i
+							OptionButton.Parent = UBHubInstance.DropdownFolderInstance
+							OptionButton.ZIndex = 3
+
+							OptionButton.MouseEnter:Connect(function() OptionButton.BackgroundColor3 = Colours.DropdownSelected or Color3.fromRGB(50,50,50) end)
+							OptionButton.MouseLeave:Connect(function() OptionButton.BackgroundColor3 = Colours.DropdownUnselected or Color3.fromRGB(40,40,40) end)
+							OptionButton.Activated:Connect(function()
+								CurrentValue = optionName
+								DropdownText.Text = tostring(CurrentValue)
+								if itemConfig.Flag and UBHubInstance.SaveFile then UBHubInstance.SaveFile(itemConfig.Flag, CurrentValue) end
+								if itemConfig.Callback then itemConfig.Callback(CurrentValue) end
+
+								UBHubInstance.MoreBlurFrame.Visible = false
+								UBHubInstance.DropdownSelectFrame.Visible = false
+							end)
+						end
+						local numOptions = #Options
+						local dropdownHeight = math.min(numOptions * 25 + (numOptions > 0 and (numOptions -1) * UBHubInstance.DropdownFolderInstance.UIPageLayout.Padding.Offset or 0), 150) -- Max height 150
+						UBHubInstance.DropdownSelectFrame.Size = UDim2.new(0,160,0, dropdownHeight)
+						UBHubInstance.DropdownSelectRealFrame.Size = UDim2.new(1,-10,1,-10) -- Keep padding
+						task.wait()
+						UBHubInstance.DropPageLayoutInstance.Parent = nil -- Force refresh UIPageLayout
+						UBHubInstance.DropPageLayoutInstance.Parent = UBHubInstance.DropdownFolderInstance
+					end
+
+					DropdownButton.Activated:Connect(function()
+						UBHubInstance.CircleClick(DropdownButton, Mouse.X, Mouse.Y)
+						if UBHubInstance.MoreBlurFrame.Visible and UBHubInstance.DropdownSelectFrame.LayoutOrder == displayOrder then
+							UBHubInstance.MoreBlurFrame.Visible = false
+							UBHubInstance.DropdownSelectFrame.Visible = false
+						else
+							UpdateOptions()
+							UBHubInstance.DropdownSelectFrame.Position = UDim2.new(0, DropdownButton.AbsolutePosition.X - UBHubInstance.MoreBlurFrame.AbsolutePosition.X, 0, DropdownButton.AbsolutePosition.Y - UBHubInstance.MoreBlurFrame.AbsolutePosition.Y + DropdownButton.AbsoluteSize.Y + 5)
+							UBHubInstance.DropdownSelectFrame.LayoutOrder = displayOrder
+							UBHubInstance.MoreBlurFrame.Visible = true
+							UBHubInstance.DropdownSelectFrame.Visible = true
+							UBHubInstance.DropPageLayoutInstance:JumpToPage(UBHubInstance.DropdownFolderInstance:GetChildren()[1]) -- Jump to first option
+						end
+					end)
+
+					local dropdownApi = {
+						Value = function() return CurrentValue end,
+						Set = function(val)
+							CurrentValue = val; DropdownText.Text = tostring(CurrentValue)
+							if itemConfig.Flag and UBHubInstance.SaveFile then UBHubInstance.SaveFile(itemConfig.Flag, CurrentValue) end
+						end,
+						Refresh = function(newOptions, newDefault)
+							Options = newOptions or {"Empty"}
+							CurrentValue = newDefault or Options[1]
+							DropdownText.Text = tostring(CurrentValue)
+							if UBHubInstance.MoreBlurFrame.Visible and UBHubInstance.DropdownSelectFrame.LayoutOrder == displayOrder then UpdateOptions() end -- Update if visible
+						end
+					}
+                    if itemConfig.InternalFlag then -- Used by local files dropdown
+                        AllCreatedItemControls[itemConfig.InternalFlag] = dropdownApi
+                    end
+					return dropdownApi
+
+				elseif itemType == "Keybind" then
+					local KeybindFrame = Instance.new("Frame")
+					local KeybindTitle = Instance.new("TextLabel")
+					local KeybindButton = Instance.new("TextButton")
+					local ButtonCorner = Instance.new("UICorner")
+					local ButtonStroke = Instance.new("UIStroke")
+
+					KeybindFrame.Name = itemConfig.Title or "Keybind"
+					KeybindFrame.Size = UDim2.new(1,0,0, (itemConfig.Title and itemConfig.Title ~= "") and 55 or 35)
+					KeybindFrame.BackgroundTransparency = 1
+					KeybindFrame.LayoutOrder = layoutOrder
+					KeybindFrame.Parent = TargetFrame
+
+					if itemConfig.Title and itemConfig.Title ~= "" then
+						KeybindTitle.Name = "KeybindTitle"
+						KeybindTitle.Text = itemConfig.Title
+						KeybindTitle.Font = Enum.Font.GothamBold
+						KeybindTitle.TextSize = 13
+						KeybindTitle.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+						KeybindTitle.TextXAlignment = Enum.TextXAlignment.Left
+						KeybindTitle.BackgroundTransparency = 1
+						KeybindTitle.Size = UDim2.new(1,0,0,20)
+						KeybindTitle.Parent = KeybindFrame
+					end
+
+					KeybindButton.Name = "KeybindButton"
+					KeybindButton.BackgroundColor3 = Colours.ElementBackground or Color3.fromRGB(45,45,45)
+					KeybindButton.Size = UDim2.new(1,0,0,30)
+					KeybindButton.Position = UDim2.new(0,0,1,-30)
+					KeybindButton.AnchorPoint = Vector2.new(0,1)
+					KeybindButton.Parent = KeybindFrame
+					KeybindButton.Font = Enum.Font.GothamBold
+					KeybindButton.TextSize = 13
+					KeybindButton.TextColor3 = Colours.TextColor or Color3.fromRGB(221,221,221)
+
+					ButtonCorner.CornerRadius = UDim.new(0,3)
+					ButtonCorner.Parent = KeybindButton
+					ButtonStroke.Color = Colours.ElementStroke or Color3.fromRGB(60,60,60)
+					ButtonStroke.Thickness = 1
+					ButtonStroke.Parent = KeybindButton
+
+					local DefaultKey = itemConfig.Default or "None"
+					local currentKey = DefaultKey
+					if itemConfig.Flag and UBHubInstance.Flags and UBHubInstance.Flags[itemConfig.Flag] then currentKey = UBHubInstance.Flags[itemConfig.Flag] end
+					KeybindButton.Text = currentKey
+
+					local isListening = false
+					local inputConnection = nil
+
+					KeybindButton.Activated:Connect(function()
+						UBHubInstance.CircleClick(KeybindButton, Mouse.X, Mouse.Y)
+						if isListening then
+							isListening = false
+							KeybindButton.Text = currentKey -- Revert if clicked again while listening
+							if inputConnection then inputConnection:Disconnect(); inputConnection = nil end
+						else
+							isListening = true
+							KeybindButton.Text = "Press any key..."
+							inputConnection = UserInputService.InputBegan:Connect(function(input)
+								if isListening then
+									if input.UserInputType == Enum.UserInputType.Keyboard then
+										currentKey = input.KeyCode.Name
+										if currentKey == "Unknown" then currentKey = "None" end -- Handle invalid keys
+									elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+										currentKey = "Mouse1"
+									elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+										currentKey = "Mouse2"
+									-- Add other mouse buttons or input types if needed
+									else
+										currentKey = "None" -- Default for unsupported input types
+									end
+									KeybindButton.Text = currentKey
+									isListening = false
+									if inputConnection then inputConnection:Disconnect(); inputConnection = nil end
+
+									if itemConfig.Flag and UBHubInstance.SaveFile then UBHubInstance.SaveFile(itemConfig.Flag, currentKey) end
+									if itemConfig.Callback then itemConfig.Callback(currentKey) end
+								end
+							end)
+						end
+					end)
+					-- Return an API to get the current key if needed, though callback is primary
+					return { GetKey = function() return currentKey end, ButtonInstance = KeybindButton }
+
+				else
+					warn("AddItemInternal: Unsupported itemType '" .. tostring(itemType) .. "'")
+					return nil
+				end
+			end
+
+			-- Specific item additions for convenience, mapping to AddItemToFrame with currentSectionFrame
+			function SectionControls:AddButton(config) return AddItemToFrame(currentSectionFrame, "Button", config) end
+			function SectionControls:AddSlider(config) return AddItemToFrame(currentSectionFrame, "Slider", config) end
+			function SectionControls:AddToggle(config) return AddItemToFrame(currentSectionFrame, "Toggle", config) end
+            function SectionControls:AddDropdown(config) return AddItemToFrame(currentSectionFrame, "Dropdown", config) end
+            function SectionControls:AddInput(config) return AddItemToFrame(currentSectionFrame, "Input", config) end
+            function SectionControls:AddParagraph(config) return AddItemToFrame(currentSectionFrame, "Paragraph", config) end
+            function SectionControls:AddDivider(config) return AddItemToFrame(currentSectionFrame, "Divider", config) end
+            function SectionControls:AddKeybind(config) return AddItemToFrame(currentSectionFrame, "Keybind", config) end
+
+
+			function SectionControls:AddSection(title) -- This creates a sub-section frame
+				local subSectionTitle = title or "Sub Section"
+				local SubSectionFrame = Instance.new("Frame")
+				SubSectionFrame.Name = subSectionTitle
+				SubSectionFrame.BackgroundTransparency = 1
+				SubSectionFrame.Size = UDim2.new(1, 0, 0, 0)
+				SubSectionFrame.AutomaticSize = Enum.AutomaticSize.Y
+				SubSectionFrame.Parent = currentSectionFrame -- Parent to the current section frame
+				SubSectionFrame.LayoutOrder = currentSectionFrame:GetChildren(#currentSectionFrame:GetChildren()) and currentSectionFrame:GetChildren(#currentSectionFrame:GetChildren()).LayoutOrder + 1 or 0
+
+				local SubSectionListLayout = Instance.new("UIListLayout")
+				SubSectionListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+				SubSectionListLayout.Padding = UDim.new(0, 2)
+				SubSectionListLayout.Parent = SubSectionFrame
+				SubSectionListLayout.Name = "SubSectionListLayout"
+
+				if subSectionTitle ~= "" and subSectionTitle ~= " " then
+					local SubSectionText = Instance.new("TextLabel")
+					SubSectionText.Font = Enum.Font.GothamSemibold
+					SubSectionText.Text = subSectionTitle
+					SubSectionText.TextColor3 = Colours.TextColor or Color3.fromRGB(200,200,200)
+					SubSectionText.TextSize = 14
+					SubSectionText.TextXAlignment = Enum.TextXAlignment.Left
+					SubSectionText.BackgroundTransparency = 1
+					SubSectionText.Size = UDim2.new(1, 0, 0, 18)
+					SubSectionText.Name = "SubSectionTitle"
+					SubSectionText.Parent = SubSectionFrame
+					SubSectionText.LayoutOrder = 0
+				end
+
+				-- Create a new SectionControls object for the sub-section
+				-- This new object's AddItemToFrame will target the SubSectionFrame
+				local SubSectionControlsApi = {}
+				for k,v_func in pairs(SectionControls) do -- Copy methods from parent SectionControls
+					if type(v_func) == "function" and k ~= "AddSection" then -- Don't allow AddSection on sub-sub-sections for now
+						SubSectionControlsApi[k] = function(...)
+							-- Temporarily set currentSectionFrame to SubSectionFrame for the duration of this call
+							local oldSectionFrame = currentSectionFrame
+							currentSectionFrame = SubSectionFrame
+							local result = v_func(...) -- This will call the original AddButton, AddSlider etc.
+							currentSectionFrame = oldSectionFrame -- Restore it
+							return result
+						end
+					elseif type(v_func) == "function" and k == "AddSection" then -- Allow one level of sub-sectioning
+                         SubSectionControlsApi[k] = v_func -- This might need more careful handling if deeper nesting is desired.
+                    end
+				end
+				return SubSectionControlsApi
+			end
+
+			return SectionControls
+		end
+
+		-- Store reference for ThemesButton linking
+		if tabName == "Themes" and UBHubLib.TabReferences then
 			UBHubLib.TabReferences["Themes"] = {
-				TabButton = tabReturnData.TabButton, Name = TabConfig.Name, ScrollFramePage = tabReturnData.ScrollFramePage
+				TabButtonInstance = TabButton, -- The actual button instance for activation
+				TabFrame = Tab,             -- The visual tab frame in the list
+				Name = tabName,
+				ScrollFramePage = ScrollFramePage,
+				LayoutOrder = Tab.LayoutOrder
 			}
 		end
-		return tabReturnData.Sections
+
+		return TabControls
 	end
 
+	-- Method for users to add tabs using the new instance
+	function UBHubInstance:CreateUserTab(TabConfig)
+		return CreateTabInternal(TabConfig)
+	end
 
-	local localTabsObject = Tabs -- Use this to add Interface tab
+	-- Expose necessary functions on UBHubInstance
+	UBHubInstance.ApplyTheme = applyTheme
+	UBHubInstance.GetDefaultThemes = function() return DefaultThemes end
+	UBHubInstance.GetCurrentColours = function() return Colours end
+    UBHubInstance.MakeNotify = UBHubLib.MakeNotify -- Expose MakeNotify if it was meant to be public
+    UBHubInstance.CircleClick = CircleClick -- Expose CircleClick if used by items
+    UBHubInstance.Flags = Flags -- Expose Flags for item direct flag manipulation if necessary
+    UBHubInstance.SaveFile = SaveFile -- Expose SaveFile for item direct flag manipulation if necessary
+    UBHubInstance.DisplayOrderCounter = { Value = 0 } -- For dropdowns, etc.
+    UBHubInstance.MoreBlurFrame = MoreBlurFrame -- For dropdowns
+    UBHubInstance.DropdownSelectFrame = DropdownSelectFrame -- For dropdowns
+    UBHubInstance.DropdownFolderInstance = DropdownFolderInstance -- For dropdowns
+    UBHubInstance.DropPageLayoutInstance = DropPageLayoutInstance -- For dropdowns
+    UBHubInstance.MoreBlurConnectButton = MoreBlurConnectButton -- For dropdowns
+    UBHubInstance.CountDropdown = CountDropdown -- For dropdowns, if still needed globally
+
+	-- The old 'localTabsObject = Tabs' is now implicitly handled by CreateTabInternal
+	-- The 'Interface' and 'Themes' tabs will be created using CreateTabInternal later.
 
 	-- Interface Tab Creation (Subtask 5, adapted)
 	local mediaFolder = "UBHubAssets"
-	if FSO.makefolder and not (FSO.isfile and FSO.isfile(mediaFolder)) then FSO.makefolder(mediaFolder) end
+	-- Ensure mediaFolder is created only if FSO tools are available.
+    if FSO.makefolder and FSO.isfile and not FSO.isfile(mediaFolder) then
+        local success, err = pcall(FSO.makefolder, mediaFolder)
+        if not success then warn("Failed to create mediaFolder:", err) end
+    end
 
 	local function ChangeTransparencyInternal(transparencyValue)
 		if Main then Main.BackgroundTransparency = transparencyValue end
@@ -1313,7 +2240,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				if not CurrentHttpService then error("HttpService not available.") end
 				if not FSO.writefile then error("FSO.writefile not available.") end
 				if FSO.makefolder and not (FSO.isfile and FSO.isfile(mediaFolder)) then FSO.makefolder(mediaFolder) end
-				
+
 				local data
 				local httpSuccess, httpResult = pcall(CurrentHttpService.HttpGet, CurrentHttpService, urlOrPath)
 				if not httpSuccess then error("HttpGet failed: " .. tostring(httpResult)) end
@@ -1322,7 +2249,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				local extension = mediaType == "Image" and ".png" or ".mp4"
 				if not filename or filename == "" then filename = CurrentHttpService:GenerateGUID(false) end
 				if not filename:match("%..+$") then filename = filename .. extension end
-				
+
 				local filePath = mediaFolder .. "/" .. filename
 				FSO.writefile(filePath, data)
 				assetId = FSO.getcustomasset(filePath)
@@ -1379,46 +2306,197 @@ function UBHubLib:MakeGui(GuiConfig)
         if GuiConfig then GuiConfig.MainBackgroundTransparency = 0.1 end
     end
 
+	-- ==== BUILT-IN TAB CREATION ====
+	-- Create "Interface" Tab using the new internal structure
+	local InterfaceTabControls = CreateTabInternal({ Name = "Interface", Icon = "lucide:sliders-horizontal" })
+	if InterfaceTabControls then
+		local BGSettingsSection = InterfaceTabControls:AddSectionInternal("Background Settings")
+		if BGSettingsSection then
+			BGSettingsSection:AddSlider({ -- Assuming AddSlider will be mapped to AddItemInternal
+				Title = "UI Transparency", Content = "Adjust overall UI transparency.",
+				Min = 0, Max = 1, Increment = 0.01,
+				Default = Flags.MainBackgroundTransparency or 0.1,
+				Flag = "MainUITransparencySlider",
+				Callback = function(value) ChangeTransparencyInternal(value) end
+			})
+		end
 
-	local InterfaceTab = localTabsObject:CreateTab({ Name = "Interface", Icon = "" }) -- Icon "sliders-horizontal" removed
-	local BGSettingsSection = InterfaceTab:AddSection("Background Settings")
-	BGSettingsSection:AddSlider({
-		Title = "UI Transparency", Content = "Adjust overall UI transparency.",
-		Min = 0, Max = 1, Increment = 0.01,
-		Default = Flags.MainBackgroundTransparency or 0.1,
-		Flag = "MainUITransparencySlider",
-		Callback = function(value) ChangeTransparencyInternal(value) end
-	})
-	local CustomBGSection = InterfaceTab:AddSection("Custom Background")
-	local DownloaderSubSection = CustomBGSection:AddSection("[+] Background Downloader")
-	local selectedMediaType = "Image"
-	DownloaderSubSection:AddDropdown({
-		Title = "Select Media Type", Options = {"Image", "Video"}, Default = selectedMediaType,
-		Callback = function(val) selectedMediaType = type(val) == "table" and val[1] or val end
-	})
-	local bgUrlInput = DownloaderSubSection:AddInput({ Title = "Background URL", Default = "" })
-	local bgFilenameInput = DownloaderSubSection:AddInput({ Title = "Filename (Optional)", Content = "Name to save as. Auto-generates if empty.", Default = "" })
-	DownloaderSubSection:AddButton({ Title = "Load Web Background", Icon = "", Callback = function() -- Icon "download-cloud" removed
-		if bgUrlInput and bgUrlInput.Value ~= "" then ChangeAssetInternal(selectedMediaType, bgUrlInput.Value, bgFilenameInput.Value) end
-	end })
-	local LocalFilesSubSection = CustomBGSection:AddSection("[-] Local Backgrounds")
-	local localFilesDropdown = LocalFilesSubSection:AddDropdown({ Title = "Select Local File", Options = {"(Refresh to see files)"}, Default = "(Refresh to see files)"})
-	local selectedLocalFile = ""
-	if localFilesDropdown and localFilesDropdown.GetPropertyChangedSignal then -- Ensure dropdown object is valid
-		localFilesDropdown:GetPropertyChangedSignal("Value"):Connect(function()
-			if type(localFilesDropdown.Value) == "table" then selectedLocalFile = localFilesDropdown.Value[1] or ""
-			else selectedLocalFile = localFilesDropdown.Value or "" end
-		end)
+		local CustomBGSection = InterfaceTabControls:AddSectionInternal("Custom Background")
+		if CustomBGSection then
+			local DownloaderSubSection = CustomBGSection:AddSection("[+] Background Downloader") -- Test sub-sectioning
+			if DownloaderSubSection then
+				local selectedMediaType = "Image"
+				DownloaderSubSection:AddDropdown({
+					Title = "Select Media Type", Options = {"Image", "Video"}, Default = selectedMediaType,
+					Callback = function(val) selectedMediaType = type(val) == "table" and val[1] or val end
+				})
+				local bgUrlInput = DownloaderSubSection:AddInput({ Title = "Background URL", Default = "" })
+				local bgFilenameInput = DownloaderSubSection:AddInput({ Title = "Filename (Optional)", Content = "Name to save as. Auto-generates if empty.", Default = "" })
+				DownloaderSubSection:AddButton({ Title = "Load Web Background", Icon = "lucide:download-cloud", Callback = function()
+					if bgUrlInput and bgUrlInput.Value ~= "" then ChangeAssetInternal(selectedMediaType, bgUrlInput.Value, bgFilenameInput.Value) end
+				end })
+			end
+
+			local LocalFilesSubSection = CustomBGSection:AddSection("[-] Local Backgrounds")
+			if LocalFilesSubSection then
+				local localFilesDropdown = LocalFilesSubSection:AddDropdown({ Title = "Select Local File", Options = {"(Refresh to see files)"}, Default = "(Refresh to see files)", InternalFlag = "LocalFilesDropdown"})
+				local selectedLocalFile = ""
+				-- Note: Dropdown value is now typically obtained via its API, e.g., localFilesDropdown.Value()
+				LocalFilesSubSection:AddButton({ Title = "Refresh Local Files", Icon = "lucide:refresh-cw", Callback = function()
+					if FSO.makefolder and FSO.listfiles and FSO.isfile then
+						if FSO.isfile and FSO.makefolder and not FSO.isfile(mediaFolder) then
+                            local suc,er = pcall(FSO.makefolder, mediaFolder)
+                            if not suc then warn("Refresh: makefolder failed", er) end
+                        end
+						local files = {}
+                        local sucList, listRes = pcall(FSO.listfiles, mediaFolder)
+                        if sucList then files = listRes else warn("Refresh: listfiles failed", listRes) end
+
+						local allFilesToDisplay = {}
+						for _, fileFullName in ipairs(files) do
+							if fileFullName:match("%.png$") or fileFullName:match("%.jpg$") or fileFullName:match("%.jpeg$") or fileFullName:match("%.gif$") or fileFullName:match("%.mp4$") or fileFullName:match("%.webm$") then
+								table.insert(allFilesToDisplay, mediaFolder .. "/" .. fileFullName)
+							end
+						end
+						if #allFilesToDisplay == 0 then table.insert(allFilesToDisplay, "(No files found)") end
+
+                        local lfdAPI = AllCreatedItemControls["LocalFilesDropdown"] -- Get API from stored controls
+						if lfdAPI and lfdAPI.Refresh then
+							lfdAPI:Refresh(allFilesToDisplay, allFilesToDisplay[1] or "(No files found)")
+							-- selectedLocalFile will be updated by the dropdown's own callback/value mechanism
+						else warn("localFilesDropdown or its Refresh method not found.") end
+					else warn("Refresh Local Files: 'listfiles', 'makefolder' or 'isfile' not available.") end
+				end})
+				LocalFilesSubSection:AddButton({ Title = "Load Selected Local File", Icon = "lucide:folder-up", Callback = function()
+                    local lfdAPI = AllCreatedItemControls["LocalFilesDropdown"]
+                    if lfdAPI then selectedLocalFile = lfdAPI.Value() end -- Get current value from API
+
+					if selectedLocalFile and selectedLocalFile ~= "" and selectedLocalFile ~= "(No files found)" and selectedLocalFile ~= "(Refresh to see files)" then
+						if FSO.getcustomasset then
+							local mediaTypeForLocal = (selectedLocalFile:match("%.mp4$") or selectedLocalFile:match("%.webm$")) and "Video" or "Image"
+							ChangeAssetInternal(mediaTypeForLocal, selectedLocalFile, nil)
+						else warn("Load Selected Local File: 'getcustomasset' not available.") end
+					else warn("No valid local file selected.") end
+				end})
+			end
+			CustomBGSection:AddButton({ Title = "Reset Background", Icon = "lucide:rotate-ccw", Callback = function() ResetBackgroundInternal() end })
+		end
 	end
-	LocalFilesSubSection:AddButton({ Title = "Refresh Local Files", Icon = "", Callback = function() -- Icon "refresh-cw" removed
-		if FSO.makefolder and FSO.listfiles and FSO.isfile then
-			if not FSO.isfile(mediaFolder) then FSO.makefolder(mediaFolder) end
-			local files = FSO.listfiles(mediaFolder)
-			local allFilesToDisplay = {}
-			for _, fileFullName in ipairs(files) do
-				if fileFullName:match("%.png$") or fileFullName:match("%.jpg$") or fileFullName:match("%.jpeg$") or fileFullName:match("%.gif$") or fileFullName:match("%.mp4$") or fileFullName:match("%.webm$") then
-					table.insert(allFilesToDisplay, mediaFolder .. "/" .. fileFullName)
+
+	-- Create "Themes" Tab
+	local ThemesTabControls = CreateTabInternal({Name = "Themes", Icon = "lucide:palette"})
+	if ThemesTabControls then
+		local PresetsSection = ThemesTabControls:AddSectionInternal("Theme Presets")
+		if PresetsSection then
+			for themeName, _ in pairs(DefaultThemes) do
+				PresetsSection:AddButton({
+					Title = themeName,
+                    Icon = "lucide:brush",
+					Callback = function()
+						if UBHubInstance.ApplyTheme then UBHubInstance.ApplyTheme(themeName, false) end
+					end
+				})
+			end
+		end
+		local CustomizeSection = ThemesTabControls:AddSectionInternal("Customize Colors")
+		if CustomizeSection then
+			-- Define an order for color keys to appear in UI if desired
+			local orderedColorKeys = {
+				"Background", "Topbar", "TabBackground", "TabBackgroundSelected", "ElementBackground", "SecondaryElementBackground",
+				"InputBackground", "DropdownUnselected", "DropdownSelected", "SliderBackground",
+				"TextColor", "SelectedTabTextColor", "TabTextColor", "PlaceholderColor",
+				"Stroke", "SecondaryElementStroke", "ElementStroke", "SliderStroke",
+				"ToggleEnabled", "ToggleDisabled", "ToggleEnabledStroke", "ToggleDisabledStroke",
+				"ToggleEnabledOuterStroke", "ToggleDisabledOuterStroke",
+				"Primary", "Secondary", "Accent", "ThemeHighlight", "SliderProgress", "Shadow", "GuiConfigColor",
+				"NotificationBackground", "NotificationActionsBackground"
+			}
+			local tempColourHolder = deepcopy(Colours) -- Use a consistent snapshot for creating sliders
+
+			for _, colorKey in ipairs(orderedColorKeys) do
+				if tempColourHolder[colorKey] and type(tempColourHolder[colorKey]) == "Color3" then
+					local colorDisplayName = colorKey:gsub("([a-z])([A-Z])", "%1 %2") -- Add space before capital letters
+
+					local ColorSubSection = CustomizeSection:AddSection(colorDisplayName) -- Create a sub-section for each color
+					if ColorSubSection then
+						local originalColor = tempColourHolder[colorKey]
+						local r, g, b = math.floor(originalColor.R * 255 + 0.5), math.floor(originalColor.G * 255 + 0.5), math.floor(originalColor.B * 255 + 0.5)
+
+						local function updateCustomColor()
+							local newR = AllCreatedItemControls.Sliders[colorKey].R.Value
+							local newG = AllCreatedItemControls.Sliders[colorKey].G.Value
+							local newB = AllCreatedItemControls.Sliders[colorKey].B.Value
+							Colours[colorKey] = Color3.fromRGB(newR, newG, newB)
+							if UBHubInstance.ApplyTheme then UBHubInstance.ApplyTheme(Colours, false) end -- Apply the direct table of colours
+						end
+
+						AllCreatedItemControls.Sliders[colorKey] = AllCreatedItemControls.Sliders[colorKey] or {}
+						AllCreatedItemControls.Sliders[colorKey].R = ColorSubSection:AddSlider({ Title = "Red", Min = 0, Max = 255, Default = r, Increment = 1, Callback = updateCustomColor })
+						AllCreatedItemControls.Sliders[colorKey].G = ColorSubSection:AddSlider({ Title = "Green", Min = 0, Max = 255, Default = g, Increment = 1, Callback = updateCustomColor })
+						AllCreatedItemControls.Sliders[colorKey].B = ColorSubSection:AddSlider({ Title = "Blue", Min = 0, Max = 255, Default = b, Increment = 1, Callback = updateCustomColor })
+					end
 				end
+			end
+		end
+	end
+	-- End of Built-in Tab Creation
+
+	if Flags.MainBackgroundTransparency ~= nil then
+		ChangeTransparencyInternal(Flags.MainBackgroundTransparency)
+	end
+
+	-- Create built-in tabs after all base UI is defined and CreateTabInternal is ready
+	-- local ThemesTabControls = CreateTabInternal({ Name = "Themes", Icon = GetIcon("lucide:palette") })
+	-- -- Populate ThemesTabControls with sections and items
+
+	-- local InterfaceTabControls = CreateTabInternal({ Name = "Interface", Icon = GetIcon("lucide:sliders-horizontal") })
+	-- -- Populate InterfaceTabControls (code for this is currently below, needs to be moved/adapted)
+
+
+	-- Ensure the "ThemesButton" in Info section can trigger the "Themes" tab.
+						local files = {}
+                        local sucList, listRes = pcall(FSO.listfiles, mediaFolder)
+                        if sucList then files = listRes else warn("Refresh: listfiles failed", listRes) end
+
+						local allFilesToDisplay = {}
+						for _, fileFullName in ipairs(files) do
+							if fileFullName:match("%.png$") or fileFullName:match("%.jpg$") or fileFullName:match("%.jpeg$") or fileFullName:match("%.gif$") or fileFullName:match("%.mp4$") or fileFullName:match("%.webm$") then
+								table.insert(allFilesToDisplay, mediaFolder .. "/" .. fileFullName)
+							end
+						end
+						if #allFilesToDisplay == 0 then table.insert(allFilesToDisplay, "(No files found)") end
+						if localFilesDropdown and localFilesDropdown.Refresh then
+							localFilesDropdown:Refresh(allFilesToDisplay, allFilesToDisplay[1] or "(No files found)")
+							if type(allFilesToDisplay[1]) == "string" then selectedLocalFile = allFilesToDisplay[1] else selectedLocalFile = "" end
+						else warn("localFilesDropdown or its Refresh method not found.") end
+					else warn("Refresh Local Files: 'listfiles', 'makefolder' or 'isfile' not available.") end
+				end})
+				LocalFilesSubSection:AddButton({ Title = "Load Selected Local File", Icon = "", Callback = function()
+					if selectedLocalFile and selectedLocalFile ~= "" and selectedLocalFile ~= "(No files found)" and selectedLocalFile ~= "(Refresh to see files)" then
+						if FSO.getcustomasset then
+							local mediaTypeForLocal = (selectedLocalFile:match("%.mp4$") or selectedLocalFile:match("%.webm$")) and "Video" or "Image"
+							ChangeAssetInternal(mediaTypeForLocal, selectedLocalFile, nil)
+						else warn("Load Selected Local File: 'getcustomasset' not available.") end
+					else warn("No valid local file selected.") end
+				end})
+			end
+			CustomBGSection:AddButton({ Title = "Reset Background", Icon = "lucide:rotate-ccw", Callback = function() ResetBackgroundInternal() end })
+		end
+	end
+
+	-- Create "Themes" Tab
+	local ThemesTabControls = CreateTabInternal({Name = "Themes", Icon = "lucide:palette"})
+	if ThemesTabControls then
+		local PresetsSection = ThemesTabControls:AddSectionInternal("Theme Presets")
+		if PresetsSection then
+			for themeName, _ in pairs(DefaultThemes) do
+				PresetsSection:AddButton({
+					Title = themeName,
+                    Icon = "lucide:brush",
+					Callback = function()
+						if UBHubInstance.ApplyTheme then UBHubInstance.ApplyTheme(themeName, false) end
+					end
+				})
 			end
 			if #allFilesToDisplay == 0 then table.insert(allFilesToDisplay, "(No files found)") end
 			if localFilesDropdown and localFilesDropdown.Refresh then
@@ -1441,7 +2519,32 @@ function UBHubLib:MakeGui(GuiConfig)
 		ChangeTransparencyInternal(Flags.MainBackgroundTransparency)
 	end
 
-	return Tabs
+	-- Create built-in tabs after all base UI is defined and CreateTabInternal is ready
+	-- local ThemesTabControls = CreateTabInternal({ Name = "Themes", Icon = GetIcon("lucide:palette") })
+	-- -- Populate ThemesTabControls with sections and items
+
+	-- local InterfaceTabControls = CreateTabInternal({ Name = "Interface", Icon = GetIcon("lucide:sliders-horizontal") })
+	-- -- Populate InterfaceTabControls (code for this is currently below, needs to be moved/adapted)
+
+
+	-- Ensure the "ThemesButton" in Info section can trigger the "Themes" tab.
+	-- This connection logic might need adjustment based on how TabButton.Activated is structured in CreateTabInternal
+	if ThemesButton and UBHubLib.TabReferences and UBHubLib.TabReferences["Themes"] and UBHubLib.TabReferences["Themes"].TabButtonInstance then
+		ThemesButton.Activated:Connect(function()
+			local themesTabRef = UBHubLib.TabReferences["Themes"]
+			if themesTabRef and themesTabRef.TabButtonInstance and themesTabRef.TabButtonInstance.Activated then
+				-- Fire the "Activated" event on the actual TabButton instance for the "Themes" tab.
+				-- This centralizes the tab switching logic within CreateTabInternal.
+				-- The CircleClick is already handled within the TabButton's own Activated event.
+				themesTabRef.TabButtonInstance.Activated:Fire()
+			else
+				warn("ThemesButton: Could not switch to Themes tab. Tab reference or its 'Activated' event not found.")
+			end
+		end)
+	end
+
+
+	return UBHubInstance -- Return the new instance
 end
 
 return UBHubLib
