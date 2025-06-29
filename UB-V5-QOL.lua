@@ -563,6 +563,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	GuiConfig["Tab Width"] = GuiConfig["Tab Width"] or 120
 	GuiConfig["SaveFolder"] = GuiConfig["SaveFolder"] or false
 	local Flags = UBHubLib and UBHubLib.Flags or {}
+	local UIInstance = {}
 	local function SaveFile(Name, Value)
 		if not (writefile and GuiConfig and GuiConfig.SaveFolder) then
 			return false
@@ -2678,7 +2679,6 @@ function UBHubLib:MakeGui(GuiConfig)
 		local Tab = {}
 		return Tab
 	end
-	local UIInstance = {}
 	return UIInstance
 end
 return UBHubLib
