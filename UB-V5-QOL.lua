@@ -1203,8 +1203,105 @@ function UBHubLib:MakeGui(GuiConfig)
 		-- AddDropdown and AddDivider are more complex and will be adapted similarly
 		-- For brevity, only including the structure for now.
 		SectionObject.AddDropdown = Section.AddDropdown -- Assign existing complex functions
-		SectionObject.AddDivider = Section.AddDivider   -- Assign existing complex functions
+		SectionObject.AddDropdown = Section.AddDropdown -- Assign existing complex functions
+		-- SectionObject.AddDivider = Section.AddDivider   -- This was an error, AddDivider is defined on Section, not SectionObject for settings
+		-- Corrected: Define AddDivider for SectionObject within SettingsTab:AddSection if it's not inheriting properly
+		-- Or ensure the AddDivider from the main Section definition is used.
+		-- For now, let's assume the AddDivider from the main Section definition is what we want to use here too,
+		-- or rather, that it was correctly defined on SectionObject as part of the copy.
 
+		-- The crucial missing return was for SectionObject from SettingsTab:AddSection
+		-- However, the diff where SettingsTab:AddSection was created already includes "return SectionObject"
+		-- Let me re-check the diff where SettingsTab:AddSection was introduced.
+		-- The diff was:
+		--    SectionObject.AddDropdown = Section.AddDropdown -- Assign existing complex functions
+		--    SectionObject.AddDivider = Section.AddDivider   -- Assign existing complex functions
+		--    settingsSectionCount = settingsSectionCount + 1
+		--    return SectionObject
+		-- So the return IS there.
+		-- The issue might be in how AddDivider was assigned or if SectionObject itself is not what's expected.
+
+		-- Let's ensure all methods, including AddDivider, are correctly on SectionObject.
+		-- The previous diff for populating SectionObject methods was:
+		-- SectionObject.AddDropdown = Section.AddDropdown
+		-- SectionObject.AddDivider = Section.AddDivider
+		-- This implies it *should* be there.
+
+		-- The user's provided code for AddDivider was "function Items:AddDivider(DividerConfig)"
+		-- which I then integrated as "function Section:AddDivider(DividerConfig)"
+		-- For SettingsTab, this should be "function SectionObject:AddDivider(DividerConfig)"
+
+		-- Let's ensure the AddDivider is correctly defined for the SectionObject within SettingsTab:AddSection
+		-- by copying the corrected AddDivider logic directly into it.
+
+		function SectionObject:AddDivider(DividerConfig) -- Copied from user's corrected version
+			local DividerConfig = DividerConfig or {}
+			DividerConfig.Text = DividerConfig.Text or nil
+
+			local DividerContainer = Instance.new("Frame")
+			DividerContainer.Name = "Divider"
+			DividerContainer.Size = UDim2.new(1, 0, 0, 20)
+			DividerContainer.BackgroundTransparency = 1
+			DividerContainer.LayoutOrder = CountItem -- This CountItem is local to SectionObject's methods scope
+			DividerContainer.Parent = SectionObject._SectionAdd
+
+			if not DividerConfig.Text or DividerConfig.Text == "" then
+				local Line = Instance.new("Frame")
+				Line.Name = "FullLine"
+				Line.BackgroundColor3 = DividerConfig.Color or Color3.fromRGB(120, 120, 120)
+				Line.BorderSizePixel = 0
+				Line.AnchorPoint = Vector2.new(0.5, 0.5)
+				Line.Position = UDim2.new(0.5, 0, 0.5, 0)
+				Line.Size = UDim2.new(1, -10, 0, 1)
+				Line.Parent = DividerContainer
+			else
+				DividerContainer.Size = UDim2.new(1, 0, 0, (DividerConfig.TextSize or 12) + 8)
+
+				local ListLayout = Instance.new("UIListLayout")
+				ListLayout.FillDirection = Enum.FillDirection.Horizontal
+				ListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+				ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+				ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+				ListLayout.Padding = UDim.new(0, 8)
+				ListLayout.Parent = DividerContainer
+
+				local Line1 = Instance.new("Frame")
+				Line1.Name = "Line1"
+				Line1.BackgroundColor3 = DividerConfig.Color or Color3.fromRGB(120, 120, 120)
+				Line1.BorderSizePixel = 0
+				Line1.Size = UDim2.new(1, 0, 0, 1)
+				Line1.LayoutOrder = 1
+				Line1.Parent = DividerContainer
+
+				local DividerText = Instance.new("TextLabel")
+				DividerText.Name = "DividerText"
+				DividerText.Text = DividerConfig.Text
+				DividerText.TextColor3 = DividerConfig.TextColor or Color3.fromRGB(200, 200, 200)
+				DividerText.Font = DividerConfig.Font or Enum.Font.GothamBold
+				DividerText.TextSize = DividerConfig.TextSize or 12
+				DividerText.BackgroundTransparency = 1
+				DividerText.AutomaticSize = Enum.AutomaticSize.X
+				DividerText.Size = UDim2.new(0, 0, 1, 0)
+				DividerText.LayoutOrder = 2
+				DividerText.Parent = DividerContainer
+
+				local Line2 = Instance.new("Frame")
+				Line2.Name = "Line2"
+				Line2.BackgroundColor3 = DividerConfig.Color or Color3.fromRGB(120, 120, 120)
+				Line2.BorderSizePixel = 0
+				Line2.Size = UDim2.new(1, 0, 0, 1)
+				Line2.LayoutOrder = 3
+				Line2.Parent = DividerContainer
+			end
+
+			task.defer(function()
+				SectionObject._UpdateSizeSection()
+				SectionObject._UpdateSizeScroll()
+			end)
+
+			CountItem = CountItem + 1
+			return {}
+		end
 
 		settingsSectionCount = settingsSectionCount + 1
 		return SectionObject
