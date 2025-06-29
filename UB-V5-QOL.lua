@@ -1247,10 +1247,9 @@ function UBHubLib:MakeGui(GuiConfig)
 	DropPageLayout.Name = "DropPageLayout"
 	DropPageLayout.Parent = DropdownFolder
 	--// Tabs
-	local Tabs = {}
 	local CountTab = 0
 	local CountDropdown = 0
-	function Tabs:CreateTab(TabConfig)
+	function UIInstance:CreateTab(TabConfig)
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "Tab"
 		TabConfig.Icon = TabConfig.Icon or ""
@@ -2676,8 +2675,10 @@ function UBHubLib:MakeGui(GuiConfig)
 			return Items
 		end
 		CountTab = CountTab + 1
-		return Sections
+		local Tab = {}
+		return Tab
 	end
-	return Tabs
+	local UIInstance = {}
+	return UIInstance
 end
 return UBHubLib
