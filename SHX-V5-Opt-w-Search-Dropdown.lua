@@ -2208,14 +2208,37 @@ end)
         
           local function UpdateCanvasSize()
             local OffsetY = 0
+            local uiListLayout = ScrollSelect:FindFirstChildOfClass("UIListLayout")
 
-            for _, child in ipairs(ScrollSelect:GetChildren()) do
-              if child.Name ~= "UIListLayout" then
-                OffsetY = OffsetY + 3 + child.Size.Y.Offset
-              end
+            if not uiListLayout then
+                warn("Item:AddDropdown:UpdateCanvasSize - UIListLayout not found in ScrollSelect. Using default padding guess for CanvasSize.")
+                -- Fallback or alternative calculation if uiListLayout is missing.
+                for _, child in ipairs(ScrollSelect:GetChildren()) do
+                    -- Consider only 'Option' frames and exclude the SearchBar (TextBox) for height calculation.
+                    if child:IsA("Frame") and child.Name == "Option" then
+                         OffsetY = OffsetY + 3 + child.Size.Y.Offset -- Fallback to old hardcoded padding of 3
+                    end
+                end
+                ScrollSelect.CanvasSize = UDim2.new(0, 0, 0, math.max(0, OffsetY))
+                return
             end
 
-            ScrollSelect.CanvasSize = UDim2.new(0, 0, 0, OffsetY)
+            local optionFrames = {}
+            for _, child in ipairs(ScrollSelect:GetChildren()) do
+                if child:IsA("Frame") and child.Name == "Option" then
+                    table.insert(optionFrames, child)
+                end
+            end
+
+            if #optionFrames > 0 then
+                for i, itemFrame in ipairs(optionFrames) do
+                    OffsetY = OffsetY + itemFrame.Size.Y.Offset
+                    if i < #optionFrames then -- Add padding for all but the last item
+                        OffsetY = OffsetY + uiListLayout.Padding.Offset
+                    end
+                end
+            end
+            ScrollSelect.CanvasSize = UDim2.new(0, 0, 0, math.max(0, OffsetY)) -- Ensure non-negative
           end
         
           UpdateCanvasSize()
