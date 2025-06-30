@@ -738,27 +738,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				if DropdownConfig.Flag then resources.saveFileFunc(DropdownConfig.Flag, DropdownFunc.Value) end
 			end)
 
-			-- Corrected CanvasSize calculation
-			task.wait() -- Allow UI to update before calculating size
-			local Current_UIListLayout_Scroll = ScrollSelect_Instance:FindFirstChildOfClass("UIListLayout")
-			if not Current_UIListLayout_Scroll then
-				warn("_Internal_CreateDropdown:AddOption - UIListLayout_Scroll_Instance not found during CanvasSize update for ScrollSelect: " .. ScrollSelect_Instance.Name)
-				return
-			end -- Safety check
-
-			local offsetY = 0
-			for _, child in ipairs(ScrollSelect_Instance:GetChildren()) do
-				if child:IsA("GuiObject") and child.Name == "Option" then
-					offsetY = offsetY + child.AbsoluteSize.Y + Current_UIListLayout_Scroll.Padding.Offset
-				end
-			end
-            -- The loop correctly adds padding *after* each item that has a subsequent item.
-            -- If there are items, the last item's padding addition effectively becomes bottom padding.
-            -- If no items, offsetY remains 0. If items, subtract the last added padding if you don't want bottom padding.
-            -- The provided user example implicitly creates bottom padding. If that's not desired:
-            if offsetY > 0 then offsetY = offsetY - Current_UIListLayout_Scroll.Padding.Offset end
-
-			ScrollSelect_Instance.CanvasSize = UDim2.new(0, 0, 0, math.max(0, offsetY)) -- Ensure non-negative
+			-- CanvasSize calculation removed from AddOption, will be handled in Refresh
 		end
 
 		function DropdownFunc:Set(val)
@@ -791,6 +771,21 @@ function UBHubLib:MakeGui(GuiConfig)
 			DropdownFunc.Options=rL
 			for _,oR in pairs(rL) do DropdownFunc:AddOption(oR) end
 			DropdownFunc.Value=nil; DropdownFunc:Set(sEl)
+
+			-- Set CanvasSize after all options are added
+			task.defer(function()
+				if ScrollSelect_Instance and UIListLayout_Scroll_Instance then -- Ensure they are still valid
+					ScrollSelect_Instance.CanvasSize = UDim2.new(0, 0, 0, UIListLayout_Scroll_Instance.AbsoluteContentSize.Y)
+				elseif ScrollSelect_Instance then -- Fallback if UIListLayout_Scroll_Instance became nil unexpectedly
+					warn("_Internal_CreateDropdown:Refresh - UIListLayout_Scroll_Instance was nil, attempting to find again.")
+					local currentLayout = ScrollSelect_Instance:FindFirstChildOfClass("UIListLayout")
+					if currentLayout then
+						ScrollSelect_Instance.CanvasSize = UDim2.new(0,0,0, currentLayout.AbsoluteContentSize.Y)
+					else
+						warn("_Internal_CreateDropdown:Refresh - Could not find UIListLayout in ScrollSelect_Instance for CanvasSize.")
+					end
+				end
+			end)
 		end
 
 		DropdownFunc:Refresh(DropdownConfig.Options, DropdownConfig.Default)
