@@ -563,6 +563,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	GuiConfig["SaveFolder"] = GuiConfig["SaveFolder"] or false
 	local Flags = UBHubLib and UBHubLib.Flags or {}
 	local UIInstance = {}
+	local CountTab = 0
+	local CountDropdown = 0
 
 	--[[
 		_Internal_CreateDropdown: Master function for creating dropdown UI elements.
@@ -2336,8 +2338,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	DropPageLayout.Name = "DropPageLayout"
 	DropPageLayout.Parent = DropdownFolder
 	--// Tabs
-	local CountTab = 0
-	local CountDropdown = 0 -- Moved here from CreateTab
+	-- local CountTab = 0 -- Moved to top of MakeGui
+	-- local CountDropdown = 0 -- Moved to top of MakeGui
 	function UIInstance:CreateTab(TabConfig)
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "Tab"
