@@ -682,6 +682,238 @@ function Speed_Library:CreateWindow(Config)
   DropShadowHolder.Size = UDim2.new(0, 115 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X, 0, 350)
 	MakeDraggable(Top, DropShadowHolder)
 
+  local function _Internal_Create_SHX_Dropdown(parentFrameForItems, DropdownConfig, extResources)
+    -- extResources expected: Custom, DropdownFolder, DropPageLayout, MoreBlur, DropdownSelect,
+    -- circleClick (global), PlayerMouse (via getter), TweenService (global),
+    -- itemCount (direct value), countDropdownRef (passed as {Value=...})
+    -- updateParentSizeFunc (optional callback from caller)
+
+    local Config = DropdownConfig or {}
+    Config.Title = Config.Title or "No Title"
+    Config.Content = Config.Content or ""
+    Config.Multi = Config.Multi or false
+    Config.Options = Config.Options or {}
+    Config.Default = Config.Default or (Config.Multi and {} or nil)
+    Config.Callback = Config.Callback or function() end
+
+    local DropdownFunc = {Value = Config.Default, Options = Config.Options}
+
+    local DropdownFrame = extResources.Custom.Create("Frame", {
+        Name = "Dropdown",
+        Parent = parentFrameForItems,
+        LayoutOrder = extResources.itemCount, -- Direct value from caller
+        Size = UDim2.new(1,0,0,35),
+        BackgroundTransparency = 0.935,
+        BackgroundColor3 = Color3.fromRGB(40,40,40)
+    })
+    if parentFrameForItems then DropdownFrame.Parent = parentFrameForItems end -- Ensure parent
+    extResources.Custom.Create("UICorner", {CornerRadius = UDim.new(0,4)}, DropdownFrame)
+
+    local DropdownTitle = extResources.Custom.Create("TextLabel", {
+        Name = "DropdownTitle", Font = Enum.Font.GothamBold, Text = Config.Title,
+        TextColor3 = Color3.fromRGB(230,230,230), TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
+        BackgroundTransparency=1, Position = UDim2.new(0,10,0,10), Size = UDim2.new(1,-180,0,13)
+    }, DropdownFrame)
+
+    local DropdownContent = extResources.Custom.Create("TextLabel", {
+        Name = "DropdownContent", Font = Enum.Font.GothamBold, Text = Config.Content,
+        TextColor3 = Color3.fromRGB(255,255,255), TextSize = 12, TextTransparency = 0.6,
+        TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Bottom,
+        BackgroundTransparency=1, Position = UDim2.new(0,10,0,23), Size = UDim2.new(1,-180,0,12)
+    }, DropdownFrame)
+
+    task.delay(0, function()
+        if not DropdownContent or not DropdownContent.Parent then return end
+        DropdownContent.TextWrapped = false
+        local textSizeX = DropdownContent.TextBounds.X
+        local frameWidth = DropdownContent.AbsoluteSize.X > 0 and DropdownContent.AbsoluteSize.X or 1
+        local lines = math.max(1, math.ceil(textSizeX / frameWidth))
+        local contentHeight = lines * 12
+        DropdownContent.Size = UDim2.new(1, -180, 0, contentHeight)
+        if DropdownFrame and DropdownFrame.Parent then
+             DropdownFrame.Size = UDim2.new(1, 0, 0, math.max(35, 10 + (DropdownTitle and DropdownTitle.TextBounds.Y or 13) + 5 + contentHeight + 10))
+        end
+        DropdownContent.TextWrapped = true
+        if extResources.updateParentSizeFunc then extResources.updateParentSizeFunc() end
+    end)
+
+    local SelectOptionsFrame = extResources.Custom.Create("Frame", {
+        Name = "SelectOptionsFrame", AnchorPoint = Vector2.new(1,0.5),
+        BackgroundColor3 = Color3.fromRGB(30,30,30),
+        BackgroundTransparency = 0.95, BorderSizePixel = 0,
+        Position = UDim2.new(1,-7,0.5,0), Size = UDim2.new(0,148,0,30),
+        LayoutOrder = extResources.countDropdownRef.Value
+    }, DropdownFrame)
+    extResources.Custom.Create("UICorner",{CornerRadius = UDim.new(0,4)}, SelectOptionsFrame)
+
+    local OptionSelecting = extResources.Custom.Create("TextLabel", {
+        Name = "OptionSelecting", Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(255,255,255),
+        TextSize = 12, TextTransparency = 0.6, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
+        AnchorPoint = Vector2.new(0,0.5), BackgroundTransparency = 1,
+        Position = UDim2.new(0,5,0.5,0), Size = UDim2.new(1,-30,1,-8)
+    }, SelectOptionsFrame)
+
+    extResources.Custom.Create("ImageLabel", {
+        Name = "OptionImg", Image = "rbxassetid://16851841101",
+        ImageColor3 = Color3.fromRGB(231,231,231), AnchorPoint = Vector2.new(1,0.5),
+        BackgroundTransparency=1, Position = UDim2.new(1,0,0.5,0), Size = UDim2.new(0,25,0,25)
+    }, SelectOptionsFrame)
+
+    local DropdownButton = extResources.Custom.Create("TextButton", {
+        Name = "DropdownButton", Text = "", Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1
+    }, DropdownFrame)
+
+    local currentDropdownID = extResources.countDropdownRef.Value
+    extResources.countDropdownRef.Value = extResources.countDropdownRef.Value + 1
+
+    local DropdownContainer = extResources.DropdownFolder:FindFirstChild("DropdownContainer_"..tostring(currentDropdownID))
+    if not DropdownContainer then
+        DropdownContainer = extResources.Custom.Create("Frame", { Name = "DropdownContainer_"..tostring(currentDropdownID), Parent = extResources.DropdownFolder, BackgroundTransparency = 1, Size = UDim2.new(1,0,1,0) })
+        local SearchBar = extResources.Custom.Create("TextBox", {
+            Name = "SearchBar_Dropdown", Parent = DropdownContainer, Font = Enum.Font.GothamBold, PlaceholderText = "Search",
+            PlaceholderColor3 = Color3.fromRGB(120,120,120), Text = "", TextColor3 = Color3.fromRGB(255,255,255), TextSize = 12,
+            BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 0.9, BorderColor3 = Custom.ColorRGB, BorderSizePixel = 1,
+            Size = UDim2.new(1,-10,0,20), Position = UDim2.new(0,5,0,5)
+        })
+        local ScrollSel = extResources.Custom.Create("ScrollingFrame", {
+            Name = "ScrollSelect", Parent = DropdownContainer, CanvasSize = UDim2.new(0,0,0,0), ScrollBarThickness = 0, Active = true,
+            Position = UDim2.new(0,0,0,25), BackgroundTransparency=1, Size = UDim2.new(1,0,1,-25)
+        })
+        extResources.Custom.Create("UIListLayout", { Parent = ScrollSel, Padding = UDim.new(0,3), SortOrder = Enum.SortOrder.LayoutOrder })
+
+        SearchBar:GetPropertyChangedSignal("Text"):Connect(function()
+            local s = SearchBar.Text:lower()
+            for _,oF in ipairs(ScrollSel:GetChildren()) do
+                if oF:IsA("Frame") and oF.Name == "Option" then
+                    local oT = oF:FindFirstChild("OptionText")
+                    if oT then oF.Visible = (s == "" or oT.Text:lower():find(s,1,true)) end
+                end
+            end
+        end)
+    end
+
+    local ScrollSelect_Instance = DropdownContainer:FindFirstChild("ScrollSelect")
+    local UIListLayout_Scroll_Instance
+	if ScrollSelect_Instance then UIListLayout_Scroll_Instance = ScrollSelect_Instance:FindFirstChildOfClass("UIListLayout") else warn("SHX_InternalDropdown: ScrollSelect_Instance not found") end
+    if not UIListLayout_Scroll_Instance then warn("SHX_InternalDropdown: UIListLayout_Scroll_Instance not found") end
+
+    DropdownButton.Activated:Connect(function()
+        CircleClick(DropdownButton, Player:GetMouse().X, Player:GetMouse().Y)
+        if not extResources.MoreBlur.Visible then
+            extResources.MoreBlur.Visible = true
+            extResources.DropPageLayout:JumpTo(DropdownContainer)
+            TweenService:Create(extResources.MoreBlur, TweenInfo.new(0.2),{BackgroundTransparency = 0.7}):Play()
+            TweenService:Create(extResources.DropdownSelect, TweenInfo.new(0.2),{Position = UDim2.new(1,-11,0.5,0)}):Play()
+        end
+    end)
+
+    local dropCountLocal = 0
+    function DropdownFunc:Clear()
+        if not ScrollSelect_Instance then return end
+        for i = #ScrollSelect_Instance:GetChildren(), 1, -1 do
+            local child = ScrollSelect_Instance:GetChildren()[i]
+            if child.Name == "Option" then child:Destroy() end
+        end
+        DropdownFunc.Value={}; DropdownFunc.Options={}; OptionSelecting.Text = "Select Options"; dropCountLocal = 0
+        ScrollSelect_Instance.CanvasSize = UDim2.new(0,0,0,0)
+    end
+
+    function DropdownFunc:AddOption(oN)
+        if not ScrollSelect_Instance or not UIListLayout_Scroll_Instance then
+            warn("SHX_InternalDropdown:AddOption - ScrollSelect or UIListLayout is nil.")
+            return
+        end
+        oN = oN or "Option"
+        local oF = extResources.Custom.Create("Frame", { Name="Option", Size=UDim2.new(1,0,0,30), BackgroundTransparency=0.97, BackgroundColor3=Color3.fromRGB(45,45,45), Parent = ScrollSelect_Instance})
+        extResources.Custom.Create("UICorner",{CornerRadius=UDim.new(0,3)},oF)
+        local oB = extResources.Custom.Create("TextButton",{Name="OptionButton", Text="", Size=UDim2.new(1,0,1,0), BackgroundTransparency=1},oF)
+        extResources.Custom.Create("TextLabel",{Name="OptionText", Font=Enum.Font.GothamBold, Text=oN, TextColor3=Color3.fromRGB(230,230,230), TextSize=13, TextXAlignment=Enum.TextXAlignment.Left, BackgroundTransparency=1, Position=UDim2.new(0,8,0,8), Size=UDim2.new(1,-16,1,-16)},oF)
+        local cF = extResources.Custom.Create("Frame",{Name="ChooseFrame", AnchorPoint=Vector2.new(0,0.5), BackgroundColor3=Custom.ColorRGB, BorderSizePixel=0, Position=UDim2.new(0,2,0.5,0), Size=UDim2.new(0,0,0,0)},oF)
+        extResources.Custom.Create("UICorner",{CornerRadius=UDim.new(0,3)},cF)
+        extResources.Custom.Create("UIStroke",{Color=Custom.ColorRGB, Thickness=1.6, Transparency=1},cF)
+        dropCountLocal=dropCountLocal+1; oF.LayoutOrder=dropCountLocal
+
+        oB.Activated:Connect(function()
+            CircleClick(oB, Player:GetMouse().X, Player:GetMouse().Y)
+            if Config.Multi then
+                local fI=table.find(DropdownFunc.Value,oN)
+                if fI then table.remove(DropdownFunc.Value,fI) else table.insert(DropdownFunc.Value,oN) end
+            else
+                DropdownFunc.Value={oN}
+            end
+            DropdownFunc:Set(DropdownFunc.Value)
+        end)
+
+        local function UpdateCanvasSize()
+            local OffsetY = 0
+            if not UIListLayout_Scroll_Instance then
+                warn("SHX_InternalDropdown:UpdateCanvasSize (nested) - UIListLayout_Scroll_Instance is nil. Cannot calculate CanvasSize correctly.")
+                for _, child_in_scroll in ipairs(ScrollSelect_Instance:GetChildren()) do
+                    if child_in_scroll:IsA("Frame") and child_in_scroll.Name == "Option" then OffsetY = OffsetY + 3 + child_in_scroll.Size.Y.Offset end
+                end
+                ScrollSelect_Instance.CanvasSize = UDim2.new(0,0,0,OffsetY)
+                return
+            end
+
+            local optionFrames = {}
+            for _, child_in_scroll in ipairs(ScrollSelect_Instance:GetChildren()) do
+                if child_in_scroll:IsA("Frame") and child_in_scroll.Name == "Option" then table.insert(optionFrames, child_in_scroll) end
+            end
+
+            if #optionFrames > 0 then
+                for i, itemFrame in ipairs(optionFrames) do
+                    OffsetY = OffsetY + itemFrame.Size.Y.Offset
+                    if i < #optionFrames then OffsetY = OffsetY + UIListLayout_Scroll_Instance.Padding.Offset end
+                end
+            end
+            ScrollSelect_Instance.CanvasSize = UDim2.new(0,0,0,math.max(0,OffsetY))
+        end
+        UpdateCanvasSize()
+    end
+
+    function DropdownFunc:Set(val)
+        if not ScrollSelect_Instance then return end
+        if val then
+            local nV=type(val)=="table" and val or {val}
+            local uV={}; for _,v_u in ipairs(nV) do if not table.find(uV,v_u) then table.insert(uV,v_u) end end
+            DropdownFunc.Value=uV
+        end
+        for _,d_S in ipairs(ScrollSelect_Instance:GetChildren()) do
+            if d_S:IsA("Frame") and d_S.Name=="Option" then
+                local optionTextInstance = d_S:FindFirstChild("OptionText")
+                if not optionTextInstance then continue end
+                local iTF=DropdownFunc.Value and table.find(DropdownFunc.Value, optionTextInstance.Text)
+                local tII=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
+                local s_S=iTF and UDim2.new(0,1,0,12) or UDim2.new(0,0,0,0)
+                local bT_S=iTF and 0.935 or 0.97; local tr_S=iTF and 0 or 0.999
+                local chooseFrame = d_S:FindFirstChild("ChooseFrame")
+                if chooseFrame then
+                    TweenService:Create(chooseFrame,tII,{Size=s_S}):Play() -- Global TweenService
+                    local chooseFrameStroke = chooseFrame:FindFirstChildOfClass("UIStroke")
+                    if chooseFrameStroke then TweenService:Create(chooseFrameStroke,tII,{Transparency=tr_S}):Play() end
+                end
+                TweenService:Create(d_S,tII,{BackgroundTransparency=bT_S}):Play()
+            end
+        end
+        local dT=(DropdownFunc.Value and #DropdownFunc.Value>0) and table.concat(DropdownFunc.Value,", ") or "Select Options"
+        OptionSelecting.Text=dT
+        if Config.Callback then Config.Callback(DropdownFunc.Value or {}) end
+    end
+
+    function DropdownFunc:Refresh(rL,sEl)
+        rL=rL or {}; sEl=sEl or Config.Default
+        DropdownFunc:Clear()
+        DropdownFunc.Options=rL
+        for _,oR in pairs(rL) do DropdownFunc:AddOption(oR) end
+        DropdownFunc.Value=nil; DropdownFunc:Set(sEl)
+    end
+
+    DropdownFunc:Refresh(Config.Options, Config.Default)
+
+    -- ItemCount is managed by the caller (Item:AddDropdown) by incrementing its own local ItemCount variable
+    return DropdownFunc
+  end
 
   -- /// Blur
 
@@ -2268,6 +2500,35 @@ end)
       end
 
       ItemCount += 1
+      -- The Item table is returned by Sections:AddSection. Item:AddDropdown is a method of this table.
+      -- Item:AddDropdown's body will be replaced.
+      function Item:AddDropdown(Config)
+          -- Resources from Speed_Library:CreateWindow scope:
+          -- Custom, DropdownFolder, DropPageLayout, MoreBlur, DropdownSelect
+          -- Globals: CircleClick, Player, TweenService
+          -- From Sections:AddSection scope: ItemCount (as direct value)
+          -- From Tabs:CreateTab scope: CountDropdown (needs to be passed as ref)
+
+          local shxResources = {
+              Custom = Custom,
+              DropdownFolder = DropdownFolder, -- Assumes DropdownFolder is defined in Speed_Library:CreateWindow scope
+              DropPageLayout = DropPageLayout, -- Same assumption
+              MoreBlur = MoreBlur,             -- Same assumption
+              DropdownSelect = DropdownSelect, -- Same assumption
+              circleClickHandler = CircleClick, -- Global function
+              mouseGetter = function() return Player:GetMouse() end,
+              tweenServiceInstance = TweenService, -- Global service
+              itemCount = ItemCount, -- Direct value, specific to this section's item count
+              countDropdownRef = { Value = CountDropdown }, -- Passed by reference, CountDropdown is from Tabs:CreateTab scope
+              updateParentSizeFunc = UpdateSizeSection -- Callback to update section size
+          }
+          local newDropdownApi = _Internal_Create_SHX_Dropdown(SectionAdd, Config, shxResources)
+          CountDropdown = shxResources.countDropdownRef.Value -- Update the upvalue
+          ItemCount = ItemCount + 1 -- Original Item:AddDropdown incremented ItemCount *after* creating, so we do it here.
+                                  -- The _Internal_Create_SHX_Dropdown uses the passed itemCount for LayoutOrder
+                                  -- but doesn't increment the caller's ItemCount itself.
+          return newDropdownApi
+      end
       return Item
     end
 
@@ -2275,7 +2536,23 @@ end)
     return Sections
   end
 
+  -- Define _Internal_Create_SHX_Dropdown within the scope of Speed_Library:CreateWindow
+  -- so it can access DropdownFolder, MoreBlur, etc.
+  -- This function will be defined before Tabs:CreateTab if it needs to be accessed by it,
+  -- or passed around if defined at the same level.
+  -- For now, defining it here, assuming it's called by Item:AddDropdown which is within Sections:AddSection,
+  -- which is within Tabs:CreateTab. So, it needs access to variables like DropdownFolder, MoreBlur, etc.,
+  -- which are typically defined at the CreateWindow level.
+  -- Let's assume _Internal_Create_SHX_Dropdown will be defined higher up or these resources passed in.
+  -- For this step, I'm focusing on the refactoring of Item:AddDropdown.
+  -- The actual _Internal_Create_SHX_Dropdown will be more involved to define correctly.
+
   return Tabs
 end
+
+-- Placeholder for where _Internal_Create_SHX_Dropdown would be defined if it were at this top level of the return.
+-- However, it's more likely defined inside Speed_Library:CreateWindow
+-- local function _Internal_Create_SHX_Dropdown(parentFrame, config, resources) ... end
+
 
 return Speed_Library

@@ -564,6 +564,234 @@ function UBHubLib:MakeGui(GuiConfig)
 	local Flags = UBHubLib and UBHubLib.Flags or {}
 	local UIInstance = {}
 
+	--[[
+		_Internal_CreateDropdown: Master function for creating dropdown UI elements.
+		Parameters:
+			- parentFrameForItems: The Frame where the main DropdownFrame UI element will be parented.
+			- config: The DropdownConfig table containing settings like Title, Content, Options, etc.
+			- resources: A table containing shared functions and UI instances needed by the dropdown logic. Expected keys:
+				- getColorFunc: Function to get theme colors.
+				- loadUIAssetFunc: Function to load UI assets.
+				- DropdownFolder: Shared Folder instance for dropdown content pages.
+				- DropPageLayout: UIPageLayout for the DropdownFolder.
+				- MoreBlur: Frame for the blur effect when dropdown is open.
+				- DropdownSelect: Frame for the dropdown selection panel.
+				- circleClickFunc: Function for click visual effect.
+				- mouseRef: Reference to the player's mouse.
+				- tweenServiceRef: Reference to TweenService.
+				- saveFileFunc: Function to save flag/setting.
+				- flagsRef: Table of current flags/settings.
+				- CountItemRef: A table { Value = number } to get and update the layout order.
+	]]
+	local function _Internal_CreateDropdown(parentFrameForItems, DropdownConfig, resources)
+		local DropdownConfig = DropdownConfig or {}
+		DropdownConfig.Title = DropdownConfig.Title or "No Title"
+		DropdownConfig.Content = DropdownConfig.Content or ""
+		DropdownConfig.Multi = DropdownConfig.Multi or false
+		DropdownConfig.Options = DropdownConfig.Options or {}
+		local savedValue = DropdownConfig.Flag and resources.flagsRef[DropdownConfig.Flag]
+		if DropdownConfig.Multi then
+			DropdownConfig.Default = (savedValue and type(savedValue) == "table") and savedValue or (type(DropdownConfig.Default) == "table" and DropdownConfig.Default or {})
+		else
+			DropdownConfig.Default = savedValue or DropdownConfig.Default
+		end
+		DropdownConfig.Callback = DropdownConfig.Callback or function() end
+
+		local DropdownFunc = {Value = DropdownConfig.Default, Options = DropdownConfig.Options}
+
+		local DropdownFrame = Instance.new("Frame")
+		DropdownFrame.Name = "Dropdown"
+		DropdownFrame.Parent = parentFrameForItems -- Use passed parent
+		DropdownFrame.LayoutOrder = resources.CountItemRef.Value
+		DropdownFrame.Size = UDim2.new(1,0,0,46)
+		DropdownFrame.BackgroundTransparency = 0.935
+		DropdownFrame.BackgroundColor3 = resources.getColorFunc("Secondary", DropdownFrame, "BackgroundColor3")
+		Instance.new("UICorner", DropdownFrame).CornerRadius = UDim.new(0,4)
+
+		local DropdownTitle = Instance.new("TextLabel", DropdownFrame)
+		DropdownTitle.Name = "DropdownTitle"; DropdownTitle.Font = Enum.Font.GothamBold; DropdownTitle.Text = DropdownConfig.Title
+		DropdownTitle.TextColor3 = resources.getColorFunc("Text", DropdownTitle, "TextColor3"); DropdownTitle.TextSize = 13
+		DropdownTitle.TextXAlignment = Enum.TextXAlignment.Left; DropdownTitle.TextYAlignment = Enum.TextYAlignment.Top
+		DropdownTitle.BackgroundTransparency=1; DropdownTitle.Position = UDim2.new(0,10,0,10); DropdownTitle.Size = UDim2.new(1,-180,0,13)
+
+		local DropdownContent = Instance.new("TextLabel", DropdownFrame)
+		DropdownContent.Name = "DropdownContent"; DropdownContent.Font = Enum.Font.Gotham; DropdownContent.Text = DropdownConfig.Content
+		DropdownContent.TextColor3 = resources.getColorFunc("Text", DropdownContent, "TextColor3"); DropdownContent.TextSize = 12
+		DropdownContent.TextTransparency = 0.4; DropdownContent.TextWrapped = true; DropdownContent.TextXAlignment = Enum.TextXAlignment.Left
+		DropdownContent.TextYAlignment = Enum.TextYAlignment.Bottom; DropdownContent.BackgroundTransparency=1
+		DropdownContent.Position = UDim2.new(0,10,0,0); DropdownContent.Size = UDim2.new(1,-180,1,-10)
+
+		local SelectOptionsFrame = Instance.new("Frame", DropdownFrame)
+		SelectOptionsFrame.Name = "SelectOptionsFrame"; SelectOptionsFrame.AnchorPoint = Vector2.new(1,0.5)
+		SelectOptionsFrame.BackgroundColor3 = resources.getColorFunc("Primary", SelectOptionsFrame, "BackgroundColor3")
+		SelectOptionsFrame.BackgroundTransparency = 0.95; SelectOptionsFrame.BorderSizePixel = 0
+		SelectOptionsFrame.Position = UDim2.new(1,-7,0.5,0); SelectOptionsFrame.Size = UDim2.new(0,148,0,30)
+		Instance.new("UICorner",SelectOptionsFrame).CornerRadius = UDim.new(0,4)
+
+		local OptionSelecting = Instance.new("TextLabel",SelectOptionsFrame)
+		OptionSelecting.Name = "OptionSelecting"; OptionSelecting.Font = Enum.Font.Gotham
+		OptionSelecting.TextColor3 = resources.getColorFunc("Text", OptionSelecting, "TextColor3"); OptionSelecting.TextSize = 12
+		OptionSelecting.TextTransparency = 0.4; OptionSelecting.TextWrapped = true; OptionSelecting.TextXAlignment = Enum.TextXAlignment.Left
+		OptionSelecting.AnchorPoint = Vector2.new(0,0.5); OptionSelecting.BackgroundTransparency = 1
+		OptionSelecting.Position = UDim2.new(0,5,0.5,0); OptionSelecting.Size = UDim2.new(1,-30,1,-8)
+
+		local OptionImg = Instance.new("ImageLabel",SelectOptionsFrame)
+		OptionImg.Name = "OptionImg"; OptionImg.Image = resources.loadUIAssetFunc("rbxassetid://16851841101", "DropdownArrow_Internal_Master")
+		OptionImg.ImageColor3 = resources.getColorFunc("Text", OptionImg, "ImageColor3"); OptionImg.AnchorPoint = Vector2.new(1,0.5)
+		OptionImg.BackgroundTransparency=1; OptionImg.Position = UDim2.new(1,0,0.5,0); OptionImg.Size = UDim2.new(0,25,0,25)
+
+		local DropdownButton = Instance.new("TextButton", DropdownFrame)
+		DropdownButton.Name = "DropdownButton"; DropdownButton.Text = ""; DropdownButton.Size = UDim2.new(1,0,1,0); DropdownButton.BackgroundTransparency = 1
+
+		local currentDropdownID = CountDropdown; CountDropdown = CountDropdown + 1; -- CountDropdown is an upvalue to MakeGui
+		SelectOptionsFrame.LayoutOrder = currentDropdownID
+
+		local DropdownContainer = resources.DropdownFolder:FindFirstChild("DropdownContainer_"..tostring(currentDropdownID))
+		if not DropdownContainer then
+			DropdownContainer = Instance.new("Frame", resources.DropdownFolder); DropdownContainer.Name = "DropdownContainer_"..tostring(currentDropdownID)
+			DropdownContainer.BackgroundTransparency = 1; DropdownContainer.Size = UDim2.new(1,0,1,0)
+			local SearchBar = Instance.new("TextBox", DropdownContainer); SearchBar.Name = "SearchBar_Dropdown"
+			SearchBar.Font = Enum.Font.GothamBold; SearchBar.PlaceholderText = "🔎 Search"
+			SearchBar.PlaceholderColor3 = resources.getColorFunc("Text", SearchBar, "PlaceholderColor3"); SearchBar.Text = ""
+			SearchBar.TextColor3 = resources.getColorFunc("Text", SearchBar, "TextColor3"); SearchBar.TextSize = 12
+			SearchBar.BackgroundColor3 = resources.getColorFunc("Secondary", SearchBar, "BackgroundColor3"); SearchBar.BackgroundTransparency = 0
+			SearchBar.BorderColor3 = resources.getColorFunc("Stroke", SearchBar, "BorderColor3"); SearchBar.BorderSizePixel = 1
+			SearchBar.Size = UDim2.new(1,-10,0,25); SearchBar.Position = UDim2.new(0,5,0,5)
+
+			local ScrollSel = Instance.new("ScrollingFrame", DropdownContainer); ScrollSel.Name = "ScrollSelect"
+			ScrollSel.CanvasSize = UDim2.new(0,0,0,0); ScrollSel.ScrollBarThickness = 0; ScrollSel.Active = true
+			ScrollSel.Position = UDim2.new(0,0,0,35); ScrollSel.BackgroundTransparency=1; ScrollSel.Size = UDim2.new(1,0,1,-35)
+
+			local UIList = Instance.new("UIListLayout", ScrollSel); UIList.Padding = UDim.new(0,3); UIList.SortOrder = Enum.SortOrder.LayoutOrder
+
+			SearchBar:GetPropertyChangedSignal("Text"):Connect(function()
+				local s = SearchBar.Text:lower()
+				for _,oF in ipairs(ScrollSel:GetChildren()) do
+					if oF:IsA("Frame") and oF.Name == "Option" then
+						local oT = oF:FindFirstChild("OptionText")
+						if oT then oF.Visible = (s == "" or oT.Text:lower():find(s,1,true)) end
+					end
+				end
+			end)
+		end
+
+		local SearchBar_Dropdown_Instance = DropdownContainer:FindFirstChild("SearchBar_Dropdown")
+		local ScrollSelect_Instance = DropdownContainer:FindFirstChild("ScrollSelect")
+		local UIListLayout_Scroll_Instance
+		if ScrollSelect_Instance then
+			UIListLayout_Scroll_Instance = ScrollSelect_Instance:FindFirstChildOfClass("UIListLayout")
+		else
+			warn("_Internal_CreateDropdown: ScrollSelect_Instance not found in DropdownContainer: " .. DropdownContainer.Name)
+		end
+		if not SearchBar_Dropdown_Instance then warn("_Internal_CreateDropdown: SearchBar_Dropdown_Instance not found in DropdownContainer: " .. DropdownContainer.Name) end
+		if not UIListLayout_Scroll_Instance then warn("_Internal_CreateDropdown: UIListLayout_Scroll_Instance not found in ScrollSelect_Instance for DropdownContainer: " .. DropdownContainer.Name) end
+
+		DropdownButton.Activated:Connect(function()
+			resources.circleClickFunc(DropdownButton, resources.mouseRef.X, resources.mouseRef.Y)
+			if not resources.MoreBlur.Visible then
+				resources.MoreBlur.Visible = true
+				resources.DropPageLayout:JumpTo(DropdownContainer)
+				resources.tweenServiceRef:Create(resources.MoreBlur, TweenInfo.new(0.2),{BackgroundTransparency = 0.7}):Play()
+				resources.tweenServiceRef:Create(resources.DropdownSelect, TweenInfo.new(0.2),{Position = UDim2.new(1,-11,0.5,0)}):Play()
+			end
+		end)
+
+		local dropCountLocal = 0
+		function DropdownFunc:Clear()
+			if not ScrollSelect_Instance then return end
+			for i=#ScrollSelect_Instance:GetChildren(),1,-1 do
+				local c = ScrollSelect_Instance:GetChildren()[i]
+				if c.Name == "Option" then c:Destroy() end
+			end
+			DropdownFunc.Value={}; DropdownFunc.Options={}; OptionSelecting.Text = "Select Options"; dropCountLocal = 0
+			ScrollSelect_Instance.CanvasSize = UDim2.new(0,0,0,0)
+		end
+
+		function DropdownFunc:AddOption(oN)
+			if not ScrollSelect_Instance or not UIListLayout_Scroll_Instance then
+				warn("_Internal_CreateDropdown:AddOption - ScrollSelect_Instance or UIListLayout_Scroll_Instance is nil.")
+				return
+			end
+			oN = oN or "Option"
+			local oF = Instance.new("Frame",ScrollSelect_Instance); oF.Name="Option"; oF.Size=UDim2.new(1,0,0,30)
+			oF.BackgroundTransparency=0.97; oF.BackgroundColor3=resources.getColorFunc("Secondary",oF,"BackgroundColor3")
+			Instance.new("UICorner",oF).CornerRadius=UDim.new(0,3)
+			local oB=Instance.new("TextButton",oF); oB.Name="OptionButton"; oB.Text=""; oB.Size=UDim2.new(1,0,1,0); oB.BackgroundTransparency=1
+			local oT=Instance.new("TextLabel",oF); oT.Name="OptionText"; oT.Font=Enum.Font.Gotham; oT.Text=oN
+			oT.TextColor3=resources.getColorFunc("Text",oT,"TextColor3"); oT.TextSize=13; oT.TextXAlignment=Enum.TextXAlignment.Left
+			oT.BackgroundTransparency=1; oT.Position=UDim2.new(0,8,0,0); oT.Size=UDim2.new(1,-16,1,0)
+			local cF=Instance.new("Frame",oF); cF.Name="ChooseFrame"; cF.AnchorPoint=Vector2.new(0,0.5)
+			cF.BackgroundColor3=resources.getColorFunc("ThemeHighlight",cF,"BackgroundColor3"); cF.BorderSizePixel=0
+			cF.Position=UDim2.new(0,2,0.5,0); cF.Size=UDim2.new(0,0,0,0); Instance.new("UICorner",cF).CornerRadius=UDim.new(0,3)
+			local cS=Instance.new("UIStroke",cF); cS.Color=resources.getColorFunc("Secondary",cS,"Color"); cS.Thickness=1.6; cS.Transparency=1
+			dropCountLocal=dropCountLocal+1; oF.LayoutOrder=dropCountLocal
+
+			oB.Activated:Connect(function()
+				resources.circleClickFunc(oB, resources.mouseRef.X, resources.mouseRef.Y)
+				if DropdownConfig.Multi then
+					local fI=table.find(DropdownFunc.Value,oN)
+					if fI then table.remove(DropdownFunc.Value,fI) else table.insert(DropdownFunc.Value,oN) end
+				else
+					DropdownFunc.Value={oN}
+				end
+				DropdownFunc:Set(DropdownFunc.Value)
+				if DropdownConfig.Flag then resources.saveFileFunc(DropdownConfig.Flag, DropdownFunc.Value) end
+			end)
+
+			local yO=0
+			for _,cld in ipairs(ScrollSelect_Instance:GetChildren()) do
+				if cld.Name=="Option" and cld:IsA("Frame") then
+					yO=yO+UIListLayout_Scroll_Instance.Padding.Offset+cld.Size.Y.Offset
+				end
+			end
+			ScrollSelect_Instance.CanvasSize=UDim2.new(0,0,0,yO-UIListLayout_Scroll_Instance.Padding.Offset)
+		end
+
+		function DropdownFunc:Set(val)
+			if not ScrollSelect_Instance then return end
+			if val then
+				local nV=type(val)=="table" and val or {val}
+				local uV={}; for _,v_u in ipairs(nV) do if not table.find(uV,v_u) then table.insert(uV,v_u) end end
+				DropdownFunc.Value=uV
+			end
+			for _,d_S in ipairs(ScrollSelect_Instance:GetChildren()) do
+				if d_S:IsA("Frame") and d_S.Name=="Option" then
+					local iTF=DropdownFunc.Value and table.find(DropdownFunc.Value,d_S.OptionText.Text)
+					local tII=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
+					local s_S=iTF and UDim2.new(0,1,0,12) or UDim2.new(0,0,0,0)
+					local bT_S=iTF and 0.935 or 0.97; local tr_S=iTF and 0 or 1
+					resources.tweenServiceRef:Create(d_S.ChooseFrame,tII,{Size=s_S}):Play()
+					resources.tweenServiceRef:Create(d_S.ChooseFrame.UIStroke,tII,{Transparency=tr_S}):Play()
+					resources.tweenServiceRef:Create(d_S,tII,{BackgroundTransparency=bT_S}):Play()
+				end
+			end
+			local dT=(DropdownFunc.Value and #DropdownFunc.Value>0) and table.concat(DropdownFunc.Value,", ") or "Select Options"
+			OptionSelecting.Text=dT
+			if DropdownConfig.Callback then DropdownConfig.Callback(DropdownFunc.Value or {}) end
+		end
+
+		function DropdownFunc:Refresh(rL,sEl)
+			local cV=savedValue or DropdownConfig.Default
+			rL=rL or {}; sEl=sEl or cV
+			DropdownFunc:Clear()
+			DropdownFunc.Options=rL
+			for _,oR in pairs(rL) do DropdownFunc:AddOption(oR) end
+			DropdownFunc.Value=nil; DropdownFunc:Set(sEl)
+		end
+
+		DropdownFunc:Refresh(DropdownConfig.Options, DropdownConfig.Default)
+
+		task.delay(0, function()
+			local contentHeight = DropdownContent.TextBounds.Y; local titleHeight = DropdownTitle.TextBounds.Y
+			DropdownFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15))
+			-- SectionObject._UpdateSizeSection() -- This needs to be called by the caller if parent size needs update
+		end)
+
+		resources.CountItemRef.Value = resources.CountItemRef.Value + 1
+		return DropdownFunc
+	end
+
+
 	local function InternalCreateSection(parentScrolLayersInstance, sectionTitle, sectionLayoutOrder,
                                      guiConfigRef, flagsRef, themesRef, currentThemeNameRef,
                                      getColorFunc, setThemeFunc, loadUIAssetFunc, saveFileFunc,
@@ -796,7 +1024,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			local SliderValueText = Instance.new("TextBox", SliderFrame); SliderValueText.Name = "SliderValueText"; SliderValueText.Font = Enum.Font.GothamBold; SliderValueText.Text = tostring(SliderConfig.Default); SliderValueText.TextColor3 = getColorFunc("Text", SliderValueText, "TextColor3"); SliderValueText.TextSize = 12; SliderValueText.BackgroundTransparency = 0.8; SliderValueText.BackgroundColor3 = getColorFunc("Accent", SliderValueText, "BackgroundColor3"); SliderValueText.Position = UDim2.new(1,-45,0,5); SliderValueText.Size = UDim2.new(0,40,0,20); Instance.new("UICorner", SliderValueText).CornerRadius = UDim.new(0,3)
 			local Bar = Instance.new("Frame", SliderFrame); Bar.Name = "Bar"; Bar.BackgroundColor3 = getColorFunc("Accent", Bar, "BackgroundColor3"); Bar.BorderSizePixel = 0; Bar.Position = UDim2.new(0,10,1,-20); Bar.Size = UDim2.new(1,-20,0,5); Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,100)
 			local Progress = Instance.new("Frame", Bar); Progress.Name = "Progress"; Progress.BackgroundColor3 = getColorFunc("ThemeHighlight", Progress, "BackgroundColor3"); Progress.BorderSizePixel = 0; Instance.new("UICorner", Progress).CornerRadius = UDim.new(0,100)
-			
+
 			-- Task #3: Slider Usability Enhancement
 			local DraggerHitbox = Instance.new("TextButton", Bar)
 			DraggerHitbox.Name = "DraggerHitbox"
@@ -818,7 +1046,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			VisualDragger.ZIndex = 2 -- Below hitbox input plane if necessary, but parent relationship handles this.
 
 			local currentValue = SliderConfig.Default
-			local function UpdateSlider(value) 
+			local function UpdateSlider(value)
 				value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max)
 				currentValue = value
 				SliderValueText.Text = tostring(value)
@@ -826,25 +1054,25 @@ function UBHubLib:MakeGui(GuiConfig)
 				Progress.Size = UDim2.new(percent,0,1,0)
 				DraggerHitbox.Position = UDim2.new(percent,0,0.5,0) -- Move the hitbox
 				if SliderConfig.Flag then saveFileFunc(SliderConfig.Flag, currentValue) end
-				SliderConfig.Callback(currentValue) 
+				SliderConfig.Callback(currentValue)
 			end
 			UpdateSlider(currentValue)
 
-			DraggerHitbox.InputBegan:Connect(function(input) 
-				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+			DraggerHitbox.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					local dragging = true
 					local conn
-					conn = UserInputService.InputChanged:Connect(function(subInput) 
+					conn = UserInputService.InputChanged:Connect(function(subInput)
 						if not dragging then conn:Disconnect() return end
-						if subInput.UserInputType == Enum.UserInputType.MouseMovement or subInput.UserInputType == Enum.UserInputType.Touch then 
+						if subInput.UserInputType == Enum.UserInputType.MouseMovement or subInput.UserInputType == Enum.UserInputType.Touch then
 							local localPos = Bar.AbsolutePosition.X
 							local mousePos = subInput.Position.X
 							local percent = math.clamp((mousePos - localPos) / Bar.AbsoluteSize.X, 0, 1)
-							UpdateSlider(SliderConfig.Min + percent * (SliderConfig.Max - SliderConfig.Min)) 
-						end 
+							UpdateSlider(SliderConfig.Min + percent * (SliderConfig.Max - SliderConfig.Min))
+						end
 					end)
 					-- Use DraggerHitbox.InputEnded or a connection to input.Changed for UserInputState.End
-					local inputEndedConn 
+					local inputEndedConn
 					inputEndedConn = input.Changed:Connect(function()
 						if input.UserInputState == Enum.UserInputState.End then
 							dragging = false
@@ -862,7 +1090,7 @@ function UBHubLib:MakeGui(GuiConfig)
 							if draggerInputEndedConn then draggerInputEndedConn:Disconnect() end
 						end
 					end)
-				end 
+				end
 			end)
 			SliderValueText.FocusLost:Connect(function(enterPressed) if enterPressed then local num = tonumber(SliderValueText.Text); if num then UpdateSlider(num) else UpdateSlider(currentValue) end end end)
 			CountItem = CountItem + 1; return { GetValue = function() return currentValue end, SetValue = UpdateSlider }
@@ -883,71 +1111,31 @@ function UBHubLib:MakeGui(GuiConfig)
 		end
 
 		function SectionObject:AddDropdown(DropdownConfig)
-			local DropdownConfig = DropdownConfig or {}
-			DropdownConfig.Title = DropdownConfig.Title or "No Title"; DropdownConfig.Content = DropdownConfig.Content or ""; DropdownConfig.Multi = DropdownConfig.Multi or false; DropdownConfig.Options = DropdownConfig.Options or {};
-			local savedValue = DropdownConfig.Flag and flagsRef[DropdownConfig.Flag]
-			if DropdownConfig.Multi then DropdownConfig.Default = (savedValue and type(savedValue) == "table") and savedValue or (type(DropdownConfig.Default) == "table" and DropdownConfig.Default or {}) else DropdownConfig.Default = savedValue or DropdownConfig.Default end
-			DropdownConfig.Callback = DropdownConfig.Callback or function() end
-			local DropdownFunc = {Value = DropdownConfig.Default, Options = DropdownConfig.Options}
-			local DropdownFrame = Instance.new("Frame"); DropdownFrame.Name = "Dropdown"; DropdownFrame.Parent = SectionObject._SectionAdd; DropdownFrame.LayoutOrder = CountItem; DropdownFrame.Size = UDim2.new(1,0,0,46); DropdownFrame.BackgroundTransparency = 0.935; DropdownFrame.BackgroundColor3 = getColorFunc("Secondary", DropdownFrame, "BackgroundColor3"); Instance.new("UICorner", DropdownFrame).CornerRadius = UDim.new(0,4)
-			local DropdownTitle = Instance.new("TextLabel", DropdownFrame); DropdownTitle.Name = "DropdownTitle"; DropdownTitle.Font = Enum.Font.GothamBold; DropdownTitle.Text = DropdownConfig.Title; DropdownTitle.TextColor3 = getColorFunc("Text", DropdownTitle, "TextColor3"); DropdownTitle.TextSize = 13; DropdownTitle.TextXAlignment = Enum.TextXAlignment.Left; DropdownTitle.TextYAlignment = Enum.TextYAlignment.Top; DropdownTitle.BackgroundTransparency=1; DropdownTitle.Position = UDim2.new(0,10,0,10); DropdownTitle.Size = UDim2.new(1,-180,0,13)
-			local DropdownContent = Instance.new("TextLabel", DropdownFrame); DropdownContent.Name = "DropdownContent"; DropdownContent.Font = Enum.Font.Gotham; DropdownContent.Text = DropdownConfig.Content; DropdownContent.TextColor3 = getColorFunc("Text", DropdownContent, "TextColor3"); DropdownContent.TextSize = 12; DropdownContent.TextTransparency = 0.4; DropdownContent.TextWrapped = true; DropdownContent.TextXAlignment = Enum.TextXAlignment.Left; DropdownContent.TextYAlignment = Enum.TextYAlignment.Bottom; DropdownContent.BackgroundTransparency=1; DropdownContent.Position = UDim2.new(0,10,0,0); DropdownContent.Size = UDim2.new(1,-180,1,-10)
-			local SelectOptionsFrame = Instance.new("Frame", DropdownFrame); SelectOptionsFrame.Name = "SelectOptionsFrame"; SelectOptionsFrame.AnchorPoint = Vector2.new(1,0.5); SelectOptionsFrame.BackgroundColor3 = getColorFunc("Primary", SelectOptionsFrame, "BackgroundColor3"); SelectOptionsFrame.BackgroundTransparency = 0.95; SelectOptionsFrame.BorderSizePixel = 0; SelectOptionsFrame.Position = UDim2.new(1,-7,0.5,0); SelectOptionsFrame.Size = UDim2.new(0,148,0,30); Instance.new("UICorner",SelectOptionsFrame).CornerRadius = UDim.new(0,4)
-			local OptionSelecting = Instance.new("TextLabel",SelectOptionsFrame); OptionSelecting.Name = "OptionSelecting"; OptionSelecting.Font = Enum.Font.Gotham; OptionSelecting.TextColor3 = getColorFunc("Text", OptionSelecting, "TextColor3"); OptionSelecting.TextSize = 12; OptionSelecting.TextTransparency = 0.4; OptionSelecting.TextWrapped = true; OptionSelecting.TextXAlignment = Enum.TextXAlignment.Left; OptionSelecting.AnchorPoint = Vector2.new(0,0.5); OptionSelecting.BackgroundTransparency = 1; OptionSelecting.Position = UDim2.new(0,5,0.5,0); OptionSelecting.Size = UDim2.new(1,-30,1,-8)
-			local OptionImg = Instance.new("ImageLabel",SelectOptionsFrame); OptionImg.Name = "OptionImg"; OptionImg.Image = loadUIAssetFunc("rbxassetid://16851841101", "DropdownArrow_Internal"); OptionImg.ImageColor3 = getColorFunc("Text", OptionImg, "ImageColor3"); OptionImg.AnchorPoint = Vector2.new(1,0.5); OptionImg.BackgroundTransparency=1; OptionImg.Position = UDim2.new(1,0,0.5,0); OptionImg.Size = UDim2.new(0,25,0,25)
-			local DropdownButton = Instance.new("TextButton", DropdownFrame); DropdownButton.Name = "DropdownButton"; DropdownButton.Text = ""; DropdownButton.Size = UDim2.new(1,0,1,0); DropdownButton.BackgroundTransparency = 1
+			-- Prepare sharedResources table. These are variables from the scope of InternalCreateSection or MakeGui
+			local resources = {
+				getColorFunc = getColorFunc,
+				loadUIAssetFunc = loadUIAssetFunc,
+				DropdownFolder = DropdownFolder,
+				DropPageLayout = DropPageLayout,
+				MoreBlur = MoreBlur,
+				DropdownSelect = DropdownSelect,
+				circleClickFunc = circleClickFunc,
+				mouseRef = mouseRef,
+				tweenServiceRef = tweenServiceRef,
+				saveFileFunc = saveFileFunc,
+				flagsRef = flagsRef, -- This is 'Flags' in MakeGui scope, passed down to InternalCreateSection
+				CountItemRef = { Value = CountItem } -- Pass CountItem by reference (as a table field)
+			}
+			local dropdownApi = _Internal_CreateDropdown(self._SectionAdd, DropdownConfig, resources)
+			CountItem = resources.CountItemRef.Value -- Update CountItem from the returned ref
 
-			local currentDropdownID = CountDropdown; CountDropdown = CountDropdown + 1;
-			SelectOptionsFrame.LayoutOrder = currentDropdownID
+			-- After dropdown is created and CountItem is updated by _Internal_CreateDropdown,
+            -- we might need to trigger a size update for the section if the new dropdown changed its total height.
+            -- The _Internal_CreateDropdown already does a task.delay for its own frame size.
+            -- This call ensures the parent section also re-evaluates its size.
+            self._UpdateSizeSection()
 
-			local DropdownContainer = DropdownFolder:FindFirstChild("DropdownContainer_"..tostring(currentDropdownID))
-			if not DropdownContainer then
-				DropdownContainer = Instance.new("Frame", DropdownFolder); DropdownContainer.Name = "DropdownContainer_"..tostring(currentDropdownID);
-				DropdownContainer.BackgroundTransparency = 1; DropdownContainer.Size = UDim2.new(1,0,1,0);
-				local SearchBar_Dropdown = Instance.new("TextBox", DropdownContainer); SearchBar_Dropdown.Name = "SearchBar_Dropdown"; SearchBar_Dropdown.Font = Enum.Font.GothamBold; SearchBar_Dropdown.PlaceholderText = "🔎 Search"; SearchBar_Dropdown.PlaceholderColor3 = getColorFunc("Text", SearchBar_Dropdown, "PlaceholderColor3"); SearchBar_Dropdown.Text = ""; SearchBar_Dropdown.TextColor3 = getColorFunc("Text", SearchBar_Dropdown, "TextColor3"); SearchBar_Dropdown.TextSize = 12; SearchBar_Dropdown.BackgroundColor3 = getColorFunc("Secondary", SearchBar_Dropdown, "BackgroundColor3"); SearchBar_Dropdown.BackgroundTransparency = 0; SearchBar_Dropdown.BorderColor3 = getColorFunc("Stroke", SearchBar_Dropdown, "BorderColor3"); SearchBar_Dropdown.BorderSizePixel = 1; SearchBar_Dropdown.Size = UDim2.new(1,-10,0,25); SearchBar_Dropdown.Position = UDim2.new(0,5,0,5)
-				local ScrollSelect = Instance.new("ScrollingFrame", DropdownContainer); ScrollSelect.Name = "ScrollSelect"; ScrollSelect.CanvasSize = UDim2.new(0,0,0,0); ScrollSelect.ScrollBarThickness = 0; ScrollSelect.Active = true; ScrollSelect.Position = UDim2.new(0,0,0,35); ScrollSelect.BackgroundTransparency=1; ScrollSelect.Size = UDim2.new(1,0,1,-35)
-				local UIListLayout_Scroll = Instance.new("UIListLayout", ScrollSelect); UIListLayout_Scroll.Padding = UDim.new(0,3); UIListLayout_Scroll.SortOrder = Enum.SortOrder.LayoutOrder
-				SearchBar_Dropdown:GetPropertyChangedSignal("Text"):Connect(function() local s = SearchBar_Dropdown.Text:lower(); for _,oF in ipairs(ScrollSelect:GetChildren()) do if oF:IsA("Frame") and oF.Name == "Option" then local oT = oF:FindFirstChild("OptionText"); if oT then oF.Visible = (s == "" or oT.Text:lower():find(s,1,true)) end end end end)
-			end
-			-- Corrected retrieval using FindFirstChild
-			local SearchBar_Dropdown = DropdownContainer:FindFirstChild("SearchBar_Dropdown")
-			local ScrollSelect = DropdownContainer:FindFirstChild("ScrollSelect")
-			local UIListLayout_Scroll -- Declare variable
-
-			if ScrollSelect then -- Ensure ScrollSelect exists before trying to get its child
-				UIListLayout_Scroll = ScrollSelect:FindFirstChildOfClass("UIListLayout")
-			else
-				warn("AddDropdown: ScrollSelect not found in DropdownContainer: " .. DropdownContainer.Name)
-			end
-
-			if not SearchBar_Dropdown then warn("AddDropdown: SearchBar_Dropdown not found in DropdownContainer: " .. DropdownContainer.Name) end
-			if not UIListLayout_Scroll then warn("AddDropdown: UIListLayout_Scroll not found in ScrollSelect for DropdownContainer: " .. DropdownContainer.Name) end
-
-
-			DropdownButton.Activated:Connect(function() circleClickFunc(DropdownButton, mouseRef.X, mouseRef.Y); if not MoreBlur.Visible then MoreBlur.Visible = true; DropPageLayout:JumpTo(DropdownContainer); tweenServiceRef:Create(MoreBlur, TweenInfo.new(0.2),{BackgroundTransparency = 0.7}):Play(); tweenServiceRef:Create(DropdownSelect, TweenInfo.new(0.2),{Position = UDim2.new(1,-11,0.5,0)}):Play() end end)
-
-			local dropCountLocal = 0;
-			function DropdownFunc:Clear() 
-				if not ScrollSelect then return end -- Guard clause
-				for i=#ScrollSelect:GetChildren(),1,-1 do local c = ScrollSelect:GetChildren()[i]; if c.Name == "Option" then c:Destroy() end end; DropdownFunc.Value={}; DropdownFunc.Options={}; OptionSelecting.Text = "Select Options"; dropCountLocal = 0; ScrollSelect.CanvasSize = UDim2.new(0,0,0,0); 
-			end
-			function DropdownFunc:AddOption(oN)
-				if not ScrollSelect or not UIListLayout_Scroll then -- Guard clauses
-					warn("AddDropdown:AddOption - ScrollSelect or UIListLayout_Scroll is nil. Cannot add option.")
-					return 
-				end
-				oN = oN or "Option"; local oF = Instance.new("Frame",ScrollSelect); oF.Name="Option"; oF.Size=UDim2.new(1,0,0,30); oF.BackgroundTransparency=0.97; oF.BackgroundColor3=getColorFunc("Secondary",oF,"BackgroundColor3"); Instance.new("UICorner",oF).CornerRadius=UDim.new(0,3); local oB=Instance.new("TextButton",oF); oB.Name="OptionButton"; oB.Text=""; oB.Size=UDim2.new(1,0,1,0); oB.BackgroundTransparency=1; local oT=Instance.new("TextLabel",oF); oT.Name="OptionText"; oT.Font=Enum.Font.Gotham; oT.Text=oN; oT.TextColor3=getColorFunc("Text",oT,"TextColor3"); oT.TextSize=13; oT.TextXAlignment=Enum.TextXAlignment.Left; oT.BackgroundTransparency=1; oT.Position=UDim2.new(0,8,0,0); oT.Size=UDim2.new(1,-16,1,0); local cF=Instance.new("Frame",oF); cF.Name="ChooseFrame"; cF.AnchorPoint=Vector2.new(0,0.5); cF.BackgroundColor3=getColorFunc("ThemeHighlight",cF,"BackgroundColor3"); cF.BorderSizePixel=0; cF.Position=UDim2.new(0,2,0.5,0); cF.Size=UDim2.new(0,0,0,0); Instance.new("UICorner",cF).CornerRadius=UDim.new(0,3); local cS=Instance.new("UIStroke",cF); cS.Color=getColorFunc("Secondary",cS,"Color"); cS.Thickness=1.6; cS.Transparency=1; dropCountLocal=dropCountLocal+1; oF.LayoutOrder=dropCountLocal;
-				oB.Activated:Connect(function() circleClickFunc(oB, mouseRef.X, mouseRef.Y); if DropdownConfig.Multi then local fI=table.find(DropdownFunc.Value,oN); if fI then table.remove(DropdownFunc.Value,fI) else table.insert(DropdownFunc.Value,oN) end else DropdownFunc.Value={oN} end; DropdownFunc:Set(DropdownFunc.Value); if DropdownConfig.Flag then saveFileFunc(DropdownConfig.Flag, DropdownFunc.Value) end end)
-				local yO=0; for _,cld in ipairs(ScrollSelect:GetChildren()) do if cld.Name=="Option" and cld:IsA("Frame") then yO=yO+UIListLayout_Scroll.Padding.Offset+cld.Size.Y.Offset end end; ScrollSelect.CanvasSize=UDim2.new(0,0,0,yO-UIListLayout_Scroll.Padding.Offset);
-			end;
-			function DropdownFunc:Set(val) 
-				if not ScrollSelect then return end -- Guard clause
-				if val then local nV=type(val)=="table" and val or {val}; local uV={}; for _,v_u in ipairs(nV) do if not table.find(uV,v_u) then table.insert(uV,v_u) end end; DropdownFunc.Value=uV end; for _,d_S in ipairs(ScrollSelect:GetChildren()) do if d_S:IsA("Frame") and d_S.Name=="Option" then local iTF=DropdownFunc.Value and table.find(DropdownFunc.Value,d_S.OptionText.Text); local tII=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut); local s_S=iTF and UDim2.new(0,1,0,12) or UDim2.new(0,0,0,0); local bT_S=iTF and 0.935 or 0.97; local tr_S=iTF and 0 or 1; tweenServiceRef:Create(d_S.ChooseFrame,tII,{Size=s_S}):Play(); tweenServiceRef:Create(d_S.ChooseFrame.UIStroke,tII,{Transparency=tr_S}):Play(); tweenServiceRef:Create(d_S,tII,{BackgroundTransparency=bT_S}):Play() end end; local dT=(DropdownFunc.Value and #DropdownFunc.Value>0) and table.concat(DropdownFunc.Value,", ") or "Select Options"; OptionSelecting.Text=dT; if DropdownConfig.Callback then DropdownConfig.Callback(DropdownFunc.Value or {}) end;
-			end;
-			function DropdownFunc:Refresh(rL,sEl) local cV=savedValue or DropdownConfig.Default; rL=rL or {}; sEl=sEl or cV; DropdownFunc:Clear(); DropdownFunc.Options=rL; for _,oR in pairs(rL) do DropdownFunc:AddOption(oR) end; DropdownFunc.Value=nil; DropdownFunc:Set(sEl); end;
-			DropdownFunc:Refresh(DropdownConfig.Options, DropdownConfig.Default)
-			task.delay(0, function() local contentHeight = DropdownContent.TextBounds.Y; local titleHeight = DropdownTitle.TextBounds.Y; DropdownFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); SectionObject._UpdateSizeSection() end)
-			CountItem = CountItem + 1; return DropdownFunc;
+			return dropdownApi
 		end
 
 		function SectionObject:AddDivider(DividerConfig)
@@ -1450,7 +1638,7 @@ function UBHubLib:MakeGui(GuiConfig)
 		table.sort(names)
 		return names
 	end
-	
+
 	-- Helper function to convert Color3 to a savable hex string
 	local function ColorToHex(color)
 		return string.format("#%02X%02X%02X", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
@@ -1546,7 +1734,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			end
 		end
 	})
-	
+
 	PresetManagementSection:AddDivider({}) -- Simple line divider
 
 	-- Dropdown for saved presets
@@ -1575,7 +1763,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					-- For simplicity, let's create a temporary theme name and apply it
 					local tempThemeName = "__CUSTOM__" .. presetName
 					Themes[tempThemeName] = themeToApply
-					SetTheme(tempThemeName) 
+					SetTheme(tempThemeName)
 					-- CurrentTheme will be tempThemeName. If user saves again, it saves current visual colors.
 					UBHubLib:MakeNotify({ Title = "Preset Applied", Content = "'" .. presetName .. "' applied."})
 					-- After applying, remove the temporary theme entry if we don't want it persisting in Themes table
@@ -1588,7 +1776,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			end
 		end
 	})
-	
+
 	PresetManagementSection:AddDivider({})
 
 	-- Another "Saved Presets" Dropdown for deletion
@@ -1636,7 +1824,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				table.insert(words, word:sub(1,1):upper() .. word:sub(2):lower())
 			end
 		else -- Handles "Text", "Primary", "ThemeHighlight"
-			for word in string.gmatch(name, "[A-Z]?[a-z]+") do 
+			for word in string.gmatch(name, "[A-Z]?[a-z]+") do
 				table.insert(words, word:sub(1,1):upper() .. word:sub(2))
 			end
 			if #words == 0 and #name > 0 then -- Single word like "Text" or if all caps
@@ -1645,15 +1833,15 @@ function UBHubLib:MakeGui(GuiConfig)
 		end
 		return table.concat(words, " ")
 	end
-	
+
 	-- Store references to sliders and inputs for two-way binding
-	local colorControls = {} 
+	local colorControls = {}
 
 	local function updateColorFromSliders(colorKeyName, component, value)
 		local r, g, b
 		local currentHex = colorControls[colorKeyName].hexInput:GetValue()
 		local currentColor = HexToColor(currentHex) -- Get current color from hex to preserve other components
-		
+
 		r = (component == "R") and value or math.floor(currentColor.R * 255)
 		g = (component == "G") and value or math.floor(currentColor.G * 255)
 		b = (component == "B") and value or math.floor(currentColor.B * 255)
