@@ -2337,7 +2337,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	DropPageLayout.Parent = DropdownFolder
 	--// Tabs
 	local CountTab = 0
-	local CountDropdown = 0
+	local CountDropdown = 0 -- Moved here from CreateTab
 	function UIInstance:CreateTab(TabConfig)
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "Tab"
