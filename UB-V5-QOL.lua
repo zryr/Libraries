@@ -1152,26 +1152,6 @@ function UBHubLib:MakeGui(GuiConfig)
 
 	LayersPageLayout.EasingStyle = Enum.EasingStyle.Quad
 
-	-- Create the SettingsContentPage (New Step 3)
-	local SettingsContentPage = Instance.new("ScrollingFrame")
-	SettingsContentPage.Name = "SettingsContentPage"
-	SettingsContentPage.Parent = Layers -- Parented to the main 'Layers' frame, sibling to 'LayersReal'
-	SettingsContentPage.Size = UDim2.new(1, 0, 1, 0) -- Should fill the Layers area
-	SettingsContentPage.Position = UDim2.new(0,0,0,0) -- Position at top-left of Layers
-	SettingsContentPage.BackgroundTransparency = 1 -- Or match LayersReal if needed
-	SettingsContentPage.BorderSizePixel = 0
-	SettingsContentPage.Visible = false -- Hidden by default
-	SettingsContentPage.ScrollBarThickness = 6
-	SettingsContentPage.ScrollingDirection = Enum.ScrollingDirection.Y
-	SettingsContentPage.CanvasSize = UDim2.new(0,0,0,0) -- Will be updated by content
-
-	local SettingsContentLayout = Instance.new("UIListLayout")
-	SettingsContentLayout.Parent = SettingsContentPage
-	SettingsContentLayout.Padding = UDim.new(0, 5)
-	SettingsContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	SettingsContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-
 	-- Initialize Flags.CustomUserThemes if it doesn't exist
 	if not Flags.CustomUserThemes then
 		Flags.CustomUserThemes = {}
@@ -1575,92 +1555,45 @@ function UBHubLib:MakeGui(GuiConfig)
 	NamePlayerLabel.Size = UDim2.new(1, -45, 1, 0)
 	NamePlayerLabel.Parent = Info
 
-	-- Separator Line below Player Info / above Settings Button
-	local SeparatorLineSettings = Instance.new("Frame")
-	SeparatorLineSettings.Name = "SeparatorLineSettings"
-	SeparatorLineSettings.Parent = LayersTab
-	SeparatorLineSettings.BackgroundColor3 = GetColor("Stroke", SeparatorLineSettings, "BackgroundColor3")
-	SeparatorLineSettings.BorderSizePixel = 0
-	SeparatorLineSettings.Size = UDim2.new(1, 0, 0, 1)
-	SeparatorLineSettings.LayoutOrder = 3
+	-- Separator Line below Player Info / above Settings Tab (created by CreateTab)
+	local SettingsSeparator = Instance.new("Frame") -- Renamed for clarity from SeparatorLineSettings
+	SettingsSeparator.Name = "SettingsSeparator"
+	SettingsSeparator.Parent = LayersTab
+	SettingsSeparator.BackgroundColor3 = GetColor("Stroke", SettingsSeparator, "BackgroundColor3")
+	SettingsSeparator.BorderSizePixel = 0
+	SettingsSeparator.Size = UDim2.new(1, 0, 0, 1)
+	SettingsSeparator.LayoutOrder = 3 -- This will be between Info and the Settings Tab button
 
-	-- Settings Button
-	local SettingsTabButton = Instance.new("TextButton")
-	SettingsTabButton.Name = "SettingsTabButton"
-	SettingsTabButton.Parent = LayersTab
-	SettingsTabButton.Size = UDim2.new(1, 0, 0, 40)
-	SettingsTabButton.Text = "" -- Text will be handled by internal TextLabel
-	SettingsTabButton.BackgroundColor3 = GetColor("Secondary", SettingsTabButton, "BackgroundColor3") -- Example color
-	SettingsTabButton.BackgroundTransparency = 0.9 -- Slightly less transparent than normal tabs when not active
-	SettingsTabButton.BorderColor3 = GetColor("Stroke", SettingsTabButton, "BorderColor3")
-	SettingsTabButton.BorderSizePixel = 1
-	SettingsTabButton.LayoutOrder = 4
-	Instance.new("UICorner", SettingsTabButton).CornerRadius = UDim.new(0, 4)
-
-	local SettingsButtonLayout = Instance.new("UIListLayout", SettingsTabButton)
-	SettingsButtonLayout.FillDirection = Enum.FillDirection.Horizontal
-	SettingsButtonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-	SettingsButtonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-	SettingsButtonLayout.Padding = UDim.new(0, 8)
-
-	local SettingsButtonIcon = Instance.new("ImageLabel", SettingsTabButton)
-	SettingsButtonIcon.Name = "SettingsButtonIcon"
-	SettingsButtonIcon.Image = "rbxassetid://126800841735072" -- Placeholder settings icon ID
-	SettingsButtonIcon.Size = UDim2.new(0, 20, 0, 20) -- Adjust size as needed
-	SettingsButtonIcon.BackgroundTransparency = 1
-	SettingsButtonIcon.LayoutOrder = 1
-	SettingsButtonIcon.ImageColor3 = GetColor("Text", SettingsButtonIcon, "ImageColor3")
-
-
-	local SettingsButtonText = Instance.new("TextLabel", SettingsTabButton)
-	SettingsButtonText.Name = "SettingsButtonText"
-	SettingsButtonText.Text = "Settings"
-	SettingsButtonText.Font = Enum.Font.GothamBold
-	SettingsButtonText.TextColor3 = GetColor("Text", SettingsButtonText, "TextColor3")
-	SettingsButtonText.TextSize = 13
-	SettingsButtonText.BackgroundTransparency = 1
-	SettingsButtonText.LayoutOrder = 2
-	SettingsButtonText.TextXAlignment = Enum.TextXAlignment.Left
-	SettingsButtonText.Size = UDim2.new(0, SettingsButtonText.TextBounds.X + 5, 1, 0) -- Auto-adjust width slightly
+	-- The old manual SettingsTabButton and its children are removed by not re-adding them here.
+	-- UIInstance:CreateTab({IsSettingsTab=true}) will create the new one.
 
 	local function ClearAllTabHighlights()
-		-- De-highlight normal tabs
+		-- De-highlight normal tabs in ScrollTab
 		for _, child in ipairs(ScrollTab:GetChildren()) do
-			if child:IsA("Frame") and child.Name == "Tab" then
+			if child:IsA("Frame") and child.Name:match("_TabButton$") then
 				TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.9990000128746033}):Play()
 				local cf = child:FindFirstChild("ChooseFrame")
 				if cf then cf.Visible = false end
 			end
 		end
-		-- De-highlight settings tab button
-		TweenService:Create(SettingsTabButton, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.9}):Play()
-		-- Potentially change border or other visual cues for settings tab deselection if added
+		-- De-highlight the static Settings Tab (which is also a 'Tab' frame but parented to LayersTab)
+		local settingsTabButtonInstance = LayersTab:FindFirstChild("Settings_TabButton") -- Find by specific name
+		if settingsTabButtonInstance then
+			TweenService:Create(settingsTabButtonInstance, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.9990000128746033}):Play() -- Standard inactive transparency
+			local cf = settingsTabButtonInstance:FindFirstChild("ChooseFrame")
+			if cf then cf.Visible = false end
+		end
 	end
 
-	SettingsTabButton.Activated:Connect(function()
-		CircleClick(SettingsTabButton, Mouse.X, Mouse.Y)
-		if SettingsContentPage.Visible then return end -- Already active
-
-		ClearAllTabHighlights()
-		TweenService:Create(SettingsTabButton, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.85}):Play() -- Highlight settings
-
-		LayersReal.Visible = false
-		SettingsContentPage.Visible = true
-		NameTab.Text = "Settings"
-		-- Ensure LayersPageLayout doesn't try to show a page when settings is active
-		-- This might not be strictly necessary if LayersReal is hidden, but good for safety.
-		if LayersPageLayout.CurrentPage then
-			-- We don't necessarily need to clear CurrentPage, just ensure its content isn't visible.
-		end
-	end)
-
-	-- Add UIListLayout to LayersTab to manage ScrollTab, Separators, Info, and SettingsButton
+	-- Add UIListLayout to LayersTab to manage ScrollTab, Separators, Info, and the future SettingsTabButton
 	local LayersTabMainLayout = LayersTab:FindFirstChildOfClass("UIListLayout")
 	if not LayersTabMainLayout then
 		LayersTabMainLayout = Instance.new("UIListLayout", LayersTab)
 		LayersTabMainLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		LayersTabMainLayout.Padding = UDim.new(0,0) -- No padding between these main elements
+		LayersTabMainLayout.Padding = UDim.new(0,0)
 	end
+	-- Ensure ScrollTab is ordered first by the layout
+	ScrollTab.LayoutOrder = 0
 
 	local function UpdateSize1()
 		local OffsetY = 0
@@ -1951,6 +1884,7 @@ function UBHubLib:MakeGui(GuiConfig)
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "Tab"
 		TabConfig.Icon = TabConfig.Icon or ""
+		TabConfig.IsSettingsTab = TabConfig.IsSettingsTab or false -- Default to false
 
 		local ScrolLayers = Instance.new("ScrollingFrame");
 		local UIListLayout1 = Instance.new("UIListLayout");
@@ -1992,10 +1926,33 @@ function UBHubLib:MakeGui(GuiConfig)
 		end
 		Tab.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Tab.BorderSizePixel = 0
-		Tab.LayoutOrder = CountTab
-		Tab.Size = UDim2.new(1, 0, 0, 30)
-		Tab.Name = "Tab"
-		Tab.Parent = ScrollTab
+		Tab.LayoutOrder = TabConfig.IsSettingsTab and 99 or CountTab -- High LayoutOrder for settings tab
+		Tab.Size = UDim2.new(1, 0, 0, 40) -- Standardized height, can be adjusted if settings tab needs different height
+		Tab.Name = TabConfig.Name .. "_TabButton" -- More specific name
+		Tab.Parent = TabConfig.IsSettingsTab and LayersTab or ScrollTab -- Conditional Parent
+
+		-- Style adjustments for settings tab button if needed (e.g., different background)
+		if TabConfig.IsSettingsTab then
+			-- Example: Make settings tab button visually distinct if desired, or use standard tab styling
+			Tab.BackgroundColor3 = GetColor("Secondary", Tab, "BackgroundColor3") -- Or a specific color
+			Tab.BackgroundTransparency = 0.85 -- Slightly more opaque for emphasis
+			Tab.BorderSizePixel = 1
+			Tab.BorderColor3 = GetColor("Stroke", Tab, "BorderColor3")
+
+			-- Ensure the icon and text elements are correctly set up if they were part of the old SettingsTabButton
+			local settingsIcon = FeatureImg -- Assuming FeatureImg is the icon instance
+			settingsIcon.Image = TabConfig.Icon
+			settingsIcon.Size = UDim2.new(0, 20, 0, 20)
+			settingsIcon.Position = UDim2.new(0, 8, 0.5, -10) -- Adjust as needed
+
+			local settingsText = TabName -- Assuming TabName is the text label instance
+			settingsText.Text = TabConfig.Name
+			settingsText.Position = UDim2.new(0, 36, 0.5, -settingsText.TextBounds.Y/2) -- Adjust as needed
+
+			-- If LayersTab uses a UIListLayout, the LayoutOrder will handle positioning.
+			-- If not, manual positioning would be needed here based on ScrollTab's end and separator.
+			-- For now, assuming LayersTabMainLayout (UIListLayout in LayersTab) will handle it.
+		end
 
 		UICorner3.CornerRadius = UDim.new(0, 4)
 		UICorner3.Parent = Tab
@@ -2056,44 +2013,35 @@ function UBHubLib:MakeGui(GuiConfig)
 		end
 		TabButton.Activated:Connect(function()
 			CircleClick(TabButton, Mouse.X, Mouse.Y)
-			local FrameChoose
-			for a, s in ScrollTab:GetChildren() do
-				for i, v in s:GetChildren() do
-					if v.Name == "ChooseFrame" then
-						FrameChoose = v
-						break
-					end
-				end
+
+			-- Check if this tab is already active (no need to do anything if LayersPageLayout.CurrentPage is this tab's ScrolLayers)
+			if LayersPageLayout.CurrentPage == ScrolLayers and NameTab.Text == TabConfig.Name then
+				return
 			end
-			if FrameChoose ~= nil and (Tab.LayoutOrder ~= LayersPageLayout.CurrentPage.LayoutOrder or SettingsContentPage.Visible) then
-				ClearAllTabHighlights() -- Clear all (includes settings button)
 
-				TweenService:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.92}):Play() -- Highlight this tab
-				local currentChooseFrame = Tab:FindFirstChild("ChooseFrame")
-				if not currentChooseFrame then
-					currentChooseFrame = Instance.new("Frame")
-					currentChooseFrame.Name = "ChooseFrame"
-					currentChooseFrame.BackgroundColor3 = GetColor("ThemeHighlight",currentChooseFrame,"BackgroundColor3")
-					currentChooseFrame.BorderSizePixel = 0
-					currentChooseFrame.Position = UDim2.new(0, 2, 0, 9)
-					currentChooseFrame.Size = UDim2.new(0, 1, 0, 12)
-					currentChooseFrame.Parent = Tab
-					local stroke = Instance.new("UIStroke", currentChooseFrame)
-					stroke.Color = GetColor("Secondary",stroke,"Color")
-					stroke.Thickness = 1.6
-					Instance.new("UICorner", currentChooseFrame)
-				end
-				currentChooseFrame.Visible = true
+			ClearAllTabHighlights() -- Clears highlights from all tabs in ScrollTab and the static SettingsTabButton
 
-				if FrameChoose and FrameChoose.Parent ~= Tab then FrameChoose.Visible = false end
-
-				LayersReal.Visible = true
-				SettingsContentPage.Visible = false
-				LayersPageLayout:JumpToIndex(Tab.LayoutOrder)
-				NameTab.Text = TabConfig.Name
-				-- lastSelectedTabName = TabConfig.Name -- No longer needed with ClearAllTabHighlights
-				-- lastSelectedTabFrame = Tab -- No longer needed
+			-- Highlight the clicked tab (Tab instance)
+			TweenService:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.92}):Play()
+			local currentChooseFrame = Tab:FindFirstChild("ChooseFrame")
+			if not currentChooseFrame then
+				currentChooseFrame = Instance.new("Frame")
+				currentChooseFrame.Name = "ChooseFrame"
+				currentChooseFrame.BackgroundColor3 = GetColor("ThemeHighlight", currentChooseFrame, "BackgroundColor3")
+				currentChooseFrame.BorderSizePixel = 0
+				currentChooseFrame.Position = UDim2.new(0, 2, 0, 9)
+				currentChooseFrame.Size = UDim2.new(0, 1, 0, 12)
+				currentChooseFrame.Parent = Tab
+				local stroke = Instance.new("UIStroke", currentChooseFrame)
+				stroke.Color = GetColor("Secondary", stroke, "Color")
+				stroke.Thickness = 1.6
+				Instance.new("UICorner", currentChooseFrame)
 			end
+			currentChooseFrame.Visible = true
+
+			-- Show its content page
+			LayersPageLayout:JumpTo(ScrolLayers)
+			NameTab.Text = TabConfig.Name
 		end)
 		--// Section
 		local CountSection = 0 -- Keep this counter for layout order if needed globally for sections
@@ -2273,122 +2221,34 @@ function UBHubLib:MakeGui(GuiConfig)
 	end
 
 	-- Setup for the new dedicated Settings Tab
-	local ActualSettingsTab = {}
-	ActualSettingsTab._ScrolLayers = SettingsContentPage
-	ActualSettingsTab._UIListLayout = SettingsContentLayout -- The UIListLayout directly in SettingsContentPage
-	local currentSectionCountForSettingsTab = 0
+	-- local ActualSettingsTab = {} -- Removed
+	-- ActualSettingsTab._ScrolLayers = SettingsContentPage -- Removed
+	-- ActualSettingsTab._UIListLayout = SettingsContentLayout -- Removed
+	-- local currentSectionCountForSettingsTab = 0 -- Removed
 
-	-- Replicated AddSection for ActualSettingsTab
-	function ActualSettingsTab:AddSection(SectionTitle)
-		SectionTitle = SectionTitle or "Settings Section"
-		local SectionObject = {}
-		local CountItem = 0
+	-- Replicated AddSection for ActualSettingsTab -- Removed
+	-- function ActualSettingsTab:AddSection(SectionTitle) -- Removed
+		-- ... entire function body removed ...
+	-- end -- Removed
 
-		local SectionFrame = Instance.new("Frame")
-		SectionFrame.Name = "Section"
-		SectionFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		SectionFrame.BackgroundTransparency = 0.999
-		SectionFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		SectionFrame.BorderSizePixel = 0
-		SectionFrame.LayoutOrder = currentSectionCountForSettingsTab
-		SectionFrame.ClipsDescendants = true
-		SectionFrame.Size = UDim2.new(1, 0, 0, 30)
-		SectionFrame.Parent = self._ScrolLayers
-
-		local SectionReal = Instance.new("Frame", SectionFrame)
-		SectionReal.Name = "SectionReal"; SectionReal.AnchorPoint = Vector2.new(0.5,0); SectionReal.BackgroundColor3 = GetColor("Secondary", SectionReal, "BackgroundColor3"); SectionReal.BackgroundTransparency=0.935; SectionReal.Position=UDim2.new(0.5,0,0,0); SectionReal.Size=UDim2.new(1,-0,0,30)
-		Instance.new("UICorner", SectionReal).CornerRadius = UDim.new(0,4)
-
-		local SectionButton = Instance.new("TextButton", SectionReal)
-		SectionButton.Name="SectionButton"; SectionButton.Text=""; SectionButton.Size=UDim2.new(1,0,1,0); SectionButton.BackgroundTransparency=1
-
-		local FeatureFrame_Section = Instance.new("Frame", SectionReal); FeatureFrame_Section.Name="FeatureFrame"; FeatureFrame_Section.AnchorPoint=Vector2.new(1,0.5); FeatureFrame_Section.BackgroundTransparency=1; FeatureFrame_Section.Position=UDim2.new(1,-5,0.5,0); FeatureFrame_Section.Size=UDim2.new(0,20,0,20)
-		local FeatureImg_Section = Instance.new("ImageLabel", FeatureFrame_Section); FeatureImg_Section.Name="FeatureImg"; FeatureImg_Section.Image=LoadUIAsset("rbxassetid://16851841101","SettingsSectionArrow.png"); FeatureImg_Section.AnchorPoint=Vector2.new(0.5,0.5); FeatureImg_Section.BackgroundTransparency=1; FeatureImg_Section.Position=UDim2.new(0.5,0,0.5,0); FeatureImg_Section.Rotation = -90; FeatureImg_Section.Size=UDim2.new(1,6,1,6)
-
-		local SectionTitleText = Instance.new("TextLabel", SectionReal)
-		SectionTitleText.Name="SectionTitle"; SectionTitleText.Font=Enum.Font.GothamBold; SectionTitleText.Text=SectionTitle; SectionTitleText.TextColor3=GetColor("Text",SectionTitleText,"TextColor3"); SectionTitleText.TextSize=13; SectionTitleText.TextXAlignment=Enum.TextXAlignment.Left; SectionTitleText.AnchorPoint=Vector2.new(0,0.5); SectionTitleText.BackgroundTransparency=1; SectionTitleText.Position=UDim2.new(0,10,0.5,0); SectionTitleText.Size=UDim2.new(1,-50,0,13)
-
-		local SectionAdd = Instance.new("Frame", SectionFrame)
-		SectionAdd.Name="SectionAdd"; SectionAdd.AnchorPoint=Vector2.new(0.5,0); SectionAdd.BackgroundTransparency=1; SectionAdd.ClipsDescendants=true; SectionAdd.Position=UDim2.new(0.5,0,0,33); SectionAdd.Size=UDim2.new(1,0,0,0)
-		Instance.new("UICorner", SectionAdd).CornerRadius = UDim.new(0,2)
-		local UIListLayout_SectionAdd = Instance.new("UIListLayout", SectionAdd); UIListLayout_SectionAdd.Padding=UDim.new(0,3); UIListLayout_SectionAdd.SortOrder = Enum.SortOrder.LayoutOrder
-
-		local OpenSection = false
-		local function UpdateSettingsSectionSize()
-			local baseHeight = 30
-			local contentHeight = 0
-			if OpenSection then
-				contentHeight = UIListLayout_SectionAdd.AbsoluteContentSize.Y
-				if #SectionAdd:GetChildren() > 1 then
-					contentHeight = contentHeight + UIListLayout_SectionAdd.Padding.Offset * (#SectionAdd:GetChildren() - 2)
-				end
-			end
-			local totalHeight = baseHeight + (OpenSection and 3 + contentHeight or 0)
-			SectionFrame.Size = UDim2.new(1,0,0,totalHeight)
-			SectionAdd.Size = UDim2.new(1,0,0,contentHeight)
-
-			task.defer(function()
-				if self._ScrolLayers and self._UIListLayout then
-					local scrollerTotalHeight = 0
-					for _, child in ipairs(self._ScrolLayers:GetChildren()) do
-						if child:IsA("Frame") then
-							scrollerTotalHeight = scrollerTotalHeight + child.Size.Y.Offset
-						end
-					end
-					if #self._ScrolLayers:GetChildren() > 1 then
-						scrollerTotalHeight = scrollerTotalHeight + self._UIListLayout.Padding.Offset * (#self._ScrolLayers:GetChildren() -1)
-					end
-					self._ScrolLayers.CanvasSize = UDim2.new(0,0,0,scrollerTotalHeight)
-				end
-			end)
-		end
-
-		SectionButton.Activated:Connect(function()
-			CircleClick(SectionButton, Mouse.X, Mouse.Y)
-			OpenSection = not OpenSection
-			FeatureImg_Section:TweenRotation(UDim.new(0, OpenSection and 0 or -90), "Out", "Quad", 0.2, true)
-			UpdateSettingsSectionSize()
-		end)
-
-		SectionAdd.ChildAdded:Connect(UpdateSettingsSectionSize)
-		SectionAdd.ChildRemoved:Connect(UpdateSettingsSectionSize)
-		UpdateSettingsSectionSize()
-
-		SectionObject._SectionAdd = SectionAdd
-		SectionObject._UpdateSizeSection = UpdateSettingsSectionSize
-
-		-- Define item creation methods for this SectionObject (mirrors normal tab's section)
-		function SectionObject:AddParagraph(ParagraphConfig) local ParagraphConfig = ParagraphConfig or {}; ParagraphConfig.Title = ParagraphConfig.Title or "Title"; ParagraphConfig.Content = ParagraphConfig.Content or "Content"; local ParagraphFunc = {}; local Paragraph = Instance.new("Frame", self._SectionAdd); Paragraph.Name = "Paragraph"; Paragraph.LayoutOrder = CountItem; Paragraph.Size = UDim2.new(1,0,0,46); Paragraph.BackgroundTransparency = 0.935; Paragraph.BackgroundColor3 = GetColor("Secondary", Paragraph, "BackgroundColor3"); Instance.new("UICorner", Paragraph).CornerRadius = UDim.new(0,4); local ParagraphTitle = Instance.new("TextLabel", Paragraph); ParagraphTitle.Name = "ParagraphTitle"; ParagraphTitle.Font = Enum.Font.GothamBold; ParagraphTitle.Text = ParagraphConfig.Title .. " | " .. ParagraphConfig.Content; ParagraphTitle.TextColor3 = GetColor("Text", ParagraphTitle, "TextColor3"); ParagraphTitle.TextSize = 13; ParagraphTitle.TextXAlignment = Enum.TextXAlignment.Left; ParagraphTitle.TextYAlignment = Enum.TextYAlignment.Top; ParagraphTitle.BackgroundTransparency = 1; ParagraphTitle.Position = UDim2.new(0,10,0,10); ParagraphTitle.Size = UDim2.new(1,-16,0,13); ParagraphTitle.TextWrapped = true; task.delay(0, function() ParagraphTitle.Size = UDim2.new(1, -16, 0, ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0, ParagraphTitle.TextBounds.Y + 20); self._UpdateSizeSection() end); function ParagraphFunc:Set(pConfig) ParagraphTitle.Text = (pConfig.Title or "T") .. " | " .. (pConfig.Content or "C"); task.delay(0,function() ParagraphTitle.Size = UDim2.new(1,-16,0,ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0,ParagraphTitle.TextBounds.Y + 20); self._UpdateSizeSection() end) end; CountItem = CountItem + 1; self._UpdateSizeSection(); return ParagraphFunc; end
-		function SectionObject:AddButton(ButtonConfig) local ButtonConfig = ButtonConfig or {}; ButtonConfig.Title = ButtonConfig.Title or "Button"; ButtonConfig.Content = ButtonConfig.Content or ""; ButtonConfig.Icon = ButtonConfig.Icon or LoadUIAsset("rbxassetid://16932740082", "ButtonDefaultIcon.png"); ButtonConfig.Callback = ButtonConfig.Callback or function() end; local ButtonFrame = Instance.new("Frame", self._SectionAdd); ButtonFrame.Name = "Button"; ButtonFrame.LayoutOrder = CountItem; ButtonFrame.Size = UDim2.new(1,0,0,46); ButtonFrame.BackgroundTransparency = 0.935; ButtonFrame.BackgroundColor3 = GetColor("Secondary", ButtonFrame, "BackgroundColor3"); Instance.new("UICorner", ButtonFrame).CornerRadius = UDim.new(0,4); local ButtonTitle = Instance.new("TextLabel", ButtonFrame); ButtonTitle.Name = "ButtonTitle"; ButtonTitle.Font = Enum.Font.GothamBold; ButtonTitle.Text = ButtonConfig.Title; ButtonTitle.TextColor3 = GetColor("Text", ButtonTitle, "TextColor3"); ButtonTitle.TextSize = 13; ButtonTitle.TextXAlignment = Enum.TextXAlignment.Left; ButtonTitle.TextYAlignment = Enum.TextYAlignment.Top; ButtonTitle.BackgroundTransparency=1; ButtonTitle.Position = UDim2.new(0,10,0,10); ButtonTitle.Size = UDim2.new(1,-100,0,13); local ButtonContent = Instance.new("TextLabel", ButtonFrame); ButtonContent.Name = "ButtonContent"; ButtonContent.Font = Enum.Font.Gotham; ButtonContent.Text = ButtonConfig.Content; ButtonContent.TextColor3 = GetColor("Text", ButtonContent, "TextColor3"); ButtonContent.TextSize = 12; ButtonContent.TextTransparency = 0.4; ButtonContent.TextXAlignment = Enum.TextXAlignment.Left; ButtonContent.TextYAlignment = Enum.TextYAlignment.Bottom; ButtonContent.BackgroundTransparency=1; ButtonContent.Position = UDim2.new(0,10,0,0); ButtonContent.Size = UDim2.new(1,-100,1,-10); ButtonContent.TextWrapped = true; local ActualButton = Instance.new("TextButton", ButtonFrame); ActualButton.Name = "ActualButton"; ActualButton.Text = ""; ActualButton.Size = UDim2.new(1,0,1,0); ActualButton.BackgroundTransparency = 1; ActualButton.Activated:Connect(function() CircleClick(ActualButton, Mouse.X, Mouse.Y); ButtonConfig.Callback() end); if ButtonConfig.Icon then local FeatureFrame1_Button = Instance.new("Frame", ButtonFrame); FeatureFrame1_Button.Name = "FeatureFrame"; FeatureFrame1_Button.AnchorPoint = Vector2.new(1,0.5); FeatureFrame1_Button.BackgroundTransparency = 1; FeatureFrame1_Button.Position = UDim2.new(1,-15,0.5,0); FeatureFrame1_Button.Size = UDim2.new(0,25,0,25); local FeatureImg3_Button = Instance.new("ImageLabel", FeatureFrame1_Button); FeatureImg3_Button.Name = "FeatureImg"; FeatureImg3_Button.Image = ButtonConfig.Icon; FeatureImg3_Button.AnchorPoint = Vector2.new(0.5,0.5); FeatureImg3_Button.BackgroundTransparency = 1; FeatureImg3_Button.Position = UDim2.new(0.5,0,0.5,0); FeatureImg3_Button.Size = UDim2.new(1,0,1,0) end; task.delay(0, function() local contentHeight = ButtonContent.TextBounds.Y; local titleHeight = ButtonTitle.TextBounds.Y; ButtonFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); self._UpdateSizeSection() end); CountItem = CountItem + 1; self._UpdateSizeSection(); return {}; end
-		function SectionObject:AddToggle(ToggleConfig) local ToggleConfig = ToggleConfig or {}; ToggleConfig.Title = ToggleConfig.Title or "Toggle"; ToggleConfig.Content = ToggleConfig.Content or ""; ToggleConfig.Default = (ToggleConfig.Flag and Flags[ToggleConfig.Flag] ~= nil) and Flags[ToggleConfig.Flag] or ToggleConfig.Default or false; ToggleConfig.Callback = ToggleConfig.Callback or function() end; local ToggleFrame = Instance.new("Frame", self._SectionAdd); ToggleFrame.Name = "Toggle"; ToggleFrame.LayoutOrder = CountItem; ToggleFrame.Size = UDim2.new(1,0,0,46); ToggleFrame.BackgroundTransparency = 0.935; ToggleFrame.BackgroundColor3 = GetColor("Secondary", ToggleFrame, "BackgroundColor3"); Instance.new("UICorner", ToggleFrame).CornerRadius = UDim.new(0,4); local ToggleTitle = Instance.new("TextLabel", ToggleFrame); ToggleTitle.Name = "ToggleTitle"; ToggleTitle.Font = Enum.Font.GothamBold; ToggleTitle.Text = ToggleConfig.Title; ToggleTitle.TextColor3 = GetColor("Text", ToggleTitle, "TextColor3"); ToggleTitle.TextSize = 13; ToggleTitle.TextXAlignment = Enum.TextXAlignment.Left; ToggleTitle.TextYAlignment = Enum.TextYAlignment.Top; ToggleTitle.BackgroundTransparency=1; ToggleTitle.Position = UDim2.new(0,10,0,10); ToggleTitle.Size = UDim2.new(1,-100,0,13); local ToggleContent = Instance.new("TextLabel", ToggleFrame); ToggleContent.Name = "ToggleContent"; ToggleContent.Font = Enum.Font.Gotham; ToggleContent.Text = ToggleConfig.Content; ToggleContent.TextColor3 = GetColor("Text", ToggleContent, "TextColor3"); ToggleContent.TextSize = 12; ToggleContent.TextTransparency = 0.4; ToggleContent.TextXAlignment = Enum.TextXAlignment.Left; ToggleContent.TextYAlignment = Enum.TextYAlignment.Bottom; ToggleContent.BackgroundTransparency=1; ToggleContent.Position = UDim2.new(0,10,0,0); ToggleContent.Size = UDim2.new(1,-100,1,-10); ToggleContent.TextWrapped = true; local SwitchFrame = Instance.new("Frame", ToggleFrame); SwitchFrame.Name = "SwitchFrame"; SwitchFrame.AnchorPoint = Vector2.new(1,0.5); SwitchFrame.BackgroundColor3 = GetColor("Accent", SwitchFrame, "BackgroundColor3"); SwitchFrame.BackgroundTransparency = 0.5; SwitchFrame.BorderSizePixel = 0; SwitchFrame.Position = UDim2.new(1,-15,0.5,0); SwitchFrame.Size = UDim2.new(0,30,0,15); Instance.new("UICorner", SwitchFrame).CornerRadius = UDim.new(0,100); local SwitchCircle = Instance.new("Frame", SwitchFrame); SwitchCircle.Name = "SwitchCircle"; SwitchCircle.BackgroundColor3 = GetColor("ThemeHighlight", SwitchCircle, "BackgroundColor3"); SwitchCircle.BorderSizePixel = 0; SwitchCircle.Position = UDim2.new(ToggleConfig.Default and 0.5 or 0, ToggleConfig.Default and -1 or 1, 0.5, -6); SwitchCircle.Size = UDim2.new(0,12,0,12); Instance.new("UICorner", SwitchCircle).CornerRadius = UDim.new(0,100); local ActualButton = Instance.new("TextButton", ToggleFrame); ActualButton.Name = "ActualButton"; ActualButton.Text = ""; ActualButton.Size = UDim2.new(1,0,1,0); ActualButton.BackgroundTransparency = 1; local currentValue = ToggleConfig.Default; local function setToggleVisual(value) SwitchCircle:TweenPosition(UDim2.new(value and 0.5 or 0, value and -1 or 1, 0.5, -6), "Out", "Quad", 0.15, true) end; setToggleVisual(currentValue); ActualButton.Activated:Connect(function() CircleClick(ActualButton, Mouse.X, Mouse.Y); currentValue = not currentValue; if ToggleConfig.Flag then SaveFile(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue) end); task.delay(0, function() local contentHeight = ToggleContent.TextBounds.Y; local titleHeight = ToggleTitle.TextBounds.Y; ToggleFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); self._UpdateSizeSection() end); CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; if ToggleConfig.Flag then SaveFile(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue); end }; end
-		function SectionObject:AddSlider(SliderConfig) local SliderConfig = SliderConfig or {}; SliderConfig.Title = SliderConfig.Title or "Slider"; SliderConfig.Content = SliderConfig.Content or ""; SliderConfig.Min = SliderConfig.Min or 0; SliderConfig.Max = SliderConfig.Max or 100; SliderConfig.Increment = SliderConfig.Increment or 1; local savedVal = SliderConfig.Flag and Flags[SliderConfig.Flag]; SliderConfig.Default = tonumber(savedVal or SliderConfig.Default or SliderConfig.Min); SliderConfig.Callback = SliderConfig.Callback or function() end; local SliderFrame = Instance.new("Frame", self._SectionAdd); SliderFrame.Name = "Slider"; SliderFrame.LayoutOrder = CountItem; SliderFrame.Size = UDim2.new(1,0,0,55); SliderFrame.BackgroundTransparency = 0.935; SliderFrame.BackgroundColor3 = GetColor("Secondary", SliderFrame, "BackgroundColor3"); Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(0,4); local SliderTitle = Instance.new("TextLabel", SliderFrame); SliderTitle.Name = "SliderTitle"; SliderTitle.Font = Enum.Font.GothamBold; SliderTitle.Text = SliderConfig.Title; SliderTitle.TextColor3 = GetColor("Text", SliderTitle, "TextColor3"); SliderTitle.TextSize = 13; SliderTitle.TextXAlignment = Enum.TextXAlignment.Left; SliderTitle.TextYAlignment = Enum.TextYAlignment.Top; SliderTitle.BackgroundTransparency=1; SliderTitle.Position = UDim2.new(0,10,0,10); SliderTitle.Size = UDim2.new(1,-60,0,13); local SliderValueText = Instance.new("TextBox", SliderFrame); SliderValueText.Name = "SliderValueText"; SliderValueText.Font = Enum.Font.GothamBold; SliderValueText.Text = tostring(SliderConfig.Default); SliderValueText.TextColor3 = GetColor("Text", SliderValueText, "TextColor3"); SliderValueText.TextSize = 12; SliderValueText.BackgroundTransparency = 0.8; SliderValueText.BackgroundColor3 = GetColor("Accent", SliderValueText, "BackgroundColor3"); SliderValueText.Position = UDim2.new(1,-45,0,5); SliderValueText.Size = UDim2.new(0,40,0,20); Instance.new("UICorner", SliderValueText).CornerRadius = UDim.new(0,3); local Bar = Instance.new("Frame", SliderFrame); Bar.Name = "Bar"; Bar.BackgroundColor3 = GetColor("Accent", Bar, "BackgroundColor3"); Bar.BorderSizePixel = 0; Bar.Position = UDim2.new(0,10,1,-20); Bar.Size = UDim2.new(1,-20,0,5); Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,100); local Progress = Instance.new("Frame", Bar); Progress.Name = "Progress"; Progress.BackgroundColor3 = GetColor("ThemeHighlight", Progress, "BackgroundColor3"); Progress.BorderSizePixel = 0; Instance.new("UICorner", Progress).CornerRadius = UDim.new(0,100); local DraggerHitbox = Instance.new("TextButton", Bar); DraggerHitbox.Name = "DraggerHitbox"; DraggerHitbox.Text = ""; DraggerHitbox.Size = UDim2.new(0,20,0,20); DraggerHitbox.AnchorPoint = Vector2.new(0.5,0.5); DraggerHitbox.BackgroundTransparency=1; DraggerHitbox.ZIndex=3; local VisualDragger = Instance.new("Frame", DraggerHitbox); VisualDragger.Name = "VisualDragger"; VisualDragger.Size=UDim2.new(0,10,0,10); VisualDragger.AnchorPoint=Vector2.new(0.5,0.5); VisualDragger.Position=UDim2.new(0.5,0,0.5,0); VisualDragger.BackgroundColor3=GetColor("ThemeHighlight",VisualDragger,"BackgroundColor3"); VisualDragger.BorderSizePixel=0; Instance.new("UICorner",VisualDragger).CornerRadius=UDim.new(0,100); local currentValue = SliderConfig.Default; local function UpdateSlider(value) value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max); currentValue = value; SliderValueText.Text = tostring(value); local percent=(SliderConfig.Max-SliderConfig.Min==0) and 0 or (value-SliderConfig.Min)/(SliderConfig.Max-SliderConfig.Min); Progress.Size=UDim2.new(percent,0,1,0); DraggerHitbox.Position=UDim2.new(percent,0,0.5,0); if SliderConfig.Flag then SaveFile(SliderConfig.Flag, currentValue) end; SliderConfig.Callback(currentValue) end; UpdateSlider(currentValue); DraggerHitbox.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then local dragging=true; local conn; conn=UserInputService.InputChanged:Connect(function(subInput) if not dragging then conn:Disconnect() return end; if subInput.UserInputType==Enum.UserInputType.MouseMovement or subInput.UserInputType==Enum.UserInputType.Touch then local localPos=Bar.AbsolutePosition.X; local mousePos=subInput.Position.X; local percent=math.clamp((mousePos-localPos)/Bar.AbsoluteSize.X,0,1); UpdateSlider(SliderConfig.Min+percent*(SliderConfig.Max-SliderConfig.Min)) end end); local inputEndedConn; inputEndedConn=input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false; if conn then conn:Disconnect() end; if inputEndedConn then inputEndedConn:Disconnect() end end end); local draggerInputEndedConn; draggerInputEndedConn=DraggerHitbox.InputEnded:Connect(function(endInput) if endInput.UserInputType==input.UserInputType then dragging=false; if conn then conn:Disconnect() end; if inputEndedConn then inputEndedConn:Disconnect() end; if draggerInputEndedConn then draggerInputEndedConn:Disconnect() end end end) end end); SliderValueText.FocusLost:Connect(function(enterPressed) if enterPressed then local num=tonumber(SliderValueText.Text); if num then UpdateSlider(num) else UpdateSlider(currentValue) end end end); CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = UpdateSlider }; end
-		function SectionObject:AddInput(InputConfig) local InputConfig = InputConfig or {}; InputConfig.Title = InputConfig.Title or "Input"; InputConfig.Content = InputConfig.Content or ""; local savedVal = InputConfig.Flag and Flags[InputConfig.Flag]; InputConfig.Default = savedVal or InputConfig.Default or ""; InputConfig.Callback = InputConfig.Callback or function() end; local InputFrame = Instance.new("Frame", self._SectionAdd); InputFrame.Name = "Input"; InputFrame.LayoutOrder = CountItem; InputFrame.Size = UDim2.new(1,0,0,46); InputFrame.BackgroundTransparency = 0.935; InputFrame.BackgroundColor3 = GetColor("Secondary", InputFrame, "BackgroundColor3"); Instance.new("UICorner", InputFrame).CornerRadius = UDim.new(0,4); local InputTitle = Instance.new("TextLabel", InputFrame); InputTitle.Name = "InputTitle"; InputTitle.Font = Enum.Font.GothamBold; InputTitle.Text = InputConfig.Title; InputTitle.TextColor3 = GetColor("Text", InputTitle, "TextColor3"); InputTitle.TextSize = 13; InputTitle.TextXAlignment = Enum.TextXAlignment.Left; InputTitle.TextYAlignment = Enum.TextYAlignment.Top; InputTitle.BackgroundTransparency=1; InputTitle.Position = UDim2.new(0,10,0,10); InputTitle.Size = UDim2.new(1,-100,0,13); local InputContent = Instance.new("TextLabel", InputFrame); InputContent.Name = "InputContent"; InputContent.Font = Enum.Font.Gotham; InputContent.Text = InputConfig.Content; InputContent.TextColor3 = GetColor("Text", InputContent, "TextColor3"); InputContent.TextSize = 12; InputContent.TextTransparency = 0.4; InputContent.TextXAlignment = Enum.TextXAlignment.Left; InputContent.TextYAlignment = Enum.TextYAlignment.Bottom; InputContent.BackgroundTransparency=1; InputContent.Position = UDim2.new(0,10,0,0); InputContent.Size = UDim2.new(1,-100,1,-10); InputContent.TextWrapped = true; local TextBox = Instance.new("TextBox", InputFrame); TextBox.Name = "TextBox"; TextBox.Font = Enum.Font.Gotham; TextBox.Text = InputConfig.Default; TextBox.TextColor3 = GetColor("Text", TextBox, "TextColor3"); TextBox.TextSize = 12; TextBox.BackgroundColor3 = GetColor("Accent", TextBox, "BackgroundColor3"); TextBox.Position = UDim2.new(1,-155,0.5,-12); TextBox.Size = UDim2.new(0,150,0,24); Instance.new("UICorner", TextBox).CornerRadius = UDim.new(0,3); TextBox.ClearTextOnFocus = false; local currentValue = InputConfig.Default; TextBox.FocusLost:Connect(function(enterPressed) if enterPressed then currentValue = TextBox.Text; if InputConfig.Flag then SaveFile(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) else TextBox.Text = currentValue end end); task.delay(0, function() local contentHeight = InputContent.TextBounds.Y; local titleHeight = InputTitle.TextBounds.Y; InputFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); self._UpdateSizeSection() end); CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; TextBox.Text = val; if InputConfig.Flag then SaveFile(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) end }; end
-		function SectionObject:AddDropdown(DropdownConfig) local resources = { getColorFunc=GetColor, loadUIAssetFunc=LoadUIAsset, DropdownFolder=DropdownFolder, DropPageLayout=DropPageLayout, MoreBlur=MoreBlur, DropdownSelect=DropdownSelect, circleClickFunc=CircleClick, mouseRef=Mouse, tweenServiceRef=TweenService, saveFileFunc=SaveFile, flagsRef=Flags, CountItemRef={Value=CountItem} }; local dropdownApi = Helper_CreateDropdownElements(self._SectionAdd, DropdownConfig, resources); CountItem = resources.CountItemRef.Value; self._UpdateSizeSection(); return dropdownApi; end
-		function SectionObject:AddDivider(DividerConfig) local DividerConfig = DividerConfig or {}; DividerConfig.Text = DividerConfig.Text or nil; local DividerContainer = Instance.new("Frame", self._SectionAdd); DividerContainer.Name = "Divider"; DividerContainer.Size = UDim2.new(1,0,0,20); DividerContainer.BackgroundTransparency=1; DividerContainer.LayoutOrder=CountItem; if not DividerConfig.Text or DividerConfig.Text == "" then local Line=Instance.new("Frame",DividerContainer); Line.Name="FullLine"; Line.BackgroundColor3=DividerConfig.Color or GetColor("Stroke",Line,"BackgroundColor3"); Line.BorderSizePixel=0; Line.AnchorPoint=Vector2.new(0.5,0.5); Line.Position=UDim2.new(0.5,0,0.5,0); Line.Size=UDim2.new(1,-10,0,1) else DividerContainer.Size = UDim2.new(1,0,0,(DividerConfig.TextSize or 12)+8); local ListLayout=Instance.new("UIListLayout",DividerContainer); ListLayout.FillDirection=Enum.FillDirection.Horizontal; ListLayout.VerticalAlignment=Enum.VerticalAlignment.Center; ListLayout.HorizontalAlignment=Enum.HorizontalAlignment.Center; ListLayout.SortOrder=Enum.SortOrder.LayoutOrder; ListLayout.Padding=UDim.new(0,8); local Line1=Instance.new("Frame",DividerContainer); Line1.Name="Line1"; Line1.BackgroundColor3=DividerConfig.Color or GetColor("Stroke",Line1,"BackgroundColor3"); Line1.BorderSizePixel=0; Line1.Size=UDim2.new(1,0,0,1); Line1.LayoutOrder=1; local DividerText=Instance.new("TextLabel",DividerContainer); DividerText.Name="DividerText"; DividerText.Text=DividerConfig.Text; DividerText.TextColor3=DividerConfig.TextColor or GetColor("Text",DividerText,"TextColor3"); DividerText.Font=DividerConfig.Font or Enum.Font.GothamBold; DividerText.TextSize=DividerConfig.TextSize or 12; DividerText.BackgroundTransparency=1; DividerText.AutomaticSize=Enum.AutomaticSize.X; DividerText.Size=UDim2.new(0,0,1,0); DividerText.LayoutOrder=2; local Line2=Instance.new("Frame",DividerContainer); Line2.Name="Line2"; Line2.BackgroundColor3=DividerConfig.Color or GetColor("Stroke",Line2,"BackgroundColor3"); Line2.BorderSizePixel=0; Line2.Size=UDim2.new(1,0,0,1); Line2.LayoutOrder=3 end; CountItem=CountItem+1; self._UpdateSizeSection(); return {}; end
-
-		currentSectionCountForSettingsTab = currentSectionCountForSettingsTab + 1
-		UpdateSettingsSectionSize() -- Update settings page scroller for the new section
-		return SectionObject
-	end
-
-	-- Populate the ActualSettingsTab (Example: Re-implementing Preset Management)
-	local PresetManagementSettingsSection = ActualSettingsTab:AddSection("Preset Management")
-	local defaultThemesDropdown_Settings = PresetManagementSettingsSection:AddDropdown({
+	-- Populate the SettingsTabObject (Example: Re-implementing Preset Management)
+	local PresetManagementSettingsSection_InSettings = SettingsTabObject:AddSection("Preset Management") -- Changed ActualSettingsTab to SettingsTabObject
+	local defaultThemesDropdown_InSettings = PresetManagementSettingsSection_InSettings:AddDropdown({ -- Changed variable name for clarity
 		Title = "Default Themes",
 		Options = GetThemes(),
 	})
-	PresetManagementSettingsSection:AddButton({
+	PresetManagementSettingsSection_InSettings:AddButton({ -- Changed variable name
 		Title = "Apply Default Theme", Content = "Apply the selected default theme",
 		Callback = function()
-			local val = defaultThemesDropdown_Settings:GetValue()
+			local val = defaultThemesDropdown_InSettings:GetValue() -- Changed variable name
 			if val and #val > 0 then SetTheme(val[1]); UBHubLib:MakeNotify({Title="Theme Applied", Content="'"..val[1].."' applied."}) end
 		end
 	})
-	-- ... (re-implement other settings sections and items here for ActualSettingsTab) ...
+	-- ... (re-implement other settings sections and items here for SettingsTabObject) ...
 
 	-- Re-implement Interface Customization Section
-	local InterfaceSettingsSection = ActualSettingsTab:AddSection("Interface Customization")
-	InterfaceSettingsSection:AddToggle({
+	local InterfaceSettingsSection_InSettings = SettingsTabObject:AddSection("Interface Customization") -- Changed ActualSettingsTab to SettingsTabObject
+	InterfaceSettingsSection_InSettings:AddToggle({ -- Changed variable name
 		Title = "Undetected Mode", Content = "Attempts to load assets in a way less likely to be detected. May not work with all assets.",
 		Flag = "UndetectedMode", Default = LibraryCfg.Undetected,
 		Callback = function(val) LibraryCfg.Undetected = val end
@@ -2429,12 +2289,12 @@ function UBHubLib:MakeGui(GuiConfig)
 
 
 	-- Re-implement Customize Colors Section
-	local CustomizeColorsSettingsSection = ActualSettingsTab:AddSection("Customize Colors")
-	local colorControls_Settings = {}
+	local CustomizeColorsSettingsSection_InSettings = SettingsTabObject:AddSection("Customize Colors") -- Changed ActualSettingsTab to SettingsTabObject
+	local colorControls_InSettings = {} -- Changed variable name
 
-	local function updateColorFromSliders_Settings(colorKeyName, component, value)
+	local function updateColorFromSliders_InSettings(colorKeyName, component, value) -- Changed function name
 		local r, g, b
-		local currentHex = colorControls_Settings[colorKeyName].hexInput:GetValue()
+		local currentHex = colorControls_InSettings[colorKeyName].hexInput:GetValue() -- Changed variable name
 		local currentColor = HexToColor(currentHex)
 		r = (component == "R") and value or math.floor(currentColor.R * 255)
 		g = (component == "G") and value or math.floor(currentColor.G * 255)
@@ -2442,67 +2302,67 @@ function UBHubLib:MakeGui(GuiConfig)
 		local newColor = Color3.fromRGB(r, g, b)
 		Themes[CurrentTheme][colorKeyName] = newColor
 		SetTheme(CurrentTheme)
-		colorControls_Settings[colorKeyName].hexInput:SetValue(ColorToHex(newColor))
+		colorControls_InSettings[colorKeyName].hexInput:SetValue(ColorToHex(newColor)) -- Changed variable name
 	end
 
-	local function updateSlidersFromHex_Settings(colorKeyName, hexValue)
+	local function updateSlidersFromHex_InSettings(colorKeyName, hexValue) -- Changed function name
 		if not hexValue or not hexValue:match("^#%x%x%x%x%x%x$") then return end
 		local color = HexToColor(hexValue)
 		Themes[CurrentTheme][colorKeyName] = color
 		SetTheme(CurrentTheme)
-		colorControls_Settings[colorKeyName].rSlider:SetValue(math.floor(color.R * 255))
-		colorControls_Settings[colorKeyName].gSlider:SetValue(math.floor(color.G * 255))
-		colorControls_Settings[colorKeyName].bSlider:SetValue(math.floor(color.B * 255))
+		colorControls_InSettings[colorKeyName].rSlider:SetValue(math.floor(color.R * 255)) -- Changed variable name
+		colorControls_InSettings[colorKeyName].gSlider:SetValue(math.floor(color.G * 255)) -- Changed variable name
+		colorControls_InSettings[colorKeyName].bSlider:SetValue(math.floor(color.B * 255)) -- Changed variable name
 	end
 
-	local baseThemeForKeys_Settings = Themes[next(Themes)]
-	if baseThemeForKeys_Settings then
-		local sortedColorKeys_Settings = {}
-		for key, _ in pairs(baseThemeForKeys_Settings) do
-			if typeof(baseThemeForKeys_Settings[key]) == "Color3" then
-				table.insert(sortedColorKeys_Settings, key)
+	local baseThemeForKeys_InSettings = Themes[next(Themes)] -- Changed variable name
+	if baseThemeForKeys_InSettings then
+		local sortedColorKeys_InSettings = {} -- Changed variable name
+		for key, _ in pairs(baseThemeForKeys_InSettings) do
+			if typeof(baseThemeForKeys_InSettings[key]) == "Color3" then
+				table.insert(sortedColorKeys_InSettings, key) -- Changed variable name
 			end
 		end
-		table.sort(sortedColorKeys_Settings)
+		table.sort(sortedColorKeys_InSettings) -- Changed variable name
 
-		for _, colorKeyName in ipairs(sortedColorKeys_Settings) do
-			local initialColor = Themes[CurrentTheme][colorKeyName] or baseThemeForKeys_Settings[colorKeyName]
+		for _, colorKeyName in ipairs(sortedColorKeys_InSettings) do -- Changed variable name
+			local initialColor = Themes[CurrentTheme][colorKeyName] or baseThemeForKeys_InSettings[colorKeyName]
 			local displayName = FormatColorNameForDisplay(colorKeyName)
-			CustomizeColorsSettingsSection:AddDivider({ Text = displayName })
-			colorControls_Settings[colorKeyName] = {}
+			CustomizeColorsSettingsSection_InSettings:AddDivider({ Text = displayName }) -- Changed variable name
+			colorControls_InSettings[colorKeyName] = {} -- Changed variable name
 			local initialHex = ColorToHex(initialColor)
 
-			local hexInput_Settings = CustomizeColorsSettingsSection:AddInput({
+			local hexInput_InSettings = CustomizeColorsSettingsSection_InSettings:AddInput({ -- Changed variable name
 				Title = displayName .. " Hex", Content = "Hexadecimal color code (e.g., #FF0000)",
-				Default = initialHex, Flag = "CustomColorHex_"..colorKeyName, -- Ensure unique flag for saving
+				Default = initialHex, Flag = "CustomColorHex_"..colorKeyName,
 				Callback = function(hexValue)
 					if hexValue:match("^#%x%x%x%x%x%x$") then
-						updateSlidersFromHex_Settings(colorKeyName, hexValue)
+						updateSlidersFromHex_InSettings(colorKeyName, hexValue) -- Changed function name
 					else
 						UBHubLib:MakeNotify({Title="Invalid Hex", Content="Please use format #RRGGBB."})
-						hexInput_Settings:SetValue(ColorToHex(Themes[CurrentTheme][colorKeyName]))
+						hexInput_InSettings:SetValue(ColorToHex(Themes[CurrentTheme][colorKeyName])) -- Changed variable name
 					end
 				end
 			})
-			colorControls_Settings[colorKeyName].hexInput = hexInput_Settings
+			colorControls_InSettings[colorKeyName].hexInput = hexInput_InSettings -- Changed variable name
 
-			local rSlider_Settings = CustomizeColorsSettingsSection:AddSlider({
+			local rSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({ -- Changed variable name
 				Title = "Red", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor.R * 255),
-				Flag = "CustomColorR_"..colorKeyName,  Callback = function(value) updateColorFromSliders_Settings(colorKeyName, "R", value) end
+				Flag = "CustomColorR_"..colorKeyName,  Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "R", value) end -- Changed function name
 			})
-			colorControls_Settings[colorKeyName].rSlider = rSlider_Settings
+			colorControls_InSettings[colorKeyName].rSlider = rSlider_InSettings -- Changed variable name
 
-			local gSlider_Settings = CustomizeColorsSettingsSection:AddSlider({
+			local gSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({ -- Changed variable name
 				Title = "Green", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor.G * 255),
-				Flag = "CustomColorG_"..colorKeyName, Callback = function(value) updateColorFromSliders_Settings(colorKeyName, "G", value) end
+				Flag = "CustomColorG_"..colorKeyName, Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "G", value) end -- Changed function name
 			})
-			colorControls_Settings[colorKeyName].gSlider = gSlider_Settings
+			colorControls_InSettings[colorKeyName].gSlider = gSlider_InSettings -- Changed variable name
 
-			local bSlider_Settings = CustomizeColorsSettingsSection:AddSlider({
+			local bSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({ -- Changed variable name
 				Title = "Blue", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor.B * 255),
-				Flag = "CustomColorB_"..colorKeyName, Callback = function(value) updateColorFromSliders_Settings(colorKeyName, "B", value) end
+				Flag = "CustomColorB_"..colorKeyName, Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "B", value) end -- Changed function name
 			})
-			colorControls_Settings[colorKeyName].bSlider = bSlider_Settings
+			colorControls_InSettings[colorKeyName].bSlider = bSlider_InSettings -- Changed variable name
 		end
 	end
 
