@@ -738,13 +738,27 @@ function UBHubLib:MakeGui(GuiConfig)
 				if DropdownConfig.Flag then resources.saveFileFunc(DropdownConfig.Flag, DropdownFunc.Value) end
 			end)
 
-			local yO=0
-			for _,cld in ipairs(ScrollSelect_Instance:GetChildren()) do
-				if cld.Name=="Option" and cld:IsA("Frame") then
-					yO=yO+UIListLayout_Scroll_Instance.Padding.Offset+cld.Size.Y.Offset
+			-- Corrected CanvasSize calculation
+			task.wait() -- Allow UI to update before calculating size
+			local Current_UIListLayout_Scroll = ScrollSelect_Instance:FindFirstChildOfClass("UIListLayout")
+			if not Current_UIListLayout_Scroll then
+				warn("_Internal_CreateDropdown:AddOption - UIListLayout_Scroll_Instance not found during CanvasSize update for ScrollSelect: " .. ScrollSelect_Instance.Name)
+				return
+			end -- Safety check
+
+			local offsetY = 0
+			for _, child in ipairs(ScrollSelect_Instance:GetChildren()) do
+				if child:IsA("GuiObject") and child.Name == "Option" then
+					offsetY = offsetY + child.AbsoluteSize.Y + Current_UIListLayout_Scroll.Padding.Offset
 				end
 			end
-			ScrollSelect_Instance.CanvasSize=UDim2.new(0,0,0,yO-UIListLayout_Scroll_Instance.Padding.Offset)
+            -- The loop correctly adds padding *after* each item that has a subsequent item.
+            -- If there are items, the last item's padding addition effectively becomes bottom padding.
+            -- If no items, offsetY remains 0. If items, subtract the last added padding if you don't want bottom padding.
+            -- The provided user example implicitly creates bottom padding. If that's not desired:
+            if offsetY > 0 then offsetY = offsetY - Current_UIListLayout_Scroll.Padding.Offset end
+
+			ScrollSelect_Instance.CanvasSize = UDim2.new(0, 0, 0, math.max(0, offsetY)) -- Ensure non-negative
 		end
 
 		function DropdownFunc:Set(val)

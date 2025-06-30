@@ -846,28 +846,22 @@ function Speed_Library:CreateWindow(Config)
         end)
 
         local function UpdateCanvasSize()
-            local OffsetY = 0
-            if not UIListLayout_Scroll_Instance then
-                warn("SHX_InternalDropdown:UpdateCanvasSize (nested) - UIListLayout_Scroll_Instance is nil. Cannot calculate CanvasSize correctly.")
-                for _, child_in_scroll in ipairs(ScrollSelect_Instance:GetChildren()) do
-                    if child_in_scroll:IsA("Frame") and child_in_scroll.Name == "Option" then OffsetY = OffsetY + 3 + child_in_scroll.Size.Y.Offset end
-                end
-                ScrollSelect_Instance.CanvasSize = UDim2.new(0,0,0,OffsetY)
+            -- Corrected CanvasSize calculation for SHX
+            task.wait()
+            local Current_UIListLayout_Scroll = ScrollSelect_Instance:FindFirstChildOfClass("UIListLayout")
+            if not Current_UIListLayout_Scroll then
+                warn("_Internal_Create_SHX_Dropdown:UpdateCanvasSize - UIListLayout_Scroll_Instance not found for ScrollSelect: " .. ScrollSelect_Instance.Name)
                 return
             end
 
-            local optionFrames = {}
-            for _, child_in_scroll in ipairs(ScrollSelect_Instance:GetChildren()) do
-                if child_in_scroll:IsA("Frame") and child_in_scroll.Name == "Option" then table.insert(optionFrames, child_in_scroll) end
-            end
-
-            if #optionFrames > 0 then
-                for i, itemFrame in ipairs(optionFrames) do
-                    OffsetY = OffsetY + itemFrame.Size.Y.Offset
-                    if i < #optionFrames then OffsetY = OffsetY + UIListLayout_Scroll_Instance.Padding.Offset end
+            local offsetY = 0
+            for _, child in ipairs(ScrollSelect_Instance:GetChildren()) do
+                if child:IsA("GuiObject") and child.Name == "Option" then
+                    offsetY = offsetY + child.AbsoluteSize.Y + Current_UIListLayout_Scroll.Padding.Offset
                 end
             end
-            ScrollSelect_Instance.CanvasSize = UDim2.new(0,0,0,math.max(0,OffsetY))
+            if offsetY > 0 then offsetY = offsetY - Current_UIListLayout_Scroll.Padding.Offset end
+            ScrollSelect_Instance.CanvasSize = UDim2.new(0, 0, 0, math.max(0,offsetY))
         end
         UpdateCanvasSize()
     end
