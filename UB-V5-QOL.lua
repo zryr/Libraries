@@ -909,20 +909,40 @@ function UBHubLib:MakeGui(GuiConfig)
 				local UIListLayout_Scroll = Instance.new("UIListLayout", ScrollSelect); UIListLayout_Scroll.Padding = UDim.new(0,3); UIListLayout_Scroll.SortOrder = Enum.SortOrder.LayoutOrder
 				SearchBar_Dropdown:GetPropertyChangedSignal("Text"):Connect(function() local s = SearchBar_Dropdown.Text:lower(); for _,oF in ipairs(ScrollSelect:GetChildren()) do if oF:IsA("Frame") and oF.Name == "Option" then local oT = oF:FindFirstChild("OptionText"); if oT then oF.Visible = (s == "" or oT.Text:lower():find(s,1,true)) end end end end)
 			end
-			local SearchBar_Dropdown = DropdownContainer.SearchBar_Dropdown
-			local ScrollSelect = DropdownContainer.ScrollSelect
-			local UIListLayout_Scroll = ScrollSelect:FindFirstChildOfClass("UIListLayout")
+			-- Corrected retrieval using FindFirstChild
+			local SearchBar_Dropdown = DropdownContainer:FindFirstChild("SearchBar_Dropdown")
+			local ScrollSelect = DropdownContainer:FindFirstChild("ScrollSelect")
+			local UIListLayout_Scroll -- Declare variable
+
+			if ScrollSelect then -- Ensure ScrollSelect exists before trying to get its child
+				UIListLayout_Scroll = ScrollSelect:FindFirstChildOfClass("UIListLayout")
+			else
+				warn("AddDropdown: ScrollSelect not found in DropdownContainer: " .. DropdownContainer.Name)
+			end
+
+			if not SearchBar_Dropdown then warn("AddDropdown: SearchBar_Dropdown not found in DropdownContainer: " .. DropdownContainer.Name) end
+			if not UIListLayout_Scroll then warn("AddDropdown: UIListLayout_Scroll not found in ScrollSelect for DropdownContainer: " .. DropdownContainer.Name) end
+
 
 			DropdownButton.Activated:Connect(function() circleClickFunc(DropdownButton, mouseRef.X, mouseRef.Y); if not MoreBlur.Visible then MoreBlur.Visible = true; DropPageLayout:JumpTo(DropdownContainer); tweenServiceRef:Create(MoreBlur, TweenInfo.new(0.2),{BackgroundTransparency = 0.7}):Play(); tweenServiceRef:Create(DropdownSelect, TweenInfo.new(0.2),{Position = UDim2.new(1,-11,0.5,0)}):Play() end end)
 
 			local dropCountLocal = 0;
-			function DropdownFunc:Clear() for i=#ScrollSelect:GetChildren(),1,-1 do local c = ScrollSelect:GetChildren()[i]; if c.Name == "Option" then c:Destroy() end end; DropdownFunc.Value={}; DropdownFunc.Options={}; OptionSelecting.Text = "Select Options"; dropCountLocal = 0; ScrollSelect.CanvasSize = UDim2.new(0,0,0,0); end
+			function DropdownFunc:Clear()
+				if not ScrollSelect then return end -- Guard clause
+				for i=#ScrollSelect:GetChildren(),1,-1 do local c = ScrollSelect:GetChildren()[i]; if c.Name == "Option" then c:Destroy() end end; DropdownFunc.Value={}; DropdownFunc.Options={}; OptionSelecting.Text = "Select Options"; dropCountLocal = 0; ScrollSelect.CanvasSize = UDim2.new(0,0,0,0);
+			end
 			function DropdownFunc:AddOption(oN)
+				if not ScrollSelect or not UIListLayout_Scroll then -- Guard clauses
+					warn("AddDropdown:AddOption - ScrollSelect or UIListLayout_Scroll is nil. Cannot add option.")
+					return
+				end
 				oN = oN or "Option"; local oF = Instance.new("Frame",ScrollSelect); oF.Name="Option"; oF.Size=UDim2.new(1,0,0,30); oF.BackgroundTransparency=0.97; oF.BackgroundColor3=getColorFunc("Secondary",oF,"BackgroundColor3"); Instance.new("UICorner",oF).CornerRadius=UDim.new(0,3); local oB=Instance.new("TextButton",oF); oB.Name="OptionButton"; oB.Text=""; oB.Size=UDim2.new(1,0,1,0); oB.BackgroundTransparency=1; local oT=Instance.new("TextLabel",oF); oT.Name="OptionText"; oT.Font=Enum.Font.Gotham; oT.Text=oN; oT.TextColor3=getColorFunc("Text",oT,"TextColor3"); oT.TextSize=13; oT.TextXAlignment=Enum.TextXAlignment.Left; oT.BackgroundTransparency=1; oT.Position=UDim2.new(0,8,0,0); oT.Size=UDim2.new(1,-16,1,0); local cF=Instance.new("Frame",oF); cF.Name="ChooseFrame"; cF.AnchorPoint=Vector2.new(0,0.5); cF.BackgroundColor3=getColorFunc("ThemeHighlight",cF,"BackgroundColor3"); cF.BorderSizePixel=0; cF.Position=UDim2.new(0,2,0.5,0); cF.Size=UDim2.new(0,0,0,0); Instance.new("UICorner",cF).CornerRadius=UDim.new(0,3); local cS=Instance.new("UIStroke",cF); cS.Color=getColorFunc("Secondary",cS,"Color"); cS.Thickness=1.6; cS.Transparency=1; dropCountLocal=dropCountLocal+1; oF.LayoutOrder=dropCountLocal;
 				oB.Activated:Connect(function() circleClickFunc(oB, mouseRef.X, mouseRef.Y); if DropdownConfig.Multi then local fI=table.find(DropdownFunc.Value,oN); if fI then table.remove(DropdownFunc.Value,fI) else table.insert(DropdownFunc.Value,oN) end else DropdownFunc.Value={oN} end; DropdownFunc:Set(DropdownFunc.Value); if DropdownConfig.Flag then saveFileFunc(DropdownConfig.Flag, DropdownFunc.Value) end end)
 				local yO=0; for _,cld in ipairs(ScrollSelect:GetChildren()) do if cld.Name=="Option" and cld:IsA("Frame") then yO=yO+UIListLayout_Scroll.Padding.Offset+cld.Size.Y.Offset end end; ScrollSelect.CanvasSize=UDim2.new(0,0,0,yO-UIListLayout_Scroll.Padding.Offset);
 			end;
-			function DropdownFunc:Set(val) if val then local nV=type(val)=="table" and val or {val}; local uV={}; for _,v_u in ipairs(nV) do if not table.find(uV,v_u) then table.insert(uV,v_u) end end; DropdownFunc.Value=uV end; for _,d_S in ipairs(ScrollSelect:GetChildren()) do if d_S:IsA("Frame") and d_S.Name=="Option" then local iTF=DropdownFunc.Value and table.find(DropdownFunc.Value,d_S.OptionText.Text); local tII=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut); local s_S=iTF and UDim2.new(0,1,0,12) or UDim2.new(0,0,0,0); local bT_S=iTF and 0.935 or 0.97; local tr_S=iTF and 0 or 1; tweenServiceRef:Create(d_S.ChooseFrame,tII,{Size=s_S}):Play(); tweenServiceRef:Create(d_S.ChooseFrame.UIStroke,tII,{Transparency=tr_S}):Play(); tweenServiceRef:Create(d_S,tII,{BackgroundTransparency=bT_S}):Play() end end; local dT=(DropdownFunc.Value and #DropdownFunc.Value>0) and table.concat(DropdownFunc.Value,", ") or "Select Options"; OptionSelecting.Text=dT; if DropdownConfig.Callback then DropdownConfig.Callback(DropdownFunc.Value or {}) end;
+			function DropdownFunc:Set(val)
+				if not ScrollSelect then return end -- Guard clause
+				if val then local nV=type(val)=="table" and val or {val}; local uV={}; for _,v_u in ipairs(nV) do if not table.find(uV,v_u) then table.insert(uV,v_u) end end; DropdownFunc.Value=uV end; for _,d_S in ipairs(ScrollSelect:GetChildren()) do if d_S:IsA("Frame") and d_S.Name=="Option" then local iTF=DropdownFunc.Value and table.find(DropdownFunc.Value,d_S.OptionText.Text); local tII=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut); local s_S=iTF and UDim2.new(0,1,0,12) or UDim2.new(0,0,0,0); local bT_S=iTF and 0.935 or 0.97; local tr_S=iTF and 0 or 1; tweenServiceRef:Create(d_S.ChooseFrame,tII,{Size=s_S}):Play(); tweenServiceRef:Create(d_S.ChooseFrame.UIStroke,tII,{Transparency=tr_S}):Play(); tweenServiceRef:Create(d_S,tII,{BackgroundTransparency=bT_S}):Play() end end; local dT=(DropdownFunc.Value and #DropdownFunc.Value>0) and table.concat(DropdownFunc.Value,", ") or "Select Options"; OptionSelecting.Text=dT; if DropdownConfig.Callback then DropdownConfig.Callback(DropdownFunc.Value or {}) end;
 			end;
 			function DropdownFunc:Refresh(rL,sEl) local cV=savedValue or DropdownConfig.Default; rL=rL or {}; sEl=sEl or cV; DropdownFunc:Clear(); DropdownFunc.Options=rL; for _,oR in pairs(rL) do DropdownFunc:AddOption(oR) end; DropdownFunc.Value=nil; DropdownFunc:Set(sEl); end;
 			DropdownFunc:Refresh(DropdownConfig.Options, DropdownConfig.Default)
