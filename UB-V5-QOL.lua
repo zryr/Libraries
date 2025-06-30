@@ -796,7 +796,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			local SliderValueText = Instance.new("TextBox", SliderFrame); SliderValueText.Name = "SliderValueText"; SliderValueText.Font = Enum.Font.GothamBold; SliderValueText.Text = tostring(SliderConfig.Default); SliderValueText.TextColor3 = getColorFunc("Text", SliderValueText, "TextColor3"); SliderValueText.TextSize = 12; SliderValueText.BackgroundTransparency = 0.8; SliderValueText.BackgroundColor3 = getColorFunc("Accent", SliderValueText, "BackgroundColor3"); SliderValueText.Position = UDim2.new(1,-45,0,5); SliderValueText.Size = UDim2.new(0,40,0,20); Instance.new("UICorner", SliderValueText).CornerRadius = UDim.new(0,3)
 			local Bar = Instance.new("Frame", SliderFrame); Bar.Name = "Bar"; Bar.BackgroundColor3 = getColorFunc("Accent", Bar, "BackgroundColor3"); Bar.BorderSizePixel = 0; Bar.Position = UDim2.new(0,10,1,-20); Bar.Size = UDim2.new(1,-20,0,5); Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,100)
 			local Progress = Instance.new("Frame", Bar); Progress.Name = "Progress"; Progress.BackgroundColor3 = getColorFunc("ThemeHighlight", Progress, "BackgroundColor3"); Progress.BorderSizePixel = 0; Instance.new("UICorner", Progress).CornerRadius = UDim.new(0,100)
-
+			
 			-- Task #3: Slider Usability Enhancement
 			local DraggerHitbox = Instance.new("TextButton", Bar)
 			DraggerHitbox.Name = "DraggerHitbox"
@@ -818,7 +818,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			VisualDragger.ZIndex = 2 -- Below hitbox input plane if necessary, but parent relationship handles this.
 
 			local currentValue = SliderConfig.Default
-			local function UpdateSlider(value)
+			local function UpdateSlider(value) 
 				value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max)
 				currentValue = value
 				SliderValueText.Text = tostring(value)
@@ -826,25 +826,25 @@ function UBHubLib:MakeGui(GuiConfig)
 				Progress.Size = UDim2.new(percent,0,1,0)
 				DraggerHitbox.Position = UDim2.new(percent,0,0.5,0) -- Move the hitbox
 				if SliderConfig.Flag then saveFileFunc(SliderConfig.Flag, currentValue) end
-				SliderConfig.Callback(currentValue)
+				SliderConfig.Callback(currentValue) 
 			end
 			UpdateSlider(currentValue)
 
-			DraggerHitbox.InputBegan:Connect(function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			DraggerHitbox.InputBegan:Connect(function(input) 
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
 					local dragging = true
 					local conn
-					conn = UserInputService.InputChanged:Connect(function(subInput)
+					conn = UserInputService.InputChanged:Connect(function(subInput) 
 						if not dragging then conn:Disconnect() return end
-						if subInput.UserInputType == Enum.UserInputType.MouseMovement or subInput.UserInputType == Enum.UserInputType.Touch then
+						if subInput.UserInputType == Enum.UserInputType.MouseMovement or subInput.UserInputType == Enum.UserInputType.Touch then 
 							local localPos = Bar.AbsolutePosition.X
 							local mousePos = subInput.Position.X
 							local percent = math.clamp((mousePos - localPos) / Bar.AbsoluteSize.X, 0, 1)
-							UpdateSlider(SliderConfig.Min + percent * (SliderConfig.Max - SliderConfig.Min))
-						end
+							UpdateSlider(SliderConfig.Min + percent * (SliderConfig.Max - SliderConfig.Min)) 
+						end 
 					end)
 					-- Use DraggerHitbox.InputEnded or a connection to input.Changed for UserInputState.End
-					local inputEndedConn
+					local inputEndedConn 
 					inputEndedConn = input.Changed:Connect(function()
 						if input.UserInputState == Enum.UserInputState.End then
 							dragging = false
@@ -862,7 +862,7 @@ function UBHubLib:MakeGui(GuiConfig)
 							if draggerInputEndedConn then draggerInputEndedConn:Disconnect() end
 						end
 					end)
-				end
+				end 
 			end)
 			SliderValueText.FocusLost:Connect(function(enterPressed) if enterPressed then local num = tonumber(SliderValueText.Text); if num then UpdateSlider(num) else UpdateSlider(currentValue) end end end)
 			CountItem = CountItem + 1; return { GetValue = function() return currentValue end, SetValue = UpdateSlider }
@@ -927,20 +927,20 @@ function UBHubLib:MakeGui(GuiConfig)
 			DropdownButton.Activated:Connect(function() circleClickFunc(DropdownButton, mouseRef.X, mouseRef.Y); if not MoreBlur.Visible then MoreBlur.Visible = true; DropPageLayout:JumpTo(DropdownContainer); tweenServiceRef:Create(MoreBlur, TweenInfo.new(0.2),{BackgroundTransparency = 0.7}):Play(); tweenServiceRef:Create(DropdownSelect, TweenInfo.new(0.2),{Position = UDim2.new(1,-11,0.5,0)}):Play() end end)
 
 			local dropCountLocal = 0;
-			function DropdownFunc:Clear()
+			function DropdownFunc:Clear() 
 				if not ScrollSelect then return end -- Guard clause
-				for i=#ScrollSelect:GetChildren(),1,-1 do local c = ScrollSelect:GetChildren()[i]; if c.Name == "Option" then c:Destroy() end end; DropdownFunc.Value={}; DropdownFunc.Options={}; OptionSelecting.Text = "Select Options"; dropCountLocal = 0; ScrollSelect.CanvasSize = UDim2.new(0,0,0,0);
+				for i=#ScrollSelect:GetChildren(),1,-1 do local c = ScrollSelect:GetChildren()[i]; if c.Name == "Option" then c:Destroy() end end; DropdownFunc.Value={}; DropdownFunc.Options={}; OptionSelecting.Text = "Select Options"; dropCountLocal = 0; ScrollSelect.CanvasSize = UDim2.new(0,0,0,0); 
 			end
 			function DropdownFunc:AddOption(oN)
 				if not ScrollSelect or not UIListLayout_Scroll then -- Guard clauses
 					warn("AddDropdown:AddOption - ScrollSelect or UIListLayout_Scroll is nil. Cannot add option.")
-					return
+					return 
 				end
 				oN = oN or "Option"; local oF = Instance.new("Frame",ScrollSelect); oF.Name="Option"; oF.Size=UDim2.new(1,0,0,30); oF.BackgroundTransparency=0.97; oF.BackgroundColor3=getColorFunc("Secondary",oF,"BackgroundColor3"); Instance.new("UICorner",oF).CornerRadius=UDim.new(0,3); local oB=Instance.new("TextButton",oF); oB.Name="OptionButton"; oB.Text=""; oB.Size=UDim2.new(1,0,1,0); oB.BackgroundTransparency=1; local oT=Instance.new("TextLabel",oF); oT.Name="OptionText"; oT.Font=Enum.Font.Gotham; oT.Text=oN; oT.TextColor3=getColorFunc("Text",oT,"TextColor3"); oT.TextSize=13; oT.TextXAlignment=Enum.TextXAlignment.Left; oT.BackgroundTransparency=1; oT.Position=UDim2.new(0,8,0,0); oT.Size=UDim2.new(1,-16,1,0); local cF=Instance.new("Frame",oF); cF.Name="ChooseFrame"; cF.AnchorPoint=Vector2.new(0,0.5); cF.BackgroundColor3=getColorFunc("ThemeHighlight",cF,"BackgroundColor3"); cF.BorderSizePixel=0; cF.Position=UDim2.new(0,2,0.5,0); cF.Size=UDim2.new(0,0,0,0); Instance.new("UICorner",cF).CornerRadius=UDim.new(0,3); local cS=Instance.new("UIStroke",cF); cS.Color=getColorFunc("Secondary",cS,"Color"); cS.Thickness=1.6; cS.Transparency=1; dropCountLocal=dropCountLocal+1; oF.LayoutOrder=dropCountLocal;
 				oB.Activated:Connect(function() circleClickFunc(oB, mouseRef.X, mouseRef.Y); if DropdownConfig.Multi then local fI=table.find(DropdownFunc.Value,oN); if fI then table.remove(DropdownFunc.Value,fI) else table.insert(DropdownFunc.Value,oN) end else DropdownFunc.Value={oN} end; DropdownFunc:Set(DropdownFunc.Value); if DropdownConfig.Flag then saveFileFunc(DropdownConfig.Flag, DropdownFunc.Value) end end)
 				local yO=0; for _,cld in ipairs(ScrollSelect:GetChildren()) do if cld.Name=="Option" and cld:IsA("Frame") then yO=yO+UIListLayout_Scroll.Padding.Offset+cld.Size.Y.Offset end end; ScrollSelect.CanvasSize=UDim2.new(0,0,0,yO-UIListLayout_Scroll.Padding.Offset);
 			end;
-			function DropdownFunc:Set(val)
+			function DropdownFunc:Set(val) 
 				if not ScrollSelect then return end -- Guard clause
 				if val then local nV=type(val)=="table" and val or {val}; local uV={}; for _,v_u in ipairs(nV) do if not table.find(uV,v_u) then table.insert(uV,v_u) end end; DropdownFunc.Value=uV end; for _,d_S in ipairs(ScrollSelect:GetChildren()) do if d_S:IsA("Frame") and d_S.Name=="Option" then local iTF=DropdownFunc.Value and table.find(DropdownFunc.Value,d_S.OptionText.Text); local tII=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut); local s_S=iTF and UDim2.new(0,1,0,12) or UDim2.new(0,0,0,0); local bT_S=iTF and 0.935 or 0.97; local tr_S=iTF and 0 or 1; tweenServiceRef:Create(d_S.ChooseFrame,tII,{Size=s_S}):Play(); tweenServiceRef:Create(d_S.ChooseFrame.UIStroke,tII,{Transparency=tr_S}):Play(); tweenServiceRef:Create(d_S,tII,{BackgroundTransparency=bT_S}):Play() end end; local dT=(DropdownFunc.Value and #DropdownFunc.Value>0) and table.concat(DropdownFunc.Value,", ") or "Select Options"; OptionSelecting.Text=dT; if DropdownConfig.Callback then DropdownConfig.Callback(DropdownFunc.Value or {}) end;
 			end;
@@ -1450,7 +1450,7 @@ function UBHubLib:MakeGui(GuiConfig)
 		table.sort(names)
 		return names
 	end
-
+	
 	-- Helper function to convert Color3 to a savable hex string
 	local function ColorToHex(color)
 		return string.format("#%02X%02X%02X", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
@@ -1546,7 +1546,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			end
 		end
 	})
-
+	
 	PresetManagementSection:AddDivider({}) -- Simple line divider
 
 	-- Dropdown for saved presets
@@ -1575,7 +1575,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					-- For simplicity, let's create a temporary theme name and apply it
 					local tempThemeName = "__CUSTOM__" .. presetName
 					Themes[tempThemeName] = themeToApply
-					SetTheme(tempThemeName)
+					SetTheme(tempThemeName) 
 					-- CurrentTheme will be tempThemeName. If user saves again, it saves current visual colors.
 					UBHubLib:MakeNotify({ Title = "Preset Applied", Content = "'" .. presetName .. "' applied."})
 					-- After applying, remove the temporary theme entry if we don't want it persisting in Themes table
@@ -1588,7 +1588,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			end
 		end
 	})
-
+	
 	PresetManagementSection:AddDivider({})
 
 	-- Another "Saved Presets" Dropdown for deletion
@@ -1636,7 +1636,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				table.insert(words, word:sub(1,1):upper() .. word:sub(2):lower())
 			end
 		else -- Handles "Text", "Primary", "ThemeHighlight"
-			for word in string.gmatch(name, "[A-Z]?[a-z]+") do
+			for word in string.gmatch(name, "[A-Z]?[a-z]+") do 
 				table.insert(words, word:sub(1,1):upper() .. word:sub(2))
 			end
 			if #words == 0 and #name > 0 then -- Single word like "Text" or if all caps
@@ -1645,15 +1645,15 @@ function UBHubLib:MakeGui(GuiConfig)
 		end
 		return table.concat(words, " ")
 	end
-
+	
 	-- Store references to sliders and inputs for two-way binding
-	local colorControls = {}
+	local colorControls = {} 
 
 	local function updateColorFromSliders(colorKeyName, component, value)
 		local r, g, b
 		local currentHex = colorControls[colorKeyName].hexInput:GetValue()
 		local currentColor = HexToColor(currentHex) -- Get current color from hex to preserve other components
-
+		
 		r = (component == "R") and value or math.floor(currentColor.R * 255)
 		g = (component == "G") and value or math.floor(currentColor.G * 255)
 		b = (component == "B") and value or math.floor(currentColor.B * 255)
