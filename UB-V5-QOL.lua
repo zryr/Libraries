@@ -8,7 +8,6 @@ local ProtectGui = protectgui or (syn and syn.protect_gui) or function(f) end
 local CoreGui = cloneref(gethui()) or game:GetService("CoreGui")
 local SizeUI = UDim2.new(0, 550, 0, 350)
 LibraryCfg = {
-	ShowPlayer = false,
 	Undetected = false
 }
 UBDir = _G.Service or "UBHub5"
@@ -797,11 +796,74 @@ function UBHubLib:MakeGui(GuiConfig)
 			local SliderValueText = Instance.new("TextBox", SliderFrame); SliderValueText.Name = "SliderValueText"; SliderValueText.Font = Enum.Font.GothamBold; SliderValueText.Text = tostring(SliderConfig.Default); SliderValueText.TextColor3 = getColorFunc("Text", SliderValueText, "TextColor3"); SliderValueText.TextSize = 12; SliderValueText.BackgroundTransparency = 0.8; SliderValueText.BackgroundColor3 = getColorFunc("Accent", SliderValueText, "BackgroundColor3"); SliderValueText.Position = UDim2.new(1,-45,0,5); SliderValueText.Size = UDim2.new(0,40,0,20); Instance.new("UICorner", SliderValueText).CornerRadius = UDim.new(0,3)
 			local Bar = Instance.new("Frame", SliderFrame); Bar.Name = "Bar"; Bar.BackgroundColor3 = getColorFunc("Accent", Bar, "BackgroundColor3"); Bar.BorderSizePixel = 0; Bar.Position = UDim2.new(0,10,1,-20); Bar.Size = UDim2.new(1,-20,0,5); Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,100)
 			local Progress = Instance.new("Frame", Bar); Progress.Name = "Progress"; Progress.BackgroundColor3 = getColorFunc("ThemeHighlight", Progress, "BackgroundColor3"); Progress.BorderSizePixel = 0; Instance.new("UICorner", Progress).CornerRadius = UDim.new(0,100)
-			local Dragger = Instance.new("TextButton", Bar); Dragger.Name = "Dragger"; Dragger.Text = ""; Dragger.Size = UDim2.new(0,10,0,10); Dragger.AnchorPoint = Vector2.new(0.5,0.5); Dragger.BackgroundColor3 = getColorFunc("ThemeHighlight", Dragger, "BackgroundColor3"); Dragger.BorderSizePixel = 0; Instance.new("UICorner", Dragger).CornerRadius = UDim.new(0,100); Dragger.ZIndex = 2
+
+			-- Task #3: Slider Usability Enhancement
+			local DraggerHitbox = Instance.new("TextButton", Bar)
+			DraggerHitbox.Name = "DraggerHitbox"
+			DraggerHitbox.Text = ""
+			DraggerHitbox.Size = UDim2.new(0, 20, 0, 20) -- Larger hitbox (e.g., 20x20 or 24x24)
+			DraggerHitbox.AnchorPoint = Vector2.new(0.5, 0.5)
+			DraggerHitbox.BackgroundTransparency = 1 -- Invisible hitbox
+			DraggerHitbox.BorderSizePixel = 0
+			DraggerHitbox.ZIndex = 3 -- Above visual dragger if visual is also child of Bar, or ensure it captures input
+
+			local VisualDragger = Instance.new("Frame", DraggerHitbox) -- Visual part is child of hitbox
+			VisualDragger.Name = "VisualDragger"
+			VisualDragger.Size = UDim2.new(0, 10, 0, 10) -- Original visual size
+			VisualDragger.AnchorPoint = Vector2.new(0.5, 0.5)
+			VisualDragger.Position = UDim2.new(0.5, 0, 0.5, 0) -- Centered in hitbox
+			VisualDragger.BackgroundColor3 = getColorFunc("ThemeHighlight", VisualDragger, "BackgroundColor3")
+			VisualDragger.BorderSizePixel = 0
+			Instance.new("UICorner", VisualDragger).CornerRadius = UDim.new(0,100)
+			VisualDragger.ZIndex = 2 -- Below hitbox input plane if necessary, but parent relationship handles this.
+
 			local currentValue = SliderConfig.Default
-			local function UpdateSlider(value) value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max); currentValue = value; SliderValueText.Text = tostring(value); local percent = (SliderConfig.Max - SliderConfig.Min == 0) and 0 or (value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min); Progress.Size = UDim2.new(percent,0,1,0); Dragger.Position = UDim2.new(percent,0,0.5,0); if SliderConfig.Flag then saveFileFunc(SliderConfig.Flag, currentValue) end; SliderConfig.Callback(currentValue) end
+			local function UpdateSlider(value)
+				value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max)
+				currentValue = value
+				SliderValueText.Text = tostring(value)
+				local percent = (SliderConfig.Max - SliderConfig.Min == 0) and 0 or (value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
+				Progress.Size = UDim2.new(percent,0,1,0)
+				DraggerHitbox.Position = UDim2.new(percent,0,0.5,0) -- Move the hitbox
+				if SliderConfig.Flag then saveFileFunc(SliderConfig.Flag, currentValue) end
+				SliderConfig.Callback(currentValue)
+			end
 			UpdateSlider(currentValue)
-			Dragger.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then local dragging = true; local conn; conn = UserInputService.InputChanged:Connect(function(subInput) if not dragging then conn:Disconnect() return end; if subInput.UserInputType == Enum.UserInputType.MouseMovement or subInput.UserInputType == Enum.UserInputType.Touch then local localPos = Bar.AbsolutePosition.X; local mousePos = subInput.Position.X; local percent = math.clamp((mousePos - localPos) / Bar.AbsoluteSize.X, 0, 1); UpdateSlider(SliderConfig.Min + percent * (SliderConfig.Max - SliderConfig.Min)) end end); Dragger.InputEnded:Connect(function() dragging = false conn:Disconnect() end) end end)
+
+			DraggerHitbox.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					local dragging = true
+					local conn
+					conn = UserInputService.InputChanged:Connect(function(subInput)
+						if not dragging then conn:Disconnect() return end
+						if subInput.UserInputType == Enum.UserInputType.MouseMovement or subInput.UserInputType == Enum.UserInputType.Touch then
+							local localPos = Bar.AbsolutePosition.X
+							local mousePos = subInput.Position.X
+							local percent = math.clamp((mousePos - localPos) / Bar.AbsoluteSize.X, 0, 1)
+							UpdateSlider(SliderConfig.Min + percent * (SliderConfig.Max - SliderConfig.Min))
+						end
+					end)
+					-- Use DraggerHitbox.InputEnded or a connection to input.Changed for UserInputState.End
+					local inputEndedConn
+					inputEndedConn = input.Changed:Connect(function()
+						if input.UserInputState == Enum.UserInputState.End then
+							dragging = false
+							if conn then conn:Disconnect() end
+							if inputEndedConn then inputEndedConn:Disconnect() end
+						end
+					end)
+					-- Fallback for InputEnded on the DraggerHitbox itself if Changed event isn't reliable for all cases
+					local draggerInputEndedConn
+					draggerInputEndedConn = DraggerHitbox.InputEnded:Connect(function(endInput)
+						if endInput.UserInputType == input.UserInputType then -- Ensure it's the same input type ending
+							dragging = false
+							if conn then conn:Disconnect() end
+							if inputEndedConn then inputEndedConn:Disconnect() end
+							if draggerInputEndedConn then draggerInputEndedConn:Disconnect() end
+						end
+					end)
+				end
+			end)
 			SliderValueText.FocusLost:Connect(function(enterPressed) if enterPressed then local num = tonumber(SliderValueText.Text); if num then UpdateSlider(num) else UpdateSlider(currentValue) end end end)
 			CountItem = CountItem + 1; return { GetValue = function() return currentValue end, SetValue = UpdateSlider }
 		end
@@ -1351,123 +1413,316 @@ function UBHubLib:MakeGui(GuiConfig)
 		return newSectionObject -- Return the SectionObject created by InternalCreateSection
 	end
 
-	-- Populate Settings Page
-	local PresetsSection = SettingsTab:AddSection("Presets")
-	local availableThemes = GetThemes()
-	for _, themeName in ipairs(availableThemes) do
-		PresetsSection:AddButton({
-			Title = themeName,
-			Content = "Click to apply this theme",
-			Callback = function()
-				SetTheme(themeName)
-			end
-		})
+	-- Initialize Flags.CustomUserThemes if it doesn't exist
+	if not Flags.CustomUserThemes then
+		Flags.CustomUserThemes = {}
+		SaveFile("CustomUserThemes", Flags.CustomUserThemes) -- Save immediately if created
 	end
 
-	local InterfaceSection = SettingsTab:AddSection("Interface")
-	-- Transparency Slider
-	InterfaceSection:AddSlider({
-		Title = "Window Transparency",
-		Content = "Adjust background opacity",
-		Min = 0,
-		Max = 100, -- Representing 0.0 to 1.0
-		Increment = 1,
-		Default = Main.BackgroundTransparency * 100,
-		Callback = function(value)
-			ChangeTransparency(value / 100) -- ChangeTransparency expects 0-1
-		end,
-		Flag = "UI_BackgroundTransparency" -- Optional: For saving/loading if desired later
+	-- Helper function to get saved custom theme names
+	local function GetSavedThemeNames()
+		local names = {}
+		if Flags.CustomUserThemes then
+			for name, _ in pairs(Flags.CustomUserThemes) do
+				table.insert(names, name)
+			end
+		end
+		table.sort(names)
+		return names
+	end
+
+	-- Helper function to convert Color3 to a savable hex string
+	local function ColorToHex(color)
+		return string.format("#%02X%02X%02X", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
+	end
+
+	-- Helper function to convert hex string back to Color3
+	local function HexToColor(hex)
+		if type(hex) ~= "string" or not hex:match("^#%x%x%x%x%x%x$") then
+			warn("Invalid hex color string:", hex)
+			return Color3.new(1,0,0) -- Default to red on error
+		end
+		local r = tonumber(hex:sub(2,3), 16) / 255
+		local g = tonumber(hex:sub(4,5), 16) / 255
+		local b = tonumber(hex:sub(6,7), 16) / 255
+		return Color3.new(r, g, b)
+	end
+
+
+	-- Section for Preset Management (Task #3)
+	local PresetManagementSection = SettingsTab:AddSection("Preset Management")
+
+	-- Dropdown for default themes
+	local defaultThemesDropdown = PresetManagementSection:AddDropdown({
+		Title = "Default Themes",
+		Options = GetThemes(), -- GetThemes() returns a list of default theme names
+		Callback = function(selected)
+			-- Callback not strictly needed here if apply button is used
+		end
 	})
 
-	-- Custom Background
-	local bgAssetInput = InterfaceSection:AddInput({
-		Title = "Background Asset URL/Path",
-		Content = "Enter image/video URL or local path",
-		Default = Flags["CustomBackgroundURL"] or ""
-	})
-
-	InterfaceSection:AddButton({
-		Title = "Set Image Background",
-		Content = "Apply image from URL/Path",
+	-- Apply Preset Button
+	PresetManagementSection:AddButton({
+		Title = "Apply Default Theme",
+		Content = "Apply the selected default theme",
 		Callback = function()
-			local assetUrl = bgAssetInput:GetValue()
-			if assetUrl and assetUrl ~= "" then
-				ChangeAsset("Image", assetUrl, "CustomBG_Img")
-				SaveFile("CustomBackgroundURL", assetUrl) -- Save the URL
-				SaveFile("CustomBackgroundType", "Image")
+			local selectedThemeNameTable = defaultThemesDropdown:GetValue() -- Returns a table
+			if selectedThemeNameTable and #selectedThemeNameTable > 0 then
+				local themeName = selectedThemeNameTable[1] -- Get the first selected (should only be one)
+				if Themes[themeName] then
+					SetTheme(themeName)
+					UBHubLib:MakeNotify({ Title = "Theme Applied", Content = "'" .. themeName .. "' applied."})
+					-- Potentially refresh color sliders if they are visible and part of another section
+				else
+					UBHubLib:MakeNotify({ Title = "Error", Content = "Default theme not found: " .. themeName})
+				end
+			else
+				UBHubLib:MakeNotify({ Title = "Info", Content = "No default theme selected."})
 			end
 		end
 	})
 
-	InterfaceSection:AddButton({
-		Title = "Set Video Background",
-		Content = "Apply video from URL/Path",
+	PresetManagementSection:AddDivider({Text = "Custom Preset Settings"}) -- Using AddDivider from the section object
+
+	-- TextBox for naming a custom preset
+	local customPresetNameInput = PresetManagementSection:AddInput({
+		Title = "Custom Preset Name",
+		Content = "Enter a name for your custom preset",
+		Default = ""
+	})
+
+	-- Save Current Colors Button
+	PresetManagementSection:AddButton({
+		Title = "Save Current Colors",
+		Content = "Save the current color configuration as a new preset",
 		Callback = function()
-			local assetUrl = bgAssetInput:GetValue()
-			if assetUrl and assetUrl ~= "" then
-				ChangeAsset("Video", assetUrl, "CustomBG_Vid")
-				SaveFile("CustomBackgroundURL", assetUrl) -- Save the URL
-				SaveFile("CustomBackgroundType", "Video")
+			local presetName = customPresetNameInput:GetValue()
+			if not presetName or presetName == "" then
+				UBHubLib:MakeNotify({ Title = "Preset Name Required", Content = "Please enter a name for your custom preset."})
+				return
+			end
+			if Flags.CustomUserThemes[presetName] then
+				UBHubLib:MakeNotify({ Title = "Preset Exists", Content = "A preset with this name already exists. Choose a different name or delete the existing one."})
+				return
+			end
+
+			local currentColorsHex = {}
+			if Themes[CurrentTheme] then -- Should always be true
+				for colorKey, colorValue in pairs(Themes[CurrentTheme]) do
+					if typeof(colorValue) == "Color3" then
+						currentColorsHex[colorKey] = ColorToHex(colorValue)
+					end
+				end
+				Flags.CustomUserThemes[presetName] = currentColorsHex
+				SaveFile("CustomUserThemes", Flags.CustomUserThemes) -- Save all custom themes
+				UBHubLib:MakeNotify({ Title = "Preset Saved", Content = "'" .. presetName .. "' has been saved."})
+				-- Refresh saved presets dropdowns
+				local savedNames = GetSavedThemeNames()
+				savedPresetsDropdown:Refresh(savedNames, savedPresetsDropdown:GetValue())
+				deletePresetDropdown:Refresh(savedNames, deletePresetDropdown:GetValue())
+				customPresetNameInput:SetValue("") -- Clear input
+			else
+				UBHubLib:MakeNotify({ Title = "Error", Content = "Could not retrieve current theme colors."})
 			end
 		end
 	})
 
-	InterfaceSection:AddButton({
-		Title = "Reset Background",
-		Content = "Remove custom background",
-		Callback = function()
-			Reset()
-			SaveFile("CustomBackgroundURL", "") -- Clear saved URL
-			SaveFile("CustomBackgroundType", "")
+	PresetManagementSection:AddDivider({}) -- Simple line divider
+
+	-- Dropdown for saved presets
+	local savedPresetsDropdown = PresetManagementSection:AddDropdown({
+		Title = "Saved Custom Presets",
+		Options = GetSavedThemeNames(),
+		Callback = function(selected)
+			-- Callback not strictly needed here
 		end
 	})
 
+	-- Apply Saved Preset Button
+	PresetManagementSection:AddButton({
+		Title = "Apply Saved Preset",
+		Content = "Apply the selected saved custom preset",
+		Callback = function()
+			local selectedPresetNameTable = savedPresetsDropdown:GetValue()
+			if selectedPresetNameTable and #selectedPresetNameTable > 0 then
+				local presetName = selectedPresetNameTable[1]
+				if Flags.CustomUserThemes and Flags.CustomUserThemes[presetName] then
+					local themeToApply = {}
+					for colorKey, hexValue in pairs(Flags.CustomUserThemes[presetName]) do
+						themeToApply[colorKey] = HexToColor(hexValue)
+					end
+					-- Create a temporary theme or update CurrentTheme carefully
+					-- For simplicity, let's create a temporary theme name and apply it
+					local tempThemeName = "__CUSTOM__" .. presetName
+					Themes[tempThemeName] = themeToApply
+					SetTheme(tempThemeName)
+					-- CurrentTheme will be tempThemeName. If user saves again, it saves current visual colors.
+					UBHubLib:MakeNotify({ Title = "Preset Applied", Content = "'" .. presetName .. "' applied."})
+					-- After applying, remove the temporary theme entry if we don't want it persisting in Themes table
+					-- task.delay(0.1, function() Themes[tempThemeName] = nil end) -- Or handle this more robustly
+				else
+					UBHubLib:MakeNotify({ Title = "Error", Content = "Saved preset not found: " .. presetName})
+				end
+			else
+				UBHubLib:MakeNotify({ Title = "Info", Content = "No saved preset selected."})
+			end
+		end
+	})
+
+	PresetManagementSection:AddDivider({})
+
+	-- Another "Saved Presets" Dropdown for deletion
+	local deletePresetDropdown = PresetManagementSection:AddDropdown({
+		Title = "Select Preset to Delete",
+		Options = GetSavedThemeNames(),
+		Callback = function(selected)
+			-- Callback not strictly needed here
+		end
+	})
+
+	-- Delete Saved Preset Button
+	PresetManagementSection:AddButton({
+		Title = "Delete Saved Preset",
+		Content = "Delete the selected saved custom preset",
+		Callback = function()
+			local selectedPresetNameTable = deletePresetDropdown:GetValue()
+			if selectedPresetNameTable and #selectedPresetNameTable > 0 then
+				local presetName = selectedPresetNameTable[1]
+				if Flags.CustomUserThemes and Flags.CustomUserThemes[presetName] then
+					Flags.CustomUserThemes[presetName] = nil -- Remove from the table
+					SaveFile("CustomUserThemes", Flags.CustomUserThemes) -- Save the updated table
+					UBHubLib:MakeNotify({ Title = "Preset Deleted", Content = "'" .. presetName .. "' has been deleted."})
+					-- Refresh dropdowns
+					local savedNames = GetSavedThemeNames()
+					savedPresetsDropdown:Refresh(savedNames)
+					deletePresetDropdown:Refresh(savedNames)
+				else
+					UBHubLib:MakeNotify({ Title = "Error", Content = "Preset not found for deletion: " .. presetName})
+				end
+			else
+				UBHubLib:MakeNotify({ Title = "Info", Content = "No preset selected for deletion."})
+			end
+		end
+	})
+
+	-- Section for Customizing Colors (Task #3)
 	local CustomizeColorsSection = SettingsTab:AddSection("Customize Colors")
-	local function createColorSliders(colorKeyName, initialColor3)
-		CustomizeColorsSection:AddParagraph({Title = colorKeyName, Content = ""}) -- Simple label for the color property
 
-		local r, g, b = math.floor(initialColor3.R * 255), math.floor(initialColor3.G * 255), math.floor(initialColor3.B * 255)
-
-		local rSlider, gSlider, bSlider -- Forward declare for callbacks if needed, though direct update is fine
-
-		rSlider = CustomizeColorsSection:AddSlider({
-			Title = "Red", Content = "", Min = 0, Max = 255, Increment = 1, Default = r,
-			Callback = function(newR)
-				local currentColor = Themes[CurrentTheme][colorKeyName]
-				Themes[CurrentTheme][colorKeyName] = Color3.fromRGB(newR, math.floor(currentColor.G * 255), math.floor(currentColor.B * 255))
-				SetTheme(CurrentTheme)
+	local function FormatColorNameForDisplay(name)
+		local words = {}
+		-- Split by uppercase letters, but handle single-word lowercase names too
+		if name:match("[a-z][A-Z]") then -- Mixed case with uppercase not at start
+			for word in string.gmatch(name, "[%u%l][^%u]*") do -- More general split
+				table.insert(words, word:sub(1,1):upper() .. word:sub(2):lower())
 			end
-		})
-		gSlider = CustomizeColorsSection:AddSlider({
-			Title = "Green", Content = "", Min = 0, Max = 255, Increment = 1, Default = g,
-			Callback = function(newG)
-				local currentColor = Themes[CurrentTheme][colorKeyName]
-				Themes[CurrentTheme][colorKeyName] = Color3.fromRGB(math.floor(currentColor.R * 255), newG, math.floor(currentColor.B * 255))
-				SetTheme(CurrentTheme)
+		else -- Handles "Text", "Primary", "ThemeHighlight"
+			for word in string.gmatch(name, "[A-Z]?[a-z]+") do
+				table.insert(words, word:sub(1,1):upper() .. word:sub(2))
 			end
-		})
-		bSlider = CustomizeColorsSection:AddSlider({
-			Title = "Blue", Content = "", Min = 0, Max = 255, Increment = 1, Default = b,
-			Callback = function(newB)
-				local currentColor = Themes[CurrentTheme][colorKeyName]
-				Themes[CurrentTheme][colorKeyName] = Color3.fromRGB(math.floor(currentColor.R * 255), math.floor(currentColor.G * 255), newB)
-				SetTheme(CurrentTheme)
-			end
-		})
-	end
-
-	-- Iterate over a sample theme to get all color keys, assuming all themes have the same keys
-	local sampleThemeName = next(Themes) -- Get the first theme name as a sample
-	if sampleThemeName then
-		for key, colorValue in pairs(Themes[sampleThemeName]) do
-			if typeof(colorValue) == "Color3" then
-				-- We need to ensure CurrentTheme's values are used for defaults and updates.
-				-- The createColorSliders function will read from Themes[CurrentTheme]
-				-- For initial creation, we pass the current value from Themes[CurrentTheme]
-				createColorSliders(key, Themes[CurrentTheme][key] or colorValue)
+			if #words == 0 and #name > 0 then -- Single word like "Text" or if all caps
+				table.insert(words, name:sub(1,1):upper() .. name:sub(2):lower())
 			end
 		end
+		return table.concat(words, " ")
 	end
+
+	-- Store references to sliders and inputs for two-way binding
+	local colorControls = {}
+
+	local function updateColorFromSliders(colorKeyName, component, value)
+		local r, g, b
+		local currentHex = colorControls[colorKeyName].hexInput:GetValue()
+		local currentColor = HexToColor(currentHex) -- Get current color from hex to preserve other components
+
+		r = (component == "R") and value or math.floor(currentColor.R * 255)
+		g = (component == "G") and value or math.floor(currentColor.G * 255)
+		b = (component == "B") and value or math.floor(currentColor.B * 255)
+
+		local newColor = Color3.fromRGB(r, g, b)
+		Themes[CurrentTheme][colorKeyName] = newColor
+		SetTheme(CurrentTheme) -- Apply the theme change immediately
+		colorControls[colorKeyName].hexInput:SetValue(ColorToHex(newColor))
+	end
+
+	local function updateSlidersFromHex(colorKeyName, hexValue)
+		if not hexValue or not hexValue:match("^#%x%x%x%x%x%x$") then return end -- Validate hex
+		local color = HexToColor(hexValue)
+		Themes[CurrentTheme][colorKeyName] = color -- Update the theme table directly
+		SetTheme(CurrentTheme) -- Apply the theme change
+
+		colorControls[colorKeyName].rSlider:SetValue(math.floor(color.R * 255))
+		colorControls[colorKeyName].gSlider:SetValue(math.floor(color.G * 255))
+		colorControls[colorKeyName].bSlider:SetValue(math.floor(color.B * 255))
+	end
+
+	-- Function to create individual color editor (divider, hex, R, G, B sliders)
+	local function CreateColorEditor(colorKey, initialColor3Value)
+		local displayName = FormatColorNameForDisplay(colorKey)
+		CustomizeColorsSection:AddDivider({ Text = displayName })
+
+		colorControls[colorKey] = {} -- Initialize storage for this color's controls
+
+		local initialHex = ColorToHex(initialColor3Value)
+
+		-- Hex Input
+		local hexInput = CustomizeColorsSection:AddInput({
+			Title = displayName .. " Hex",
+			Content = "Hexadecimal color code (e.g., #FF0000)",
+			Default = initialHex,
+			Callback = function(hexValue)
+				if hexValue:match("^#%x%x%x%x%x%x$") then
+					updateSlidersFromHex(colorKey, hexValue)
+				else
+					-- Optional: Notify user of invalid hex or revert
+					UBHubLib:MakeNotify({Title="Invalid Hex", Content="Please use format #RRGGBB."})
+					hexInput:SetValue(ColorToHex(Themes[CurrentTheme][colorKey])) -- Revert to current valid
+				end
+			end
+		})
+		colorControls[colorKey].hexInput = hexInput
+
+		-- R Slider
+		local rSlider = CustomizeColorsSection:AddSlider({
+			Title = "Red", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor3Value.R * 255),
+			Callback = function(value) updateColorFromSliders(colorKey, "R", value) end
+		})
+		colorControls[colorKey].rSlider = rSlider
+
+		-- G Slider
+		local gSlider = CustomizeColorsSection:AddSlider({
+			Title = "Green", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor3Value.G * 255),
+			Callback = function(value) updateColorFromSliders(colorKey, "G", value) end
+		})
+		colorControls[colorKey].gSlider = gSlider
+
+		-- B Slider
+		local bSlider = CustomizeColorsSection:AddSlider({
+			Title = "Blue", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor3Value.B * 255),
+			Callback = function(value) updateColorFromSliders(colorKey, "B", value) end
+		})
+		colorControls[colorKey].bSlider = bSlider
+	end
+
+	-- Populate the Customize Colors section
+	-- Iterate over a base theme to get all color keys, assuming all themes have the same keys.
+	-- Use CurrentTheme to get initial values.
+	local baseThemeForKeys = Themes[next(Themes)] -- Get the first theme in Themes as a template for keys
+	if baseThemeForKeys then
+		local sortedColorKeys = {}
+		for key, _ in pairs(baseThemeForKeys) do
+			if typeof(baseThemeForKeys[key]) == "Color3" then -- Ensure it's a color entry
+				table.insert(sortedColorKeys, key)
+			end
+		end
+		table.sort(sortedColorKeys) -- Sort keys for consistent order
+
+		for _, colorKeyName in ipairs(sortedColorKeys) do
+			-- Get the initial value from the CurrentTheme, or fallback to the base if not found (shouldn't happen)
+			local initialColor = Themes[CurrentTheme][colorKeyName] or baseThemeForKeys[colorKeyName]
+			CreateColorEditor(colorKeyName, initialColor)
+		end
+	end
+
 
 	--// Layer Tabs
 	local ScrollTab = Instance.new("ScrollingFrame");
@@ -1481,13 +1736,22 @@ function UBHubLib:MakeGui(GuiConfig)
 	ScrollTab.BackgroundTransparency = 0.9990000128746033
 	ScrollTab.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	ScrollTab.BorderSizePixel = 0
-	ScrollTab.Size = UDim2.new(1, 0, 1, -50)
+	ScrollTab.Size = UDim2.new(1, 0, 1, -50) -- Adjusted for permanent Info (40px) + Separator (1px) + existing margin/padding difference
 	ScrollTab.Name = "ScrollTab"
 	ScrollTab.Parent = LayersTab
 
 	UIListLayout.Padding = UDim.new(0, 3)
 	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	UIListLayout.Parent = ScrollTab
+
+	-- Separator Line (Task #3)
+	local SeparatorLine = Instance.new("Frame")
+	SeparatorLine.Name = "SeparatorLine"
+	SeparatorLine.Parent = LayersTab
+	SeparatorLine.BackgroundColor3 = GetColor("Stroke")
+	SeparatorLine.BorderSizePixel = 0
+	SeparatorLine.Size = UDim2.new(1, 0, 0, 1)
+	SeparatorLine.Position = UDim2.new(0, 0, 1, -41) -- Positioned above the 40px Info frame
 
 	local function UpdateSize1()
 		local OffsetY = 0
@@ -1517,7 +1781,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	Info.Position = UDim2.new(1, 0, 1, 0)
 	Info.Size = UDim2.new(1, 0, 0, 40)
 	Info.Name = "Info"
-	Info.Visible = LibraryCfg.ShowPlayer
+	Info.Visible = true -- Made permanent as per Task #3
 	Info.Parent = LayersTab
 
 	UICorner.CornerRadius = UDim.new(0, 5)
@@ -1565,37 +1829,98 @@ function UBHubLib:MakeGui(GuiConfig)
 	NamePlayerButton.Size = UDim2.new(1, -45, 1, 0)
 	NamePlayerButton.Parent = Info
 	NamePlayerButton.AutoButtonColor = false
+	-- NamePlayerButton.Text is now directly set on the TextLabel part of Info, which is now static "Customize"
+	-- LogoPlayer.Image is set above.
+	-- The NamePlayerButton itself is being repurposed or replaced by an invisible button.
+	-- For clarity, I will rename NamePlayerButton to CustomizeLabel and then add the new invisible button.
+	NamePlayerButton.Name = "CustomizeLabel" -- Renaming for clarity
+	NamePlayerButton.Text = "Customize" -- Ensure this is set
+	LogoPlayer.Image = "rbxassetid://126800841735072" -- Ensure this is set
+
+	-- Task #3: Create an invisible button for the "Customize" tab functionality
+	local CustomizeButton = Instance.new("TextButton")
+	CustomizeButton.Name = "CustomizeButton"
+	CustomizeButton.Parent = Info
+	CustomizeButton.Size = UDim2.new(1, 0, 1, 0) -- Cover entire Info frame
+	CustomizeButton.Text = ""
+	CustomizeButton.BackgroundTransparency = 1
+	CustomizeButton.ZIndex = Info.ZIndex + 1 -- Ensure it's on top to be clickable
 
 	local isSettingsViewActive = false
 	local lastSelectedTabName = "" -- To store the name of the last active tab
+	local lastSelectedTabFrame = nil -- To store the actual tab frame for highlight management
 
-	NamePlayerButton.MouseButton1Click:Connect(function()
-		isSettingsViewActive = not isSettingsViewActive
-		if isSettingsViewActive then
-			if LayersPageLayout.CurrentPage then
-				lastSelectedTabName = LayersPageLayout.CurrentPage:FindFirstChild("TabConfig_Name") and LayersPageLayout.CurrentPage.TabConfig_Name.Value or "Unknown Tab"
-			else -- Fallback if no tab was ever selected or CurrentPage is nil
-				-- Attempt to find the first tab's name as a default
-				if ScrollTab:FindFirstChild("Tab") and ScrollTab.Tab:FindFirstChild("TabName") then
-					lastSelectedTabName = ScrollTab.Tab.TabName.Text
-				else
-					lastSelectedTabName = GuiConfig.NameHub -- Default to hub name if no tabs
+	-- Function to remove highlight from all scrollable tabs
+	local function ClearScrollTabHighlights()
+		if ScrollTab then
+			for _, child in ipairs(ScrollTab:GetChildren()) do
+				if child:IsA("Frame") and child.Name == "Tab" then
+					child.BackgroundTransparency = 0.9990000128746033 -- Default non-highlight transparency
+					local chooseFrame = child:FindFirstChild("ChooseFrame")
+					if chooseFrame then
+						chooseFrame.Visible = false
+					end
 				end
 			end
+		end
+	end
+
+	-- Function to remove highlight from Customize button (Info frame)
+	local function ClearCustomizeButtonHighlight()
+		Info.BackgroundTransparency = 0.95 -- Default non-highlight transparency
+		-- If we add a specific highlight element to Info later, we'll control that here.
+	end
+
+	CustomizeButton.MouseButton1Click:Connect(function()
+		CircleClick(CustomizeButton, Mouse.X, Mouse.Y) -- Existing click effect
+		isSettingsViewActive = not isSettingsViewActive
+
+		if isSettingsViewActive then
+			-- Store last active tab name if Layers is currently visible and a tab is selected
+			if Layers.Visible and LayersPageLayout.CurrentPage then
+				lastSelectedTabName = LayersPageLayout.CurrentPage:FindFirstChild("TabConfig_Name") and LayersPageLayout.CurrentPage.TabConfig_Name.Value or "Unknown Tab"
+				-- Also store the frame if possible, though this might be tricky if it's not directly the 'Tab' frame
+			elseif Layers.Visible then -- Fallback if no specific tab was current but Layers was visible
+				local firstTab = ScrollTab:FindFirstChild("Tab")
+				if firstTab and firstTab:FindFirstChild("TabName") then
+					lastSelectedTabName = firstTab.TabName.Text
+				else
+					lastSelectedTabName = GuiConfig.NameHub -- Default if no tabs
+				end
+			end
+
 			Layers.Visible = false
 			SettingsPage.Visible = true
 			NameTab.Text = "Settings"
+			ClearScrollTabHighlights()
+			-- Highlight Customize button (Info frame)
+			Info.BackgroundTransparency = 0.85 -- Example highlight transparency
 		else
 			SettingsPage.Visible = false
 			Layers.Visible = true
 			NameTab.Text = lastSelectedTabName
-			-- Try to re-select the actual current tab to refresh its content if needed,
-			-- though just setting NameTab.Text might be sufficient for now.
-			-- This assumes LayersPageLayout.CurrentPage is still valid.
-			if LayersPageLayout.CurrentPage and LayersPageLayout.CurrentPage:FindFirstChild("TabButton") then
-				-- To avoid re-triggering full tab selection logic if not necessary,
-				-- we primarily ensure NameTab.Text is correct.
-				-- A more robust way might involve a dedicated function to update NameTab.
+			ClearCustomizeButtonHighlight()
+			-- Re-highlight the last selected scrollable tab if one was active
+			if lastSelectedTabFrame and lastSelectedTabFrame.Parent then -- Check if still valid
+				lastSelectedTabFrame.BackgroundTransparency = 0.9200000166893005 -- Highlighted transparency
+				local chooseFrame = lastSelectedTabFrame:FindFirstChild("ChooseFrame")
+				if chooseFrame then
+					chooseFrame.Visible = true
+				end
+			elseif LayersPageLayout.CurrentPage then -- Fallback to CurrentPage if lastSelectedTabFrame wasn't set/valid
+				local currentTabButtonParent = nil
+				-- We need to find the "Tab" frame associated with LayersPageLayout.CurrentPage
+				for _, tabInstance in ipairs(ScrollTab:GetChildren()) do
+					if tabInstance.Name == "Tab" and tabInstance.LayoutOrder == LayersPageLayout.CurrentPage.LayoutOrder then
+						currentTabButtonParent = tabInstance
+						break
+					end
+				end
+				if currentTabButtonParent then
+					currentTabButtonParent.BackgroundTransparency = 0.9200000166893005
+					local cf = currentTabButtonParent:FindFirstChild("ChooseFrame")
+					if cf then cf.Visible = true end
+				end
 			end
 		end
 	end)
@@ -1603,7 +1928,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	-- NamePlayer TextLabel removed, will be replaced by a TextButton below
 	local GuiFunc = {}
 	function GuiFunc:DestroyGui()
-		if CoreGui:FindFirstChild("UBHubGui") then 
+		if CoreGui:FindFirstChild("UBHubGui") then
 			UBHubGui:Destroy()
 		end
 	end
@@ -1915,16 +2240,51 @@ function UBHubLib:MakeGui(GuiConfig)
 				end
 			end
 			if FrameChoose ~= nil and Tab.LayoutOrder ~= LayersPageLayout.CurrentPage.LayoutOrder then
-				for _, TabFrame in ScrollTab:GetChildren() do
-					if TabFrame.Name == "Tab" then
-						TweenService:Create(TabFrame,TweenInfo.new(0.2, Enum.EasingStyle.Linear),{BackgroundTransparency = 0.9990000128746033}):Play()
-					end    
+				ClearCustomizeButtonHighlight() -- Task #3: Clear customize highlight
+				for _, TabFrameScroll in ScrollTab:GetChildren() do -- Renamed TabFrame to TabFrameScroll for clarity
+					if TabFrameScroll.Name == "Tab" then
+						TweenService:Create(TabFrameScroll,TweenInfo.new(0.2, Enum.EasingStyle.Linear),{BackgroundTransparency = 0.9990000128746033}):Play()
+						local cf = TabFrameScroll:FindFirstChild("ChooseFrame")
+						if cf then cf.Visible = false end -- Hide other choose frames
+					end
 				end
-				TweenService:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.92}):Play()
-				TweenService:Create(FrameChoose,TweenInfo.new(0.2, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 2, 0, 9 + (33 * Tab.LayoutOrder))}):Play()
+				TweenService:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.92}):Play() -- Highlight this tab
+				-- FrameChoose is the ChooseFrame of the *previously* selected tab. We need to position the *current* tab's ChooseFrame.
+				local currentChooseFrame = Tab:FindFirstChild("ChooseFrame")
+				if not currentChooseFrame then -- Create if it doesn't exist (should for all but first initially)
+					currentChooseFrame = Instance.new("Frame")
+					currentChooseFrame.Name = "ChooseFrame"
+					currentChooseFrame.BackgroundColor3 = GetColor("ThemeHighlight",currentChooseFrame,"BackgroundColor3")
+					currentChooseFrame.BorderSizePixel = 0
+					currentChooseFrame.Position = UDim2.new(0, 2, 0, 9) -- Default position
+					currentChooseFrame.Size = UDim2.new(0, 1, 0, 12) -- Default size
+					currentChooseFrame.Parent = Tab
+					local stroke = Instance.new("UIStroke", currentChooseFrame)
+					stroke.Color = GetColor("Secondary",stroke,"Color")
+					stroke.Thickness = 1.6
+					Instance.new("UICorner", currentChooseFrame)
+				end
+				currentChooseFrame.Visible = true -- Make sure it's visible
+				-- The old FrameChoose (previous tab's selector) should be hidden by the loop above or explicitly
+				if FrameChoose and FrameChoose.Parent ~= Tab then FrameChoose.Visible = false end
+
+
 				LayersPageLayout:JumpToIndex(Tab.LayoutOrder)
 				NameTab.Text = TabConfig.Name
-				TweenService:Create(FrameChoose,TweenInfo.new(0.2, Enum.EasingStyle.Linear),{Size = UDim2.new(0, 1, 0, 20)}):Play()
+				lastSelectedTabName = TabConfig.Name -- Update for when switching back from settings
+				lastSelectedTabFrame = Tab -- Store this tab frame
+				-- TweenService:Create(FrameChoose,TweenInfo.new(0.2, Enum.EasingStyle.Linear),{Size = UDim2.new(0, 1, 0, 20)}):Play() -- This was for the old choose frame, new one handles its own
+			elseif Tab.LayoutOrder == LayersPageLayout.CurrentPage.LayoutOrder and SettingsPage.Visible then
+				-- This case handles clicking the *already active* tab when settings are open, to switch back.
+				isSettingsViewActive = false -- Deactivate settings view
+				SettingsPage.Visible = false
+				Layers.Visible = true
+				NameTab.Text = TabConfig.Name -- Set NameTab to the current tab's name
+				ClearCustomizeButtonHighlight()
+				-- Ensure this tab is highlighted
+				Tab.BackgroundTransparency = 0.92
+				local cf = Tab:FindFirstChild("ChooseFrame")
+				if cf then cf.Visible = true end
 			end
 		end)
 		--// Section
