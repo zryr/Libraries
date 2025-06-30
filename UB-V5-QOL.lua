@@ -8,7 +8,7 @@ local ProtectGui = protectgui or (syn and syn.protect_gui) or function(f) end
 local CoreGui = cloneref(gethui()) or game:GetService("CoreGui")
 local SizeUI = UDim2.new(0, 550, 0, 350)
 LibraryCfg = {
-	ShowPlayer = true,
+	ShowPlayer = false,
 	Undetected = false
 }
 UBDir = _G.Service or "UBHub5"
