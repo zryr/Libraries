@@ -604,6 +604,249 @@ function UBHubLib:MakeGui(GuiConfig)
 	local Flags = UBHubLib and UBHubLib.Flags or {}
 	local UIInstance = {}
 
+	function UIInstance:CreateTab(TabConfig)
+		local TabConfig = TabConfig or {}
+		TabConfig.Name = TabConfig.Name or "Tab"
+		TabConfig.Icon = TabConfig.Icon or ""
+		TabConfig.IsSettingsTab = TabConfig.IsSettingsTab or false -- New parameter
+
+		local ScrolLayers -- This will be the content page for the tab
+		local UIListLayout1 -- Layout for the content page
+
+		if TabConfig.IsSettingsTab then
+			-- For the settings tab, its content is the existing SettingsPage
+			ScrolLayers = SettingsPage
+			-- SettingsPage should already have its UIListLayout (SettingsPageLayout)
+			UIListLayout1 = SettingsPage:FindFirstChildOfClass("UIListLayout") or SettingsPageLayout
+		else
+			-- For normal tabs, create a new ScrollingFrame and UIListLayout
+			ScrolLayers = Instance.new("ScrollingFrame")
+			ScrolLayers.Name = "ScrolLayers_UserTab_" .. TabConfig.Name
+			ScrolLayers.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+			ScrolLayers.ScrollBarThickness = 0 -- Default for user tabs
+			ScrolLayers.Active = true
+			ScrolLayers.LayoutOrder = CountTab -- Used by LayersPageLayout
+			ScrolLayers.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			ScrolLayers.BackgroundTransparency = 0.9990000128746033
+			ScrolLayers.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			ScrolLayers.BorderSizePixel = 0
+			ScrolLayers.Size = UDim2.new(1, 0, 1, 0)
+			ScrolLayers.Parent = LayersFolder
+
+			UIListLayout1 = Instance.new("UIListLayout")
+			UIListLayout1.Padding = UDim.new(0, 3)
+			UIListLayout1.SortOrder = Enum.SortOrder.LayoutOrder
+			UIListLayout1.Parent = ScrolLayers
+		end
+
+		local TabConfigNameValue = Instance.new("StringValue")
+		TabConfigNameValue.Name = "TabConfig_Name"
+		TabConfigNameValue.Value = TabConfig.Name
+		TabConfigNameValue.Parent = ScrolLayers -- Parent to the respective content scroller
+
+		local Tab = Instance.new("Frame") -- This is the tab button itself
+		local UICorner3 = Instance.new("UICorner")
+		local TabButton = Instance.new("TextButton");
+		local TabName = Instance.new("TextLabel")
+		local FeatureImg = Instance.new("ImageLabel");
+		-- UIStroke2 and UICorner4 for ChooseFrame will be handled differently or within normal tab logic
+
+		Tab.Name = "TabInstance_" .. TabConfig.Name -- Make name more unique
+		Tab.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Base, will be overridden
+		Tab.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Tab.BorderSizePixel = 0
+
+		if TabConfig.IsSettingsTab then
+			Tab.Parent = LayersTab
+			Tab.LayoutOrder = 999
+			Tab.Size = UDim2.new(1, 0, 0, 40) -- Explicitly set size for settings tab
+			Tab.Position = UDim2.new(0, 0, 1, -40)
+			Tab.AnchorPoint = Vector2.new(0, 1) -- Anchor to bottom left for this positioning
+			Tab.BackgroundTransparency = 0.95 -- Consistent with old Info frame
+		else
+			Tab.Parent = ScrollTab
+			Tab.LayoutOrder = CountTab
+			Tab.Size = UDim2.new(1, 0, 0, 30) -- Standard user tab height
+			-- Auto-highlighting removed, will be handled by SelectTab
+			Tab.BackgroundTransparency = 0.9990000128746033
+		end
+
+		ScrolLayersMap[Tab] = ScrolLayers -- Populate the map for both types of tabs
+
+		UICorner3.CornerRadius = UDim.new(0, 4)
+		UICorner3.Parent = Tab
+
+		TabButton.Font = Enum.Font.GothamBold
+		TabButton.Text = ""
+		TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		TabButton.TextSize = 13
+		TabButton.TextXAlignment = Enum.TextXAlignment.Left
+		TabButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TabButton.BackgroundTransparency = 0.9990000128746033
+		TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TabButton.BorderSizePixel = 0
+		TabButton.Size = UDim2.new(1, 0, 1, 0)
+		TabButton.Name = "TabButton"
+		TabButton.Parent = Tab
+
+		TabName.Font = Enum.Font.GothamBold
+		TabName.Text = TabConfig.Name
+		TabName.TextColor3 = Color3.fromRGB(255, 255, 255)
+		TabName.TextSize = 13
+		TabName.TextXAlignment = Enum.TextXAlignment.Left
+		TabName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TabName.BackgroundTransparency = 0.9990000128746033
+		TabName.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TabName.BorderSizePixel = 0
+		TabName.Size = UDim2.new(1, 0, 1, 0)
+		TabName.Position = UDim2.new(0, 30, 0, 0)
+		TabName.Name = "TabName"
+		TabName.Parent = Tab
+
+		FeatureImg.Image = TabConfig.Icon
+		FeatureImg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		FeatureImg.BackgroundTransparency = 0.9990000128746033
+		FeatureImg.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		FeatureImg.BorderSizePixel = 0
+		FeatureImg.Position = UDim2.new(0, 9, 0, 7)
+		FeatureImg.Size = UDim2.new(0, 16, 0, 16)
+		FeatureImg.Name = "FeatureImg"
+		FeatureImg.Parent = Tab
+
+		-- REMOVED: Auto-highlighting, JumpTo, NameTab.Text setting, and ChooseFrame creation from CreateTab.
+		-- This will be handled by the new UIInstance:SelectTab method.
+		local TabObject = {} -- Forward declare TabObject for the Activated closure
+
+		TabButton.Activated:Connect(function()
+			CircleClick(TabButton, Mouse.X, Mouse.Y)
+			if UIInstance.SelectTab then
+				UIInstance:SelectTab(TabObject) -- Pass the TabObject created in CreateTab
+			else
+				warn("UIInstance:SelectTab is not yet defined when TabButton was activated for:", TabConfig.Name)
+			end
+		end)
+
+		local currentTabSectionCount = 0
+
+		-- TabObject definition continued
+		TabObject.Instance = Tab
+		TabObject._ScrolLayers = ScrolLayers
+		TabObject._UIListLayout = UIListLayout1 -- This is the UIListLayout of the ScrolLayers for this tab
+		TabObject._IsSettingsTab = TabConfig.IsSettingsTab
+		TabObject._TabConfig = TabConfig -- Store the original config for reference if needed
+
+		FrameToTabObjectMap[Tab] = TabObject -- Populate the new map
+
+		function TabObject:AddSection(Title)
+			Title = Title or "Section"
+
+			local function updateThisTabScrollFunc(scroller, padding)
+				task.defer(function()
+					local totalHeight = 0
+					for _, child in ipairs(scroller:GetChildren()) do
+						if child:IsA("Frame") and child.Name == "Section" then
+							totalHeight = totalHeight + child.Size.Y.Offset + (padding and padding.Offset or 0)
+						end
+					end
+					if #scroller:GetChildren() > 0 and padding then totalHeight = totalHeight - padding.Offset end
+					if totalHeight < 0 then totalHeight = 0 end
+					scroller.CanvasSize = UDim2.new(0, scroller.CanvasSize.X.Offset, 0, totalHeight)
+				end)
+			end
+
+			local function getThisTabLayoutPadding()
+				return self._UIListLayout and self._UIListLayout.Padding or UDim.new(0,3)
+			end
+
+			local newSectionObject = InternalCreateSection(
+				self._ScrolLayers,
+				Title,
+				currentTabSectionCount,
+				GuiConfig,
+				Flags,
+				Themes,
+				function() return CurrentTheme end,
+				GetColor,
+				SetTheme,
+				LoadUIAsset,
+				SaveFile,
+				HttpService,
+				TweenService,
+				Mouse,
+				CircleClick,
+				updateThisTabScrollFunc,
+				getThisTabLayoutPadding
+			)
+			currentTabSectionCount = currentTabSectionCount + 1
+			return newSectionObject
+		end
+
+		CountTab = CountTab + 1
+		return TabObject
+	end
+
+	function UIInstance:SelectTab(tabObject)
+		if not tabObject or not tabObject.Instance or not tabObject._ScrolLayers or not tabObject._TabConfig then
+			warn("SelectTab: Invalid tabObject received.")
+			return
+		end
+
+		local selectedTabFrame = tabObject.Instance
+		local isSettings = tabObject._IsSettingsTab
+
+		for _, child in ipairs(ScrollTab:GetChildren()) do
+			if child:IsA("Frame") and child.Name:match("^TabInstance_") and child ~= selectedTabFrame then
+				child.BackgroundTransparency = 0.9990000128746033
+				local cf = child:FindFirstChild("ChooseFrame")
+				if cf then cf.Visible = false end
+			end
+		end
+
+		if customizeButtonInstance and customizeButtonInstance ~= selectedTabFrame then
+			customizeButtonInstance.BackgroundTransparency = 0.95
+		end
+
+		if isSettings then
+			selectedTabFrame.BackgroundTransparency = 0.92
+		else
+			selectedTabFrame.BackgroundTransparency = 0.9200000166893005
+			local cf = selectedTabFrame:FindFirstChild("ChooseFrame")
+			if not cf then
+				cf = Instance.new("Frame", selectedTabFrame)
+				cf.Name = "ChooseFrame"
+				cf.BackgroundColor3 = GetColor("ThemeHighlight")
+				cf.BorderColor3 = Color3.fromRGB(0,0,0)
+				cf.BorderSizePixel = 0
+				cf.Position = UDim2.new(0,2,0,9)
+				cf.Size = UDim2.new(0,1,0,12)
+				local stroke = Instance.new("UIStroke", cf); stroke.Color = GetColor("Secondary"); stroke.Thickness = 1.6
+				Instance.new("UICorner", cf)
+			end
+			cf.Visible = true
+			TweenService:Create(cf, TweenInfo.new(0.2), {Size = UDim2.new(0,1,0,20)}):Play()
+		end
+
+		if isSettings then
+			if not isSettingsViewActive then
+				lastSelectedTabName = NameTab.Text
+			end
+			SettingsPage.Visible = true
+			LayersReal.Visible = false
+			NameTab.Text = "Settings"
+			isSettingsViewActive = true
+		else
+			if isSettingsViewActive then
+				NameTab.Text = tabObject._TabConfig.Name
+			else
+				NameTab.Text = tabObject._TabConfig.Name
+			end
+			SettingsPage.Visible = false
+			LayersReal.Visible = true
+			LayersPageLayout:JumpTo(tabObject._ScrolLayers)
+			isSettingsViewActive = false
+		end
+	end
+
 	-- Centralized Input Handling Variables for window drag/resize
 	local isWindowDragging = false
 	local isWindowResizing = false
@@ -1574,9 +1817,11 @@ function UBHubLib:MakeGui(GuiConfig)
 	local ScrolLayersMap = {}
 	local FrameToTabObjectMap = {} -- New map: Frame Instance -> TabObject
 
-	-- The UIInstance:CreateTab function definition is here (as modified in Step 1)
-	-- ... (Full UIInstance:CreateTab function code, already modified) ...
-	-- Make sure the full function UIInstance:CreateTab is correctly placed above its first call.
+	-- Function UIInstance:CreateTab moved here later.
+	-- For now, this is a placeholder for where it will be removed from.
+	-- [CUT UIInstance:CreateTab - from its current position later in the script]
+	-- [CUT UIInstance:SelectTab - from its current position later in the script]
+
 
 	-- After UIInstance:CreateTab is defined:
 	-- Create the Separator Line
