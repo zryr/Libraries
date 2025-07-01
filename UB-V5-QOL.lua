@@ -7,8 +7,12 @@ local Mouse = LocalPlayer:GetMouse()
 local ProtectGui = protectgui or (syn and syn.protect_gui) or function(f) end
 local CoreGui = cloneref(gethui()) or game:GetService("CoreGui")
 local SizeUI = UDim2.new(0, 550, 0, 350)
+
+-- Library-wide counters moved to global scope
+local CountTab = 0
+local CountDropdown = 0
+
 LibraryCfg = {
-	ShowPlayer = true,
 	Undetected = false
 }
 UBDir = _G.Service or "UBHub5"
@@ -178,11 +182,22 @@ function GetThemes()
 end
 local function GetColor(colorName, element, property)
     if element and property then
-        table.insert(ThemeElements, {
-            element = element,
-            property = property,
-            colorName = colorName
-        })
+        local alreadyExists = false
+        for _, existingEntry in ipairs(ThemeElements) do
+            if existingEntry.element == element and existingEntry.property == property then
+                -- Optional: Update colorName if it's different, though this might be complex if not needed.
+                -- For now, just prevent duplicate. If it exists, its colorName will be updated by SetTheme anyway.
+                alreadyExists = true
+                break
+            end
+        end
+        if not alreadyExists then
+            table.insert(ThemeElements, {
+                element = element,
+                property = property,
+                colorName = colorName
+            })
+        end
     end
     if Themes[CurrentTheme] and Themes[CurrentTheme][colorName] then
         return Themes[CurrentTheme][colorName]
@@ -199,6 +214,27 @@ function SetTheme(themeName)
 		if not ok then
 			warn("Theme application failed:", err)
 		end
+	end
+
+	-- Save theme persistence data
+	if SaveFile then -- Ensure SaveFile is available (it should be in this scope)
+		SaveFile("LastThemeName", themeName)
+		if Flags.CustomUserThemes and Flags.CustomUserThemes[themeName] or themeName == "__customApplied" or themeName == "__loadedStartupTheme" then
+			if Themes[themeName] then -- Ensure the theme data exists
+				SaveFile("LastCustomThemeData", deepcopy(Themes[themeName]))
+			end
+		else
+			-- If it's a default theme, we can clear any stale custom data
+			SaveFile("LastCustomThemeData", nil)
+		end
+	end
+
+	-- Existing SetTheme hook for color controls update (from previous step)
+	-- This should remain if it's still the SetTheme being called by UI elements.
+	-- If originalSetTheme_Settings is the one being called directly by UI, this logic needs to be in that.
+	-- Assuming the global SetTheme is wrapped and this is the inner function.
+	if isSettingsViewActive or (CurrentTheme == "__customApplied" and SettingsPage.Visible) then
+		task.delay(0.05, updateAllColorControls)
 	end
 end
 local function GetImageLink(ID)
@@ -251,50 +287,14 @@ function LoadUIAsset(url, name)
     end
     return getcustomasset(filePath)
 end
-local function MakeDraggable(topbarobject, object)
-	local function CustomPos(topbarobject, object)
-		object.Size = UDim2.new(0, 550, 0, 350)
-		local Dragging = nil
-		local DragInput = nil
-		local DragStart = nil
-		local StartPosition = nil
-		local LastPosition = nil
-		local Tween = nil
-
-		local function UpdatePos(input)
-			local Delta = input.Position - DragStart
-			local pos = UDim2.new(StartPosition.X.Scale, StartPosition.X.Offset + Delta.X, StartPosition.Y.Scale, StartPosition.Y.Offset + Delta.Y)
-			if Tween then Tween:Cancel() end
-			Tween = TweenService:Create(object,TweenInfo.new(0.03, Enum.EasingStyle.Linear),{Position = pos})Tween:Play()
-		end
-
-		topbarobject.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				Dragging = true
-				DragStart = input.Position
-				StartPosition = object.Position
-				if Tween then Tween:Cancel() end
-				input.Changed:Connect(function()
-					if input.UserInputState == Enum.UserInputState.End then
-						Dragging = false
-					end
-				end)
-			end
-		end)
-
-		topbarobject.InputChanged:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-				DragInput = input
-			end
-		end)
-
-		UserInputService.InputChanged:Connect(function(input)
-			if input == DragInput and Dragging then
-				UpdatePos(input)
-			end
-		end)
+local function MakeDraggable(topbarobject, objectToDrag)
+	-- Register this topbarobject and the object it drags with the centralized handler
+	if topbarobject and objectToDrag then
+		draggableElements[topbarobject] = {objectToDrag = objectToDrag}
+	else
+		warn("MakeDraggable: topbarobject or objectToDrag is nil")
 	end
-	CustomPos(topbarobject, object)
+	-- No internal event connections needed anymore.
 end
 function CircleClick(Button, X, Y)
 	spawn(function()
@@ -359,24 +359,23 @@ function UBHubLib:MakeNotify(NotifyConfig)
 			NotifyLayout.Size = UDim2.new(0, 320, 1, 0)
 			NotifyLayout.Name = "NotifyLayout"
 			NotifyLayout.Parent = CoreGui.NotifyGui
-			local Count = 0
-			CoreGui.NotifyGui.NotifyLayout.ChildRemoved:Connect(function()
-				Count = 0
-				for i, v in CoreGui.NotifyGui.NotifyLayout:GetChildren() do
-					TweenService:Create(
-						v,
-						TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-						{Position = UDim2.new(0, 0, 1, -((v.Size.Y.Offset + 12)*Count))}
-					):Play()
-					Count = Count + 1
-				end
-			end)
+
+			if not NotifyLayout:FindFirstChildOfClass("UIListLayout") then
+				local ListLayout = Instance.new("UIListLayout")
+				ListLayout.Parent = NotifyLayout
+				ListLayout.FillDirection = Enum.FillDirection.Vertical
+				ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+				ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+				ListLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+				ListLayout.Padding = UDim.new(0, 5)
+			end
+			-- Removed ChildRemoved connection for manual tweening; UIListLayout handles this.
 		end
-		local NotifyPosHeigh = 0
-		for i, v in CoreGui.NotifyGui.NotifyLayout:GetChildren() do
-			NotifyPosHeigh = -(v.Position.Y.Offset) + v.Size.Y.Offset + 12
-		end
+		-- Removed NotifyPosHeigh calculation and usage for NotifyFrame.Position
 		local NotifyFrame = Instance.new("Frame");
+		NotifyFrame.LayoutOrder = tick() -- Ensure new notifications appear correctly if SortOrder is LayoutOrder
+		-- NotifyFrame.AnchorPoint default (0,0) is fine with UIListLayout Bottom alignment.
+		-- NotifyFrame.Position is now controlled by UIListLayout.
 		local NotifyFrameReal = Instance.new("Frame");
 		local UICorner = Instance.new("UICorner");
 		local DropShadowHolder = Instance.new("Frame");
@@ -525,22 +524,24 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		else
 			NotifyFrame.Size = UDim2.new(1, 0, 0, TextLabel2.AbsoluteSize.Y + 40)
 		end
-		local waitbruh = false
+
+		local waitbruh_instance = false -- Local to this specific notification instance's spawn
 		function NotifyFunction:Close()
-			if waitbruh then
+			if waitbruh_instance then
 				return false
 			end
-			waitbruh = true
-			TweenService:Create(NotifyFrameReal,TweenInfo.new(tonumber(NotifyConfig.Time) * 0.2, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 400, 0, 0)}):Play()
-			task.wait(tonumber(NotifyConfig.Time) / 1.2)
+			waitbruh_instance = true
+			local tweenDuration = tonumber(NotifyConfig.Time) * 0.2
+			TweenService:Create(NotifyFrameReal,TweenInfo.new(tweenDuration, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 400, 0, 0)}):Play()
+			task.wait(tweenDuration) -- Wait for the hide animation to complete
 			NotifyFrame:Destroy()
 		end
 		Close.Activated:Connect(function()
 			NotifyFunction:Close()
 		end)
 		TweenService:Create(NotifyFrameReal,TweenInfo.new(tonumber(NotifyConfig.Time) * 0.2, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 0, 0, 0)}):Play()
-		task.wait(tonumber(NotifyConfig.Delay))
-		NotifyFunction:Close()
+		task.wait(tonumber(NotifyConfig.Delay)) -- This is the delay *before* auto-closing
+		NotifyFunction:Close() -- This will now wait for its own animation before destroying
 	end)
 	return NotifyFunction
 end
@@ -550,7 +551,45 @@ if not isfolder(Folder) then
 	makefolder(Folder)
 end
 function UBHubLib:MakeGui(GuiConfig)
+	local function deepcopy(orig)
+		local orig_type = type(orig)
+		local copy
+		if orig_type == 'table' then
+			copy = {}
+			for orig_key, orig_value in next, orig, nil do
+				copy[deepcopy(orig_key)] = deepcopy(orig_value)
+			end
+			setmetatable(copy, deepcopy(getmetatable(orig)))
+		else -- number, string, boolean, etc
+			copy = orig
+		end
+		return copy
+	end
+
 	local GuiConfig = GuiConfig or {}
+
+	-- Centralized Input Handling Variables for window drag/resize
+	local isWindowDragging = false
+	local isWindowResizing = false
+	local windowDragTarget = nil      -- The main frame being dragged (e.g., DropShadowHolder)
+	local windowDragInitiator = nil   -- The specific topbar element that initiated the drag (e.g., Top)
+	local windowResizeTarget = nil    -- The main frame being resized (e.g., Main)
+	local windowResizeInitiator = nil -- The specific resize handle that initiated resizing
+
+	local windowDragStartMouse = Vector2.new()
+	local windowDragStartPos = UDim2.new()
+	local windowResizeStartMouse = Vector2.new()
+	local windowResizeStartSize = UDim2.new()
+
+	-- To store connection objects for later disconnect if GUI is destroyed
+	local uisInputBeganConn, uisInputChangedConn, uisInputEndedConn
+
+	-- Placeholder lists/maps to register draggable/resizable elements
+	-- MakeDraggable will add to this: {topbar = objectToDrag}
+	local draggableElements = {}
+	-- MakeResizable will add to this: {resizeHandle = {objectToResize = object, saveFlag = flag, api = api}}
+	local resizableElements = {}
+
 	GuiConfig.NameHub = GuiConfig.NameHub or "UB Hub"
 	if LibraryCfg.Undetected then
 		GuiConfig.Description = "|UNDETECTED|"
@@ -564,6 +603,101 @@ function UBHubLib:MakeGui(GuiConfig)
 	GuiConfig["SaveFolder"] = GuiConfig["SaveFolder"] or false
 	local Flags = UBHubLib and UBHubLib.Flags or {}
 	local UIInstance = {}
+
+	-- Centralized Input Handling Variables for window drag/resize
+	local isWindowDragging = false
+	local isWindowResizing = false
+	local windowDragTarget = nil      -- The main frame being dragged (e.g., DropShadowHolder)
+	local windowDragInitiator = nil   -- The specific topbar element that initiated the drag (e.g., Top)
+	local windowResizeTarget = nil    -- The main frame being resized (e.g., Main)
+	local windowResizeInitiator = nil -- The specific resize handle that initiated resizing
+
+	local windowDragStartMouse = Vector2.new()
+	local windowDragStartPos = UDim2.new()
+	local windowResizeStartMouse = Vector2.new()
+	local windowResizeStartSize = UDim2.new()
+
+	local uisInputBeganConn, uisInputChangedConn, uisInputEndedConn
+
+	local draggableElements = {} -- Key: topbarInstance, Value: {objectToDrag = frameInstance}
+	local resizableElements = {} -- Key: resizeHandleInstance, Value: {objectToResize = frameInstance, saveFlag = "flagName", api = {handleSizeChange = func}}
+
+	-- Setup UserInputService connections for centralized drag/resize
+	if UserInputService then
+		uisInputBeganConn = UserInputService.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				if draggableElements[input.Target] then
+					isWindowDragging = true
+					windowDragInitiator = input.Target
+					windowDragTarget = draggableElements[input.Target].objectToDrag
+					windowDragStartMouse = input.Position
+					windowDragStartPos = windowDragTarget.Position
+				elseif resizableElements[input.Target] then
+					local resizeData = resizableElements[input.Target]
+					isWindowResizing = true
+					windowResizeInitiator = input.Target
+					windowResizeTarget = resizeData.objectToResize
+					windowResizeStartMouse = input.Position
+					windowResizeStartSize = windowResizeTarget.Size
+				end
+			end
+		end)
+
+		uisInputChangedConn = UserInputService.InputChanged:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+				if isWindowDragging and windowDragTarget then
+					local delta = input.Position - windowDragStartMouse
+					local newPos = UDim2.new(windowDragStartPos.X.Scale, windowDragStartPos.X.Offset + delta.X,
+											 windowDragStartPos.Y.Scale, windowDragStartPos.Y.Offset + delta.Y)
+					if TweenService then
+						local currentTween = windowDragTarget:FindFirstChild("WindowDragTween")
+						if currentTween then currentTween:Cancel(); currentTween:Destroy() end
+						local tween = TweenService:Create(windowDragTarget, TweenInfo.new(0.03, Enum.EasingStyle.Linear), {Position = newPos})
+						tween.Name = "WindowDragTween"
+						tween.Parent = windowDragTarget
+						tween:Play()
+					else
+						windowDragTarget.Position = newPos
+					end
+				elseif isWindowResizing and windowResizeTarget then
+					local delta = input.Position - windowResizeStartMouse
+					local resizeData = resizableElements[windowResizeInitiator]
+					local newWidth = math.max(windowResizeStartSize.X.Offset + delta.X, 50)
+					local newHeight = math.max(windowResizeStartSize.Y.Offset + delta.Y, 50)
+
+					if resizeData and resizeData.api and resizeData.api.handleSizeChange then
+						resizeData.api.handleSizeChange(UDim2.new(0, newWidth, 0, newHeight))
+					else
+						windowResizeTarget.Size = UDim2.new(0, newWidth, 0, newHeight)
+						if resizeData and resizeData.saveFlag then
+							SaveFile(resizeData.saveFlag, string.format("%d,%d", newWidth, newHeight))
+							if resizeData.saveFlag == "UI_Size" then
+								SaveFile("Blur", string.format("%d,%d", newWidth, newHeight))
+							end
+						end
+					end
+				end
+			end
+		end)
+
+		uisInputEndedConn = UserInputService.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				if isWindowDragging then
+					isWindowDragging = false
+					local currentTween = windowDragTarget and windowDragTarget:FindFirstChild("WindowDragTween")
+					if currentTween then currentTween:Cancel(); currentTween:Destroy() end
+					windowDragTarget = nil
+					windowDragInitiator = nil
+				end
+				if isWindowResizing then
+					isWindowResizing = false
+					windowResizeTarget = nil
+					windowResizeInitiator = nil
+				end
+			end
+		end)
+	end
+	-- End of Centralized Input Handling Setup
 
 	local function InternalCreateSection(parentScrolLayersInstance, sectionTitle, sectionLayoutOrder,
                                      guiConfigRef, flagsRef, themesRef, currentThemeNameRef,
@@ -748,10 +882,15 @@ function UBHubLib:MakeGui(GuiConfig)
 			ParagraphTitle.Name = "ParagraphTitle"; ParagraphTitle.Font = Enum.Font.GothamBold; ParagraphTitle.Text = ParagraphConfig.Title .. " | " .. ParagraphConfig.Content;
 			ParagraphTitle.TextColor3 = getColorFunc("Text", ParagraphTitle, "TextColor3"); ParagraphTitle.TextSize = 13; ParagraphTitle.TextXAlignment = Enum.TextXAlignment.Left; ParagraphTitle.TextYAlignment = Enum.TextYAlignment.Top;
 			ParagraphTitle.BackgroundTransparency = 1; ParagraphTitle.Position = UDim2.new(0,10,0,10); ParagraphTitle.Size = UDim2.new(1,-16,0,13); ParagraphTitle.TextWrapped = true
-			task.delay(0, function()
+			task.defer(function() -- Changed task.delay(0,...) to task.defer(...)
 				ParagraphTitle.Size = UDim2.new(1, -16, 0, ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0, ParagraphTitle.TextBounds.Y + 20); SectionObject._UpdateSizeSection()
 			end)
-			function ParagraphFunc:Set(pConfig) ParagraphTitle.Text = (pConfig.Title or "T") .. " | " .. (pConfig.Content or "C"); task.delay(0,function() ParagraphTitle.Size = UDim2.new(1,-16,0,ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0,ParagraphTitle.TextBounds.Y + 20); SectionObject._UpdateSizeSection() end) end
+			function ParagraphFunc:Set(pConfig)
+				ParagraphTitle.Text = (pConfig.Title or "T") .. " | " .. (pConfig.Content or "C");
+				task.defer(function() -- Changed task.delay(0,...) to task.defer(...)
+					ParagraphTitle.Size = UDim2.new(1,-16,0,ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0,ParagraphTitle.TextBounds.Y + 20); SectionObject._UpdateSizeSection()
+				end)
+			end
 			CountItem = CountItem + 1; return ParagraphFunc
 		end
 
@@ -783,7 +922,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			local ActualButton = Instance.new("TextButton", ToggleFrame); ActualButton.Name = "ActualButton"; ActualButton.Text = ""; ActualButton.Size = UDim2.new(1,0,1,0); ActualButton.BackgroundTransparency = 1
 			local currentValue = ToggleConfig.Default
 			local function setToggleVisual(value) SwitchCircle:TweenPosition(UDim2.new(value and 0.5 or 0, value and -1 or 1, 0.5, -6), "Out", "Quad", 0.15, true) end; setToggleVisual(currentValue)
-			function ActualButton.Activated() circleClickFunc(ActualButton, mouseRef.X, mouseRef.Y); currentValue = not currentValue; if ToggleConfig.Flag then saveFileFunc(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue) end
+			ActualButton.Activated:Connect(function() circleClickFunc(ActualButton, mouseRef.X, mouseRef.Y); currentValue = not currentValue; if ToggleConfig.Flag then saveFileFunc(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue) end)
 			task.delay(0, function() local contentHeight = ToggleContent.TextBounds.Y; local titleHeight = ToggleTitle.TextBounds.Y; ToggleFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); SectionObject._UpdateSizeSection() end)
 			CountItem = CountItem + 1; return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; if ToggleConfig.Flag then saveFileFunc(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue); end }
 		end
@@ -798,11 +937,39 @@ function UBHubLib:MakeGui(GuiConfig)
 			local Bar = Instance.new("Frame", SliderFrame); Bar.Name = "Bar"; Bar.BackgroundColor3 = getColorFunc("Accent", Bar, "BackgroundColor3"); Bar.BorderSizePixel = 0; Bar.Position = UDim2.new(0,10,1,-20); Bar.Size = UDim2.new(1,-20,0,5); Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,100)
 			local Progress = Instance.new("Frame", Bar); Progress.Name = "Progress"; Progress.BackgroundColor3 = getColorFunc("ThemeHighlight", Progress, "BackgroundColor3"); Progress.BorderSizePixel = 0; Instance.new("UICorner", Progress).CornerRadius = UDim.new(0,100)
 			local Dragger = Instance.new("TextButton", Bar); Dragger.Name = "Dragger"; Dragger.Text = ""; Dragger.Size = UDim2.new(0,10,0,10); Dragger.AnchorPoint = Vector2.new(0.5,0.5); Dragger.BackgroundColor3 = getColorFunc("ThemeHighlight", Dragger, "BackgroundColor3"); Dragger.BorderSizePixel = 0; Instance.new("UICorner", Dragger).CornerRadius = UDim.new(0,100); Dragger.ZIndex = 2
+
+			local DraggerHitbox = Instance.new("TextButton", Bar) -- Larger hitbox
+			DraggerHitbox.Name = "DraggerHitbox"
+			DraggerHitbox.Text = ""
+			DraggerHitbox.Size = UDim2.new(0, 20, 0, 20) -- Larger size for easier clicking
+			DraggerHitbox.AnchorPoint = Vector2.new(0.5, 0.5)
+			DraggerHitbox.BackgroundTransparency = 1 -- Invisible
+			DraggerHitbox.ZIndex = Dragger.ZIndex + 1 -- Ensure it's on top of the visual dragger if necessary, or handle input priority.
+			DraggerHitbox.BorderSizePixel = 0
+
 			local currentValue = SliderConfig.Default
-			local function UpdateSlider(value) value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max); currentValue = value; SliderValueText.Text = tostring(value); local percent = (SliderConfig.Max - SliderConfig.Min == 0) and 0 or (value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min); Progress.Size = UDim2.new(percent,0,1,0); Dragger.Position = UDim2.new(percent,0,0.5,0); if SliderConfig.Flag then saveFileFunc(SliderConfig.Flag, currentValue) end; SliderConfig.Callback(currentValue) end
+			local function UpdateSlider(value)
+				value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max);
+				currentValue = value;
+				SliderValueText.Text = tostring(value);
+				local percent = (SliderConfig.Max - SliderConfig.Min == 0) and 0 or (value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min);
+				Progress.Size = UDim2.new(percent,0,1,0);
+				Dragger.Position = UDim2.new(percent,0,0.5,0);
+				DraggerHitbox.Position = Dragger.Position -- Keep hitbox centered on visual dragger
+				if SliderConfig.Flag then saveFileFunc(SliderConfig.Flag, currentValue) end;
+				SliderConfig.Callback(currentValue)
+			end
 			UpdateSlider(currentValue)
-			Dragger.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then local dragging = true; local conn; conn = UserInputService.InputChanged:Connect(function(subInput) if not dragging then conn:Disconnect() return end; if subInput.UserInputType == Enum.UserInputType.MouseMovement or subInput.UserInputType == Enum.UserInputType.Touch then local localPos = Bar.AbsolutePosition.X; local mousePos = subInput.Position.X; local percent = math.clamp((mousePos - localPos) / Bar.AbsoluteSize.X, 0, 1); UpdateSlider(SliderConfig.Min + percent * (SliderConfig.Max - SliderConfig.Min)) end end); Dragger.InputEnded:Connect(function() dragging = false conn:Disconnect() end) end end)
-			SliderValueText.FocusLost:Connect(function(enterPressed) if enterPressed then local num = tonumber(SliderValueText.Text); if num then UpdateSlider(num) else UpdateSlider(currentValue) end end end)
+
+			DraggerHitbox.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then local dragging = true; local conn; conn = UserInputService.InputChanged:Connect(function(subInput) if not dragging then conn:Disconnect() return end; if subInput.UserInputType == Enum.UserInputType.MouseMovement or subInput.UserInputType == Enum.UserInputType.Touch then local localPos = Bar.AbsolutePosition.X; local mousePos = subInput.Position.X; local percent = math.clamp((mousePos - localPos) / Bar.AbsoluteSize.X, 0, 1); UpdateSlider(SliderConfig.Min + percent * (SliderConfig.Max - SliderConfig.Min)) end end); DraggerHitbox.InputEnded:Connect(function() dragging = false conn:Disconnect() end) end end)
+			SliderValueText.FocusLost:Connect(function() -- Removed enterPressed condition
+				local num = tonumber(SliderValueText.Text)
+				if num then
+					UpdateSlider(num)
+				else
+					UpdateSlider(currentValue) -- Revert to last valid value if input is not a number
+				end
+			end)
 			CountItem = CountItem + 1; return { GetValue = function() return currentValue end, SetValue = UpdateSlider }
 		end
 
@@ -815,7 +982,13 @@ function UBHubLib:MakeGui(GuiConfig)
 			local InputContent = Instance.new("TextLabel", InputFrame); InputContent.Name = "InputContent"; InputContent.Font = Enum.Font.Gotham; InputContent.Text = InputConfig.Content; InputContent.TextColor3 = getColorFunc("Text", InputContent, "TextColor3"); InputContent.TextSize = 12; InputContent.TextTransparency = 0.4; InputContent.TextXAlignment = Enum.TextXAlignment.Left; InputContent.TextYAlignment = Enum.TextYAlignment.Bottom; InputContent.BackgroundTransparency=1; InputContent.Position = UDim2.new(0,10,0,0); InputContent.Size = UDim2.new(1,-100,1,-10); InputContent.TextWrapped = true
 			local TextBox = Instance.new("TextBox", InputFrame); TextBox.Name = "TextBox"; TextBox.Font = Enum.Font.Gotham; TextBox.Text = InputConfig.Default; TextBox.TextColor3 = getColorFunc("Text", TextBox, "TextColor3"); TextBox.TextSize = 12; TextBox.BackgroundColor3 = getColorFunc("Accent", TextBox, "BackgroundColor3"); TextBox.Position = UDim2.new(1,-155,0.5,-12); TextBox.Size = UDim2.new(0,150,0,24); Instance.new("UICorner", TextBox).CornerRadius = UDim.new(0,3); TextBox.ClearTextOnFocus = false
 			local currentValue = InputConfig.Default
-			TextBox.FocusLost:Connect(function(enterPressed) if enterPressed then currentValue = TextBox.Text; if InputConfig.Flag then saveFileFunc(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) else TextBox.Text = currentValue end end)
+			TextBox.FocusLost:Connect(function() -- Removed enterPressed condition
+				currentValue = TextBox.Text
+				if InputConfig.Flag then saveFileFunc(InputConfig.Flag, currentValue) end
+				InputConfig.Callback(currentValue)
+				-- No explicit revert logic here as AddInput usually accepts any text.
+				-- If specific validation and revert were needed, it would be more complex.
+			end)
 			task.delay(0, function() local contentHeight = InputContent.TextBounds.Y; local titleHeight = InputTitle.TextBounds.Y; InputFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); SectionObject._UpdateSizeSection() end)
 			CountItem = CountItem + 1; return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; TextBox.Text = val; if InputConfig.Flag then saveFileFunc(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) end }
 		end
@@ -823,10 +996,28 @@ function UBHubLib:MakeGui(GuiConfig)
 		function SectionObject:AddDropdown(DropdownConfig)
 			local DropdownConfig = DropdownConfig or {}
 			DropdownConfig.Title = DropdownConfig.Title or "No Title"; DropdownConfig.Content = DropdownConfig.Content or ""; DropdownConfig.Multi = DropdownConfig.Multi or false; DropdownConfig.Options = DropdownConfig.Options or {};
-			local savedValue = DropdownConfig.Flag and flagsRef[DropdownConfig.Flag]
-			if DropdownConfig.Multi then DropdownConfig.Default = (savedValue and type(savedValue) == "table") and savedValue or (type(DropdownConfig.Default) == "table" and DropdownConfig.Default or {}) else DropdownConfig.Default = savedValue or DropdownConfig.Default end
+			local savedValue = DropdownConfig.Flag and flagsRef[DropdownConfig.Flag] -- This will now always be a table if it exists from save
+
+			-- Standardized default value handling:
+			-- If savedValue exists (it will be a table), use it.
+			-- Else, if DropdownConfig.Default is already a table (developer-provided default), use it.
+			-- Else, default to an empty table.
+			if savedValue ~= nil and type(savedValue) == "table" then
+				DropdownConfig.Default = savedValue
+			elseif type(DropdownConfig.Default) == "table" then
+				-- Developer provided a table as default, use it
+				DropdownConfig.Default = DropdownConfig.Default
+			else
+				-- Neither savedValue nor a table default from dev, so use empty table or single option if not multi
+				if DropdownConfig.Multi then
+					DropdownConfig.Default = {}
+				else -- Single select, try to pick first option or make it empty table if no specific default string given
+					DropdownConfig.Default = (type(DropdownConfig.Default) == "string" and {DropdownConfig.Default}) or {}
+				end
+			end
+
 			DropdownConfig.Callback = DropdownConfig.Callback or function() end
-			local DropdownFunc = {Value = DropdownConfig.Default, Options = DropdownConfig.Options}
+			local DropdownFunc = {Value = DropdownConfig.Default, Options = DropdownConfig.Options} -- Value is now consistently a table
 			local DropdownFrame = Instance.new("Frame"); DropdownFrame.Name = "Dropdown"; DropdownFrame.Parent = SectionObject._SectionAdd; DropdownFrame.LayoutOrder = CountItem; DropdownFrame.Size = UDim2.new(1,0,0,46); DropdownFrame.BackgroundTransparency = 0.935; DropdownFrame.BackgroundColor3 = getColorFunc("Secondary", DropdownFrame, "BackgroundColor3"); Instance.new("UICorner", DropdownFrame).CornerRadius = UDim.new(0,4)
 			local DropdownTitle = Instance.new("TextLabel", DropdownFrame); DropdownTitle.Name = "DropdownTitle"; DropdownTitle.Font = Enum.Font.GothamBold; DropdownTitle.Text = DropdownConfig.Title; DropdownTitle.TextColor3 = getColorFunc("Text", DropdownTitle, "TextColor3"); DropdownTitle.TextSize = 13; DropdownTitle.TextXAlignment = Enum.TextXAlignment.Left; DropdownTitle.TextYAlignment = Enum.TextYAlignment.Top; DropdownTitle.BackgroundTransparency=1; DropdownTitle.Position = UDim2.new(0,10,0,10); DropdownTitle.Size = UDim2.new(1,-180,0,13)
 			local DropdownContent = Instance.new("TextLabel", DropdownFrame); DropdownContent.Name = "DropdownContent"; DropdownContent.Font = Enum.Font.Gotham; DropdownContent.Text = DropdownConfig.Content; DropdownContent.TextColor3 = getColorFunc("Text", DropdownContent, "TextColor3"); DropdownContent.TextSize = 12; DropdownContent.TextTransparency = 0.4; DropdownContent.TextWrapped = true; DropdownContent.TextXAlignment = Enum.TextXAlignment.Left; DropdownContent.TextYAlignment = Enum.TextYAlignment.Bottom; DropdownContent.BackgroundTransparency=1; DropdownContent.Position = UDim2.new(0,10,0,0); DropdownContent.Size = UDim2.new(1,-180,1,-10)
@@ -858,7 +1049,8 @@ function UBHubLib:MakeGui(GuiConfig)
 			function DropdownFunc:AddOption(oN)
 				oN = oN or "Option"; local oF = Instance.new("Frame",ScrollSelect); oF.Name="Option"; oF.Size=UDim2.new(1,0,0,30); oF.BackgroundTransparency=0.97; oF.BackgroundColor3=getColorFunc("Secondary",oF,"BackgroundColor3"); Instance.new("UICorner",oF).CornerRadius=UDim.new(0,3); local oB=Instance.new("TextButton",oF); oB.Name="OptionButton"; oB.Text=""; oB.Size=UDim2.new(1,0,1,0); oB.BackgroundTransparency=1; local oT=Instance.new("TextLabel",oF); oT.Name="OptionText"; oT.Font=Enum.Font.Gotham; oT.Text=oN; oT.TextColor3=getColorFunc("Text",oT,"TextColor3"); oT.TextSize=13; oT.TextXAlignment=Enum.TextXAlignment.Left; oT.BackgroundTransparency=1; oT.Position=UDim2.new(0,8,0,0); oT.Size=UDim2.new(1,-16,1,0); local cF=Instance.new("Frame",oF); cF.Name="ChooseFrame"; cF.AnchorPoint=Vector2.new(0,0.5); cF.BackgroundColor3=getColorFunc("ThemeHighlight",cF,"BackgroundColor3"); cF.BorderSizePixel=0; cF.Position=UDim2.new(0,2,0.5,0); cF.Size=UDim2.new(0,0,0,0); Instance.new("UICorner",cF).CornerRadius=UDim.new(0,3); local cS=Instance.new("UIStroke",cF); cS.Color=getColorFunc("Secondary",cS,"Color"); cS.Thickness=1.6; cS.Transparency=1; dropCountLocal=dropCountLocal+1; oF.LayoutOrder=dropCountLocal;
 				oB.Activated:Connect(function() circleClickFunc(oB, mouseRef.X, mouseRef.Y); if DropdownConfig.Multi then local fI=table.find(DropdownFunc.Value,oN); if fI then table.remove(DropdownFunc.Value,fI) else table.insert(DropdownFunc.Value,oN) end else DropdownFunc.Value={oN} end; DropdownFunc:Set(DropdownFunc.Value); if DropdownConfig.Flag then saveFileFunc(DropdownConfig.Flag, DropdownFunc.Value) end end)
-				local yO=0; for _,cld in ipairs(ScrollSelect:GetChildren()) do if cld.Name=="Option" and cld:IsA("Frame") then yO=yO+UIListLayout_Scroll.Padding.Offset+cld.Size.Y.Offset end end; ScrollSelect.CanvasSize=UDim2.new(0,0,0,yO-UIListLayout_Scroll.Padding.Offset);
+				-- Optimized CanvasSize update:
+				task.defer(function() ScrollSelect.CanvasSize = UDim2.new(0, 0, 0, UIListLayout_Scroll.AbsoluteContentSize.Y) end)
 			end;
 			function DropdownFunc:Set(val) if val then local nV=type(val)=="table" and val or {val}; local uV={}; for _,v_u in ipairs(nV) do if not table.find(uV,v_u) then table.insert(uV,v_u) end end; DropdownFunc.Value=uV end; for _,d_S in ipairs(ScrollSelect:GetChildren()) do if d_S:IsA("Frame") and d_S.Name=="Option" then local iTF=DropdownFunc.Value and table.find(DropdownFunc.Value,d_S.OptionText.Text); local tII=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut); local s_S=iTF and UDim2.new(0,1,0,12) or UDim2.new(0,0,0,0); local bT_S=iTF and 0.935 or 0.97; local tr_S=iTF and 0 or 1; tweenServiceRef:Create(d_S.ChooseFrame,tII,{Size=s_S}):Play(); tweenServiceRef:Create(d_S.ChooseFrame.UIStroke,tII,{Transparency=tr_S}):Play(); tweenServiceRef:Create(d_S,tII,{BackgroundTransparency=bT_S}):Play() end end; local dT=(DropdownFunc.Value and #DropdownFunc.Value>0) and table.concat(DropdownFunc.Value,", ") or "Select Options"; OptionSelecting.Text=dT; if DropdownConfig.Callback then DropdownConfig.Callback(DropdownFunc.Value or {}) end;
 			end;
@@ -893,11 +1085,8 @@ function UBHubLib:MakeGui(GuiConfig)
 			return false
 		end
 		local valueToSave = Value
-		if type(Value) == "table" and not (Value[1] and not next(Value)) then
-			valueToSave = nil
-		elseif type(Value) == "table" and #Value == 1 then
-			valueToSave = Value[1]
-		end
+		-- All table types (arrays, empty tables, dictionaries) will be saved as is.
+		-- No special handling to extract single element from array.
 		Flags[Name] = valueToSave
 		local success, err = pcall(function()
 			local path = GuiConfig.SaveFolder
@@ -923,6 +1112,28 @@ function UBHubLib:MakeGui(GuiConfig)
 		end
 		return false
 	end; LoadFile()
+
+	-- Load last theme on startup
+	local themeToLoadOnStartup = Flags.LastThemeName
+	if themeToLoadOnStartup then
+		local customThemeData = Flags.LastCustomThemeData
+		if customThemeData and ( (Flags.CustomUserThemes and Flags.CustomUserThemes[themeToLoadOnStartup]) or themeToLoadOnStartup == "__customApplied" or themeToLoadOnStartup == "__loadedStartupTheme" or not Themes[themeToLoadOnStartup] ) then
+			-- If custom data exists AND (it's a known custom theme OR it was saved as __customApplied OR it was a previously loaded startup theme OR it's not a default theme anymore)
+			-- Then prioritize loading this custom data.
+			Themes["__loadedStartupTheme"] = deepcopy(customThemeData) -- Ensure deepcopy is available
+			SetTheme("__loadedStartupTheme")
+		elseif Themes[themeToLoadOnStartup] then
+			-- It's a default theme name, and no overriding custom data was indicated for it.
+			SetTheme(themeToLoadOnStartup)
+		else
+			-- Fallback if theme name is unknown and no applicable custom data.
+			SetTheme(CurrentTheme) -- CurrentTheme is initialized to "UB_Orange" or similar
+		end
+	else
+		-- No LastThemeName saved, use initial default.
+		SetTheme(CurrentTheme)
+	end
+
 	local function LoadUISize(saveFlag)
 		LoadFile()
 		if Flags[saveFlag] then
@@ -946,44 +1157,36 @@ function UBHubLib:MakeGui(GuiConfig)
 		
 		local resizeAPI = {
 			CurrentSize = object.Size,
-			SaveFlag = saveFlag
+			SaveFlag = saveFlag,
+			handleSizeChange = nil -- Will be assigned below
+			-- SetSize function will remain as part of the API
 		}
-		local dragging = false
-		local dragStart
-		local startSize
-		local function handleSizeChange(newSize)
+
+		local function handleSizeChange(newSize) -- This function will be called by the central handler
 			object.Size = newSize
-			resizeAPI.CurrentSize = newSize
+			resizeAPI.CurrentSize = newSize -- Update API's current size
 			if saveFlag then
 				local sizeString = string.format("%d,%d", newSize.X.Offset, newSize.Y.Offset)
 				SaveFile(saveFlag, sizeString)
-				if saveFlag == "UI_Size" then
+				if saveFlag == "UI_Size" then -- Special case for main UI size affecting Blur
 					SaveFile("Blur", sizeString)
 				end
 			end
 		end
-		resizeHandle.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				dragging = true
-				dragStart = input.Position
-				startSize = object.Size
-				local connection
-				connection = input.Changed:Connect(function()
-					if input.UserInputState == Enum.UserInputState.End then
-						dragging = false
-						connection:Disconnect()
-					end
-				end)
-			end
-		end)
-		UserInputService.InputChanged:Connect(function(input)
-			if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-				local delta = input.Position - dragStart
-				local newWidth = math.max(startSize.X.Offset + delta.X, 50)
-				local newHeight = math.max(startSize.Y.Offset + delta.Y, 50)
-				handleSizeChange(UDim2.new(0, newWidth, 0, newHeight))
-			end
-		end)
+		resizeAPI.handleSizeChange = handleSizeChange
+
+		-- Register this resizeHandle and its associated data with the centralized handler
+		if resizeHandle and object then
+			resizableElements[resizeHandle] = {
+				objectToResize = object,
+				saveFlag = saveFlag,
+				api = resizeAPI -- Pass the api so central handler can call handleSizeChange
+			}
+		else
+			warn("MakeResizable: resizeHandle or object is nil")
+		end
+		-- Removed internal InputBegan and UserInputService.InputChanged connections for the handle.
+
 		function resizeAPI:SetSize(newSize)
 			local validatedWidth = math.max(newSize.X.Offset, 50)
 			local validatedHeight = math.max(newSize.Y.Offset, 50)
@@ -992,6 +1195,7 @@ function UBHubLib:MakeGui(GuiConfig)
 		return resizeAPI
 	end
 	local UBHubGui = Instance.new("ScreenGui");
+	ProtectGui(UBHubGui) -- Protect the GUI
 	local DropShadowHolder = Instance.new("Frame");
 	local DropShadow = Instance.new("ImageLabel");
 	local Main = Instance.new("Frame");
@@ -1058,7 +1262,23 @@ function UBHubLib:MakeGui(GuiConfig)
 	local savedSize = LoadUISize("UI_Size")
 	if savedSize then
     	resizeAPI:SetSize(savedSize)
+	else
+		Main.Size = SizeUI -- Ensure Main has an initial size if not loaded
 	end
+
+	-- Initial DropShadowHolder Sizing based on Main's size
+	DropShadowHolder.Size = UDim2.new(Main.Size.X.Scale, Main.Size.X.Offset + 47, Main.Size.Y.Scale, Main.Size.Y.Offset + 47)
+	DropShadowHolder.Position = UDim2.new(0, math.floor(UBHubGui.AbsoluteSize.X / 2 - DropShadowHolder.AbsoluteSize.X / 2), 0, math.floor(UBHubGui.AbsoluteSize.Y / 2 - DropShadowHolder.AbsoluteSize.Y / 2))
+
+
+	-- Connect DropShadowHolder resizing to Main's size changes
+	Main:GetPropertyChangedSignal("Size"):Connect(function()
+		DropShadowHolder.Size = UDim2.new(Main.Size.X.Scale, Main.Size.X.Offset + 47, Main.Size.Y.Scale, Main.Size.Y.Offset + 47)
+		-- Recenter DropShadowHolder if its size changes significantly, assuming it's not anchored in a way that auto-centers.
+		-- However, DropShadowHolder is the draggable element, so its position is user-controlled.
+		-- Its position should only be set initially or when restoring from minimize.
+	end)
+
 	local BackgroundImage = Instance.new("ImageLabel")
 	BackgroundImage.Name = "MainImage"
 	BackgroundImage.Size = UDim2.new(1,0,1,0)
@@ -1285,189 +1505,24 @@ function UBHubLib:MakeGui(GuiConfig)
 	LayersPageLayout.EasingDirection = Enum.EasingDirection.InOut
 	LayersPageLayout.EasingStyle = Enum.EasingStyle.Quad
 
-	--// Settings Page Frame
+	--// Settings Page Frame (ensure it's defined before CreateTab is called for settings)
 	local SettingsPage = Instance.new("ScrollingFrame")
 	SettingsPage.Name = "SettingsPage"
-	SettingsPage.Size = Layers.Size
-	SettingsPage.Position = Layers.Position
-	SettingsPage.BackgroundTransparency = 1 -- Or match Layers BackgroundTransparency if preferred
+	SettingsPage.Size = Layers.Size -- Match the main content area size
+	SettingsPage.Position = Layers.Position -- Match the main content area position
+	SettingsPage.BackgroundTransparency = 0.999 -- Similar to LayersReal
 	SettingsPage.BorderSizePixel = 0
-	SettingsPage.Visible = false
+	SettingsPage.Visible = false -- Initially hidden
 	SettingsPage.Parent = Main
 	SettingsPage.ScrollBarThickness = 6
-	SettingsPage.ScrollingDirection = Enum.ScrollingDirection.Y -- Assuming vertical scrolling for settings
+	SettingsPage.ScrollingDirection = Enum.ScrollingDirection.Y
+	SettingsPage.CanvasSize = UDim2.new(0,0,0,0) -- Initial canvas size
 
-	local SettingsPageLayout = Instance.new("UIListLayout")
+	local SettingsPageLayout = Instance.new("UIListLayout") -- UIListLayout for settings page content
 	SettingsPageLayout.Parent = SettingsPage
-	SettingsPageLayout.Padding = UDim.new(0, 5) -- Standard padding
+	SettingsPageLayout.Padding = UDim.new(0, 5)
 	SettingsPageLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	SettingsPageLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-	--// Dummy Tab object for Settings Page
-	local SettingsTab = {}
-	SettingsTab._ScrolLayers = SettingsPage -- This is the settings page itself
-	SettingsTab._IsSettingsTab = true -- Flag to differentiate if needed later
-	SettingsTab._SettingsPageLayout = SettingsPageLayout -- Store reference to the settings page's UIListLayout for padding
-
-	local settingsSectionCount = 0 -- Local counter for sections within settings
-
-	function SettingsTab:AddSection(Title)
-		Title = Title or "Settings Section" -- Default title from InternalCreateSection will apply if nil
-
-		-- Call InternalCreateSection, passing all necessary references
-		local newSectionObject = InternalCreateSection(
-			self._ScrolLayers,          -- parentScrolLayersInstance (which is SettingsPage for SettingsTab)
-			Title,                      -- sectionTitle
-			settingsSectionCount,       -- sectionLayoutOrder (using settingsSectionCount)
-			GuiConfig,                  -- guiConfigRef
-			Flags,                      -- flagsRef
-			Themes,                     -- themesRef
-			function() return CurrentTheme end, -- currentThemeNameRef (as a function)
-			GetColor,                   -- getColorFunc
-			SetTheme,                   -- setThemeFunc
-			LoadUIAsset,                -- loadUIAssetFunc
-			SaveFile,                   -- saveFileFunc
-			HttpService,                -- httpServiceRef
-			TweenService,               -- tweenServiceRef
-			Mouse,                      -- mouseRef
-			CircleClick,                -- circleClickFunc
-			function(scroller, padding) -- updateParentScrollFunc for SettingsPage
-				-- This function updates the CanvasSize of the SettingsPage
-				task.defer(function()
-					local totalHeight = 0
-					for _, child in ipairs(scroller:GetChildren()) do -- scroller is SettingsPage here
-						if child:IsA("Frame") and child.Name == "Section" then
-							totalHeight = totalHeight + child.Size.Y.Offset + padding.Offset
-						end
-					end
-					if #scroller:GetChildren() > 0 then totalHeight = totalHeight - padding.Offset end
-					scroller.CanvasSize = UDim2.new(0,0,0, totalHeight)
-				end)
-			end,
-			function() return self._SettingsPageLayout.Padding end -- parentUIListLayoutPaddingRef (for SettingsPage)
-		)
-
-		settingsSectionCount = settingsSectionCount + 1 -- Increment settings-specific section counter
-		return newSectionObject -- Return the SectionObject created by InternalCreateSection
-	end
-
-	-- Populate Settings Page
-	local PresetsSection = SettingsTab:AddSection("Presets")
-	local availableThemes = GetThemes()
-	for _, themeName in ipairs(availableThemes) do
-		PresetsSection:AddButton({
-			Title = themeName,
-			Content = "Click to apply this theme",
-			Callback = function()
-				SetTheme(themeName)
-			end
-		})
-	end
-
-	local InterfaceSection = SettingsTab:AddSection("Interface")
-	-- Transparency Slider
-	InterfaceSection:AddSlider({
-		Title = "Window Transparency",
-		Content = "Adjust background opacity",
-		Min = 0,
-		Max = 100, -- Representing 0.0 to 1.0
-		Increment = 1,
-		Default = Main.BackgroundTransparency * 100,
-		Callback = function(value)
-			ChangeTransparency(value / 100) -- ChangeTransparency expects 0-1
-		end,
-		Flag = "UI_BackgroundTransparency" -- Optional: For saving/loading if desired later
-	})
-
-	-- Custom Background
-	local bgAssetInput = InterfaceSection:AddInput({
-		Title = "Background Asset URL/Path",
-		Content = "Enter image/video URL or local path",
-		Default = Flags["CustomBackgroundURL"] or ""
-	})
-
-	InterfaceSection:AddButton({
-		Title = "Set Image Background",
-		Content = "Apply image from URL/Path",
-		Callback = function()
-			local assetUrl = bgAssetInput:GetValue()
-			if assetUrl and assetUrl ~= "" then
-				ChangeAsset("Image", assetUrl, "CustomBG_Img")
-				SaveFile("CustomBackgroundURL", assetUrl) -- Save the URL
-				SaveFile("CustomBackgroundType", "Image")
-			end
-		end
-	})
-
-	InterfaceSection:AddButton({
-		Title = "Set Video Background",
-		Content = "Apply video from URL/Path",
-		Callback = function()
-			local assetUrl = bgAssetInput:GetValue()
-			if assetUrl and assetUrl ~= "" then
-				ChangeAsset("Video", assetUrl, "CustomBG_Vid")
-				SaveFile("CustomBackgroundURL", assetUrl) -- Save the URL
-				SaveFile("CustomBackgroundType", "Video")
-			end
-		end
-	})
-
-	InterfaceSection:AddButton({
-		Title = "Reset Background",
-		Content = "Remove custom background",
-		Callback = function()
-			Reset()
-			SaveFile("CustomBackgroundURL", "") -- Clear saved URL
-			SaveFile("CustomBackgroundType", "")
-		end
-	})
-
-	local CustomizeColorsSection = SettingsTab:AddSection("Customize Colors")
-	local function createColorSliders(colorKeyName, initialColor3)
-		CustomizeColorsSection:AddParagraph({Title = colorKeyName, Content = ""}) -- Simple label for the color property
-
-		local r, g, b = math.floor(initialColor3.R * 255), math.floor(initialColor3.G * 255), math.floor(initialColor3.B * 255)
-
-		local rSlider, gSlider, bSlider -- Forward declare for callbacks if needed, though direct update is fine
-
-		rSlider = CustomizeColorsSection:AddSlider({
-			Title = "Red", Content = "", Min = 0, Max = 255, Increment = 1, Default = r,
-			Callback = function(newR)
-				local currentColor = Themes[CurrentTheme][colorKeyName]
-				Themes[CurrentTheme][colorKeyName] = Color3.fromRGB(newR, math.floor(currentColor.G * 255), math.floor(currentColor.B * 255))
-				SetTheme(CurrentTheme)
-			end
-		})
-		gSlider = CustomizeColorsSection:AddSlider({
-			Title = "Green", Content = "", Min = 0, Max = 255, Increment = 1, Default = g,
-			Callback = function(newG)
-				local currentColor = Themes[CurrentTheme][colorKeyName]
-				Themes[CurrentTheme][colorKeyName] = Color3.fromRGB(math.floor(currentColor.R * 255), newG, math.floor(currentColor.B * 255))
-				SetTheme(CurrentTheme)
-			end
-		})
-		bSlider = CustomizeColorsSection:AddSlider({
-			Title = "Blue", Content = "", Min = 0, Max = 255, Increment = 1, Default = b,
-			Callback = function(newB)
-				local currentColor = Themes[CurrentTheme][colorKeyName]
-				Themes[CurrentTheme][colorKeyName] = Color3.fromRGB(math.floor(currentColor.R * 255), math.floor(currentColor.G * 255), newB)
-				SetTheme(CurrentTheme)
-			end
-		})
-	end
-
-	-- Iterate over a sample theme to get all color keys, assuming all themes have the same keys
-	local sampleThemeName = next(Themes) -- Get the first theme name as a sample
-	if sampleThemeName then
-		for key, colorValue in pairs(Themes[sampleThemeName]) do
-			if typeof(colorValue) == "Color3" then
-				-- We need to ensure CurrentTheme's values are used for defaults and updates.
-				-- The createColorSliders function will read from Themes[CurrentTheme]
-				-- For initial creation, we pass the current value from Themes[CurrentTheme]
-				createColorSliders(key, Themes[CurrentTheme][key] or colorValue)
-			end
-		end
-	end
 
 	--// Layer Tabs
 	local ScrollTab = Instance.new("ScrollingFrame");
@@ -1481,7 +1536,9 @@ function UBHubLib:MakeGui(GuiConfig)
 	ScrollTab.BackgroundTransparency = 0.9990000128746033
 	ScrollTab.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	ScrollTab.BorderSizePixel = 0
-	ScrollTab.Size = UDim2.new(1, 0, 1, -50)
+	-- Adjusted ScrollTab Size: Original Y Scale 1, Offset -50.
+	-- New Y Offset = -50 (original) - 40 (for settings tab) - 1 (for separator) = -91
+	ScrollTab.Size = UDim2.new(1, 0, 1, -91)
 	ScrollTab.Name = "ScrollTab"
 	ScrollTab.Parent = LayersTab
 
@@ -1492,115 +1549,347 @@ function UBHubLib:MakeGui(GuiConfig)
 	local function UpdateSize1()
 		local OffsetY = 0
 		for _, child in ScrollTab:GetChildren() do
-			if child.Name ~= "UIListLayout" then
-				OffsetY = OffsetY + 3 + child.Size.Y.Offset
+			if child.Name ~= "UIListLayout" and child:IsA("Frame") then
+				OffsetY = OffsetY + UIListLayout.Padding.Offset + child.Size.Y.Offset
 			end
+		end
+		if #ScrollTab:GetChildren() > 1 then
+			OffsetY = OffsetY - UIListLayout.Padding.Offset
 		end
 		ScrollTab.CanvasSize = UDim2.new(0, 0, 0, OffsetY)
 	end
 	ScrollTab.ChildAdded:Connect(UpdateSize1)
 	ScrollTab.ChildRemoved:Connect(UpdateSize1)
 
-	local Info = Instance.new("Frame");
-	local UICorner = Instance.new("UICorner");
-	local LogoPlayerFrame = Instance.new("Frame")
-	local UICorner1 = Instance.new("UICorner");
-	local LogoPlayer = Instance.new("ImageLabel");
-	local UICorner2 = Instance.new("UICorner");
-	local NamePlayer = Instance.new("TextLabel");
+	-- Removing the old Info, LogoPlayer, NamePlayerButton, and their direct click logic.
+	-- The variables isSettingsViewActive, lastSelectedTabName will be defined fresh for the new system.
+	-- customizeButtonHighlighted is also removed as its role is covered by isSettingsViewActive and tab instance checks.
+
+	local isSettingsViewActive = false -- Will be managed by tab click logic
+	local lastSelectedTabName = ""   -- For restoring NameTab.Text
+	local customizeButtonInstance = nil -- To store the Frame of the Customize tab for highlight management
+
+	-- Define the actual Tab creation function and related variables here
+	-- CountTab and CountDropdown are now global to the library script
+	local ScrolLayersMap = {}
+	local FrameToTabObjectMap = {} -- New map: Frame Instance -> TabObject
+
+	-- The UIInstance:CreateTab function definition is here (as modified in Step 1)
+	-- ... (Full UIInstance:CreateTab function code, already modified) ...
+	-- Make sure the full function UIInstance:CreateTab is correctly placed above its first call.
+
+	-- After UIInstance:CreateTab is defined:
+	-- Create the Separator Line
+	local SeparatorLine = Instance.new("Frame")
+	SeparatorLine.Name = "SeparatorLine"
+	SeparatorLine.Parent = LayersTab -- Parent to LayersTab
+	SeparatorLine.Size = UDim2.new(1, 0, 0, 1)
+	SeparatorLine.BackgroundColor3 = GetColor("Stroke")
+	SeparatorLine.BorderSizePixel = 0
+	SeparatorLine.LayoutOrder = 998 -- Visually just above the CustomizeTab
+	SeparatorLine.Position = UDim2.new(0, 0, 1, -41) -- Positioned above the 40px settings tab
+
+	-- Create the Customize Tab using the enhanced API
+	local CustomizeTabObject = UIInstance:CreateTab({
+		Name = "Customize",
+		Icon = "rbxassetid://126800841735072",
+		IsSettingsTab = true
+	})
+	if CustomizeTabObject then -- Ensure it was created
+		customizeButtonInstance = CustomizeTabObject.Instance
+		-- Settings population code removed from here. Will be pasted and adapted later.
+	end
+
+	-- The old direct population of SettingsPage (local PresetsSection = SettingsTab:AddSection("Presets") etc.)
+	-- has been removed by the previous diff. That content will be added via CustomizeTabObject:AddSection in a later step.
+
+	-- Create Separator Line (Done before creating the Customize Tab itself, but after ScrollTab is defined)
+	local SeparatorLine = Instance.new("Frame", LayersTab) -- Parent directly
+	SeparatorLine.Name = "SeparatorLine"
+	SeparatorLine.Size = UDim2.new(1, 0, 0, 1)
+	SeparatorLine.BackgroundColor3 = GetColor("Stroke")
+	SeparatorLine.BorderSizePixel = 0
+	SeparatorLine.LayoutOrder = 998 -- Just above the settings tab button visually, if LayersTab had a UIListLayout (which it doesn't directly manage like this)
+	-- For manual positioning, LayoutOrder is less critical than Position.
+	-- Position it to be just above the CustomizeTab (which is 40px high and at the bottom of LayersTab)
+	SeparatorLine.Position = UDim2.new(0, 0, 1, -41) -- AnchorPoint (0,1) for LayersTab items from bottom
+	SeparatorLine.AnchorPoint = Vector2.new(0,1)
+
+
+	-- Create the Customize Tab using our API
+	local CustomizeTab = UIInstance:CreateTab({
+		Name = "Customize",
+		Icon = "rbxassetid://126800841735072",
+		IsSettingsTab = true
+	})
+	-- customizeButtonInstance is already declared in MakeGui scope, assign if CustomizeTab was created.
+	if CustomizeTab and CustomizeTab.Instance then
+		customizeButtonInstance = CustomizeTab.Instance
+	end
+
+	-- Settings Population Code (Pasted and Adapted)
+	if CustomizeTab then -- Ensure CustomizeTab object exists before trying to add sections to it
+		-- Helper functions for settings population (should be within MakeGui scope or passed appropriately)
+		-- Note: deepcopy, SaveFile, GetColor, SetTheme, LoadUIAsset, UBHubLib:MakeNotify, Flags, Themes, CurrentTheme etc. are assumed to be in MakeGui's scope or accessible.
+
+		local activeColorSliders = {} -- For Customize Colors section
+
+		local function Color3ToHex(color3)
+			if not color3 then return "000000" end
+			return string.format("%02x%02x%02x", math.floor(color3.R * 255), math.floor(color3.G * 255), math.floor(color3.B * 255))
+		end
+
+		local function HexToColor3(hex)
+			hex = hex:gsub("#", "")
+			if #hex ~= 6 then return nil end
+			local r = tonumber(hex:sub(1,2), 16)
+			local g = tonumber(hex:sub(3,4), 16)
+			local b = tonumber(hex:sub(5,6), 16)
+			if r and g and b then
+				return Color3.fromRGB(r, g, b)
+			else
+				return nil
+			end
+		end
 		
-	Info.AnchorPoint = Vector2.new(1, 1)
-	Info.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	Info.BackgroundTransparency = 0.95
-	Info.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	Info.BorderSizePixel = 0
-	Info.Position = UDim2.new(1, 0, 1, 0)
-	Info.Size = UDim2.new(1, 0, 0, 40)
-	Info.Name = "Info"
-	Info.Visible = LibraryCfg.ShowPlayer
-	Info.Parent = LayersTab
-
-	UICorner.CornerRadius = UDim.new(0, 5)
-	UICorner.Parent = Info
-
-	LogoPlayerFrame.AnchorPoint = Vector2.new(0, 0.5)
-	LogoPlayerFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	LogoPlayerFrame.BackgroundTransparency = 0.95
-	LogoPlayerFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	LogoPlayerFrame.BorderSizePixel = 0
-	LogoPlayerFrame.Position = UDim2.new(0, 5, 0.5, 0)
-	LogoPlayerFrame.Size = UDim2.new(0, 30, 0, 30)
-	LogoPlayerFrame.Name = "LogoPlayerFrame"
-	LogoPlayerFrame.Parent = Info
-
-	UICorner1.CornerRadius = UDim.new(0, 1000)
-	UICorner1.Parent = LogoPlayerFrame
-
-	LogoPlayer.Image = GuiConfig["Logo Player"]
-	LogoPlayer.AnchorPoint = Vector2.new(0.5, 0.5)
-	LogoPlayer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	LogoPlayer.BackgroundTransparency = 0.999
-	LogoPlayer.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	LogoPlayer.BorderSizePixel = 0
-	LogoPlayer.Position = UDim2.new(0.5, 0, 0.5, 0)
-	LogoPlayer.Size = UDim2.new(1, -5, 1, -5)
-	LogoPlayer.Name = "LogoPlayer"
-	LogoPlayer.Parent = LogoPlayerFrame
-
-	UICorner2.CornerRadius = UDim.new(0, 1000)
-	UICorner2.Parent = LogoPlayer
-
-	local NamePlayerButton = Instance.new("TextButton")
-	NamePlayerButton.Name = "NamePlayerButton"
-	NamePlayerButton.Text = GuiConfig["Name Player"]
-	NamePlayerButton.Font = Enum.Font.GothamBold
-	NamePlayerButton.TextColor3 = Color3.fromRGB(230, 230, 230)
-	NamePlayerButton.TextSize = 12
-	NamePlayerButton.TextWrapped = true
-	NamePlayerButton.TextXAlignment = Enum.TextXAlignment.Left
-	NamePlayerButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	NamePlayerButton.BackgroundTransparency = 1 -- Make it look like a label initially
-	NamePlayerButton.BorderSizePixel = 0
-	NamePlayerButton.Position = UDim2.new(0, 40, 0, 0)
-	NamePlayerButton.Size = UDim2.new(1, -45, 1, 0)
-	NamePlayerButton.Parent = Info
-	NamePlayerButton.AutoButtonColor = false
-
-	local isSettingsViewActive = false
-	local lastSelectedTabName = "" -- To store the name of the last active tab
-
-	NamePlayerButton.MouseButton1Click:Connect(function()
-		isSettingsViewActive = not isSettingsViewActive
-		if isSettingsViewActive then
-			if LayersPageLayout.CurrentPage then
-				lastSelectedTabName = LayersPageLayout.CurrentPage:FindFirstChild("TabConfig_Name") and LayersPageLayout.CurrentPage.TabConfig_Name.Value or "Unknown Tab"
-			else -- Fallback if no tab was ever selected or CurrentPage is nil
-				-- Attempt to find the first tab's name as a default
-				if ScrollTab:FindFirstChild("Tab") and ScrollTab.Tab:FindFirstChild("TabName") then
-					lastSelectedTabName = ScrollTab.Tab.TabName.Text
-				else
-					lastSelectedTabName = GuiConfig.NameHub -- Default to hub name if no tabs
+		local function updateAllColorControls()
+			if not SettingsPage.Visible then return end -- Only update if visible
+			for key, controls in pairs(activeColorSliders) do
+				if Themes[CurrentTheme] and Themes[CurrentTheme][key] then
+					local currentColor = Themes[CurrentTheme][key]
+					if controls.rSlider:GetValue() ~= math.floor(currentColor.R * 255) then controls.rSlider:SetValue(math.floor(currentColor.R * 255)) end
+					if controls.gSlider:GetValue() ~= math.floor(currentColor.G * 255) then controls.gSlider:SetValue(math.floor(currentColor.G * 255)) end
+					if controls.bSlider:GetValue() ~= math.floor(currentColor.B * 255) then controls.bSlider:SetValue(math.floor(currentColor.B * 255)) end
+					if controls.hexInput:GetValue() ~= Color3ToHex(currentColor) then controls.hexInput:SetValue(Color3ToHex(currentColor)) end
 				end
 			end
-			Layers.Visible = false
-			SettingsPage.Visible = true
-			NameTab.Text = "Settings"
-		else
-			SettingsPage.Visible = false
-			Layers.Visible = true
-			NameTab.Text = lastSelectedTabName
-			-- Try to re-select the actual current tab to refresh its content if needed,
-			-- though just setting NameTab.Text might be sufficient for now.
-			-- This assumes LayersPageLayout.CurrentPage is still valid.
-			if LayersPageLayout.CurrentPage and LayersPageLayout.CurrentPage:FindFirstChild("TabButton") then
-				-- To avoid re-triggering full tab selection logic if not necessary,
-				-- we primarily ensure NameTab.Text is correct.
-				-- A more robust way might involve a dedicated function to update NameTab.
+		end
+
+		-- Hook into SetTheme to update color controls
+		local originalSetTheme_Settings = SetTheme -- Keep original SetTheme if not already aliased
+		SetTheme = function(themeName)
+			originalSetTheme_Settings(themeName) -- Call original
+			if isSettingsViewActive or (CurrentTheme == "__customApplied" and SettingsPage.Visible) then -- Update if settings are visible or custom theme applied
+				task.delay(0.05, updateAllColorControls) -- Delay slightly
 			end
+		end
+
+		local function createColorEditor(section, colorKeyName, initialColor3) -- Takes section object
+			section:AddDivider({Text = colorKeyName})
+			local r, g, b = math.floor(initialColor3.R * 255), math.floor(initialColor3.G * 255), math.floor(initialColor3.B * 255)
+
+			local hexInput = section:AddInput({
+				Title = "Hex Code", Content = "e.g., #FF0000 or FF0000", Default = Color3ToHex(initialColor3),
+				Callback = function(hexValue)
+					local newColor = HexToColor3(hexValue)
+					if newColor then
+						Themes[CurrentTheme][colorKeyName] = newColor
+						SetTheme(CurrentTheme)
+					else
+						hexInput:SetValue(Color3ToHex(Themes[CurrentTheme][colorKeyName]))
+						UBHubLib:MakeNotify({Title = "Color Error", Description = "Invalid hex code."})
+					end
+				end
+			})
+			local rSlider = section:AddSlider({
+				Title = "Red", Min = 0, Max = 255, Increment = 1, Default = r,
+				Callback = function(newR)
+					local oldColor = Themes[CurrentTheme][colorKeyName]
+					Themes[CurrentTheme][colorKeyName] = Color3.fromRGB(newR, math.floor(oldColor.G * 255), math.floor(oldColor.B * 255))
+					hexInput:SetValue(Color3ToHex(Themes[CurrentTheme][colorKeyName]))
+					SetTheme(CurrentTheme)
+				end
+			})
+			local gSlider = section:AddSlider({
+				Title = "Green", Min = 0, Max = 255, Increment = 1, Default = g,
+				Callback = function(newG)
+					local oldColor = Themes[CurrentTheme][colorKeyName]
+					Themes[CurrentTheme][colorKeyName] = Color3.fromRGB(math.floor(oldColor.R * 255), newG, math.floor(oldColor.B * 255))
+					hexInput:SetValue(Color3ToHex(Themes[CurrentTheme][colorKeyName]))
+					SetTheme(CurrentTheme)
+				end
+			})
+			local bSlider = section:AddSlider({
+				Title = "Blue", Min = 0, Max = 255, Increment = 1, Default = b,
+				Callback = function(newB)
+					local oldColor = Themes[CurrentTheme][colorKeyName]
+					Themes[CurrentTheme][colorKeyName] = Color3.fromRGB(math.floor(oldColor.R * 255), math.floor(oldColor.G * 255), newB)
+					hexInput:SetValue(Color3ToHex(Themes[CurrentTheme][colorKeyName]))
+					SetTheme(CurrentTheme)
+				end
+			})
+			activeColorSliders[colorKeyName] = {hexInput = hexInput, rSlider = rSlider, gSlider = gSlider, bSlider = bSlider}
+		end
+
+		-- Preset Management Section
+		local PresetManagementSection = CustomizeTab:AddSection("Preset Management")
+		local defaultThemesDropdown = PresetManagementSection:AddDropdown({
+			Title = "Default Themes", Content = "Select a built-in theme", Options = GetThemes(),
+			Callback = function(selected) end -- Callback can be empty if using button
+		})
+		PresetManagementSection:AddButton({
+			Title = "Apply Default Theme", Content = "Apply the selected default theme",
+			Callback = function()
+				local selectedThemeValue = defaultThemesDropdown:GetValue()
+				if selectedThemeValue and #selectedThemeValue > 0 then
+					SetTheme(selectedThemeValue[1])
+					UBHubLib:MakeNotify({Title = "Theme", Description = "Applied " .. selectedThemeValue[1]})
+				else
+					UBHubLib:MakeNotify({Title = "Theme", Description = "No theme selected."})
+				end
+			end
+		})
+		PresetManagementSection:AddDivider({Text = "Preset Settings"})
+		local customPresetNameInput = PresetManagementSection:AddInput({
+			Title = "Custom Preset Name", Content = "Name for your custom theme", Default = ""
+		})
+		local savedPresetsDropdown = PresetManagementSection:AddDropdown({
+			Title = "Saved Presets", Content = "Select a saved custom theme", Options = {},
+			Callback = function(selected) end
+		})
+		local deletePresetsDropdown = PresetManagementSection:AddDropdown({
+			Title = "Saved Presets (for deletion)", Content = "Select preset to delete", Options = {},
+			Callback = function(selected) end
+		})
+
+		local function refreshSavedPresetsDropdownsScoped() -- Scoped to avoid conflict if global exists
+			Flags.CustomUserThemes = Flags.CustomUserThemes or {}
+			local savedNames = {}
+			for name, _ in pairs(Flags.CustomUserThemes) do table.insert(savedNames, name) end
+			table.sort(savedNames)
+			savedPresetsDropdown:Refresh(savedNames, savedPresetsDropdown:GetValue())
+			deletePresetsDropdown:Refresh(savedNames, deletePresetsDropdown:GetValue())
+		end
+
+		PresetManagementSection:AddButton({
+			Title = "Save Current Colors", Content = "Save current colors as new preset",
+			Callback = function()
+				local presetName = customPresetNameInput:GetValue()
+				if not presetName or presetName == "" then
+					UBHubLib:MakeNotify({Title = "Save Preset", Description = "Preset name cannot be empty."}); return
+				end
+				Flags.CustomUserThemes = Flags.CustomUserThemes or {}
+				Flags.CustomUserThemes[presetName] = deepcopy(Themes[CurrentTheme]) -- deepcopy should be in scope
+				SaveFile("CustomUserThemes", Flags.CustomUserThemes)
+				refreshSavedPresetsDropdownsScoped()
+				UBHubLib:MakeNotify({Title = "Save Preset", Description = "'" .. presetName .. "' saved."})
+			end
+		})
+		refreshSavedPresetsDropdownsScoped() -- Initial population
+
+		PresetManagementSection:AddButton({
+			Title = "Apply Saved Preset", Content = "Apply the selected saved theme",
+			Callback = function()
+				local selectedValue = savedPresetsDropdown:GetValue()
+				if selectedValue and #selectedValue > 0 then
+					local presetName = selectedValue[1]
+					if Flags.CustomUserThemes and Flags.CustomUserThemes[presetName] then
+						Themes["__customApplied"] = deepcopy(Flags.CustomUserThemes[presetName])
+						SetTheme("__customApplied")
+						UBHubLib:MakeNotify({Title = "Theme", Description = "Applied '" .. presetName .. "'"})
+					else
+						UBHubLib:MakeNotify({Title = "Theme", Description = "Could not find: " .. presetName})
+					end
+				else
+					UBHubLib:MakeNotify({Title = "Theme", Description = "No saved preset selected."})
+				end
+			end
+		})
+		PresetManagementSection:AddButton({
+			Title = "Delete Saved Preset", Content = "Delete selected saved theme",
+			Callback = function()
+				local selectedValue = deletePresetsDropdown:GetValue()
+				if selectedValue and #selectedValue > 0 then
+					local presetName = selectedValue[1]
+					if Flags.CustomUserThemes and Flags.CustomUserThemes[presetName] then
+						Flags.CustomUserThemes[presetName] = nil
+						SaveFile("CustomUserThemes", Flags.CustomUserThemes)
+						refreshSavedPresetsDropdownsScoped()
+						UBHubLib:MakeNotify({Title = "Delete Preset", Description = "'" .. presetName .. "' deleted."})
+					else
+						UBHubLib:MakeNotify({Title = "Delete Preset", Description = "Could not find: " .. presetName})
+					end
+				else
+					UBHubLib:MakeNotify({Title = "Delete Preset", Description = "No preset selected."})
+				end
+			end
+		})
+
+		-- Interface Section (Backgrounds etc.)
+		local InterfaceSection = CustomizeTab:AddSection("Interface")
+		InterfaceSection:AddSlider({
+			Title = "Window Transparency", Content = "Adjust background opacity", Min = 0, Max = 100,
+			Increment = 1, Default = (Main.BackgroundTransparency or 0.1) * 100, -- Ensure default
+			Callback = function(value) ChangeTransparency(value / 100) end,
+			Flag = "UI_BackgroundTransparency"
+		})
+		local bgAssetInput = InterfaceSection:AddInput({
+			Title = "Background Asset URL/Path", Content = "Image/video URL or local path",
+			Default = Flags["CustomBackgroundURL"] or ""
+		})
+		InterfaceSection:AddButton({ Title = "Set Image Background", Callback = function()
+			local assetUrl = bgAssetInput:GetValue()
+			if assetUrl and assetUrl ~= "" then ChangeAsset("Image", assetUrl, "CustomBG_Img"); SaveFile("CustomBackgroundURL", assetUrl); SaveFile("CustomBackgroundType", "Image") end
+		end})
+		InterfaceSection:AddButton({ Title = "Set Video Background", Callback = function()
+			local assetUrl = bgAssetInput:GetValue()
+			if assetUrl and assetUrl ~= "" then ChangeAsset("Video", assetUrl, "CustomBG_Vid"); SaveFile("CustomBackgroundURL", assetUrl); SaveFile("CustomBackgroundType", "Video") end
+		end})
+		InterfaceSection:AddButton({ Title = "Reset Background", Callback = function()
+			Reset(); SaveFile("CustomBackgroundURL", ""); SaveFile("CustomBackgroundType", "")
+		end})
+
+		-- Customize Colors Section
+		local CustomizeColorsSection = CustomizeTab:AddSection("Customize Colors")
+		local baseThemeForKeys = Themes.UB_Orange or next(Themes)
+		if baseThemeForKeys then
+			local sortedKeys = {}
+			for key, valType in pairs(baseThemeForKeys) do
+				if typeof(valType) == "Color3" then table.insert(sortedKeys, key) end
+			end
+			table.sort(sortedKeys)
+			for _, key_name in ipairs(sortedKeys) do
+				if Themes[CurrentTheme][key_name] then -- Ensure current theme has this key
+					createColorEditor(CustomizeColorsSection, key_name, Themes[CurrentTheme][key_name])
+				end
+			end
+		end
+	end -- End of if CustomizeTab then
+
+	task.defer(function()
+		local firstUserTabFrame = nil
+		for _, child in ipairs(ScrollTab:GetChildren()) do
+			if child:IsA("Frame") and child.Name:match("^TabInstance_") then -- Identifies user tabs
+				firstUserTabFrame = child
+				break
+			end
+		end
+
+		if firstUserTabFrame then
+			local scrolLayer = ScrolLayersMap[firstUserTabFrame]
+			if scrolLayer and scrolLayer:FindFirstChild("TabConfig_Name") then
+				local reconstructedTabObject = {
+					Instance = firstUserTabFrame,
+					_ScrolLayers = scrolLayer,
+					_TabConfig = { Name = scrolLayer.TabConfig_Name.Value },
+					_IsSettingsTab = false
+				}
+				UIInstance:SelectTab(reconstructedTabObject)
+			else
+				warn("Could not select first user tab: ScrolLayer or TabConfig_Name not found for", firstUserTabFrame and firstUserTabFrame.Name)
+				NameTab.Text = ""
+				SettingsPage.Visible = false
+				LayersReal.Visible = true
+				if LayersPageLayout and #LayersFolder:GetChildren() > 0 then LayersPageLayout:JumpTo(LayersFolder:GetChildren()[1]) else if LayersPageLayout then LayersPageLayout:Clear() end end
+			end
+		else
+			NameTab.Text = ""
+			SettingsPage.Visible = false
+			LayersReal.Visible = true
+			if LayersPageLayout then LayersPageLayout:Clear() end
 		end
 	end)
 
-	-- NamePlayer TextLabel removed, will be replaced by a TextButton below
 	local GuiFunc = {}
 	function GuiFunc:DestroyGui()
 		if CoreGui:FindFirstChild("UBHubGui") then 
@@ -1609,6 +1898,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	end
 	local OldPos = DropShadowHolder.Position
 	local OldSize = DropShadowHolder.Size
+	local isMaximized = false -- State variable for maximize/restore
 	local MinimizedIcon = Instance.new("ImageButton")
 	local MinCorner = Instance.new("UICorner")
 	local ScreenGui = Instance.new("ScreenGui")
@@ -1636,22 +1926,30 @@ function UBHubLib:MakeGui(GuiConfig)
 	MinCorner.Parent = MinimizedIcon
 	Min.Activated:Connect(function()
 		CircleClick(Min, Mouse.X, Mouse.Y)
+		OldPos = DropShadowHolder.Position -- Moved from MaxRestore
+		OldSize = DropShadowHolder.Size   -- Moved from MaxRestore
 		DropShadowHolder.Visible = false
 		DropShadow.Visible = false
         MinimizedIcon.Visible = true
 	end)
 	MaxRestore.Activated:Connect(function()
 		CircleClick(MaxRestore, Mouse.X, Mouse.Y)
-		if ImageLabel.Image == LoadUIAsset("rbxassetid://9886659406", "MaxRestoreA.png")  then
-			ImageLabel.Image = LoadUIAsset("rbxassetid://9886659406", "MaxRestoreA.png") 
-			OldPos = DropShadowHolder.Position
-			OldSize = DropShadowHolder.Size
-			TweenService:Create(DropShadowHolder, TweenInfo.new(0.3), {Position = UDim2.new(0, 0, 0, 0)}):Play()
-			TweenService:Create(DropShadowHolder, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 1, 0)}):Play()
-		else
-			ImageLabel.Image = LoadUIAsset("rbxassetid://9886659406", "MaxRestore.png")
+		local maximizeIcon = LoadUIAsset("rbxassetid://9886659406", "MaxRestore.png")
+		local restoreIcon = LoadUIAsset("rbxassetid://16598400946", "MaxRestoreA.png") -- Assuming 'A' means alternate/restore
+
+		if isMaximized then -- Window was maximized, user wants to restore
 			TweenService:Create(DropShadowHolder, TweenInfo.new(0.3), {Position = OldPos}):Play()
 			TweenService:Create(DropShadowHolder, TweenInfo.new(0.3), {Size = OldSize}):Play()
+			ImageLabel.Image = maximizeIcon
+			isMaximized = false
+		else -- Window was normal/restored, user wants to maximize
+			-- OldPos and OldSize should have been captured when Min button was pressed, or on initial load.
+			-- If OldPos/OldSize are not valid here (e.g. user never minimized), it might restore to initial default.
+			-- This is acceptable as per current logic flow where Min.Activated captures these.
+			TweenService:Create(DropShadowHolder, TweenInfo.new(0.3), {Position = UDim2.new(0, 0, 0, 0)}):Play()
+			TweenService:Create(DropShadowHolder, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+			ImageLabel.Image = restoreIcon
+			isMaximized = true
 		end
 	end)
 	MinimizedIcon.MouseButton1Click:Connect(function()
@@ -1676,8 +1974,45 @@ function UBHubLib:MakeGui(GuiConfig)
 			end
 		end
 	end)
-	DropShadowHolder.Size = UDim2.new(0, 150 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X, 0, 450)
+	-- DropShadowHolder.Size = UDim2.new(0, 150 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X, 0, 450) -- Deleted
 	MakeDraggable(Top, DropShadowHolder)
+
+	-- Responsive Resizing Logic
+	Main:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		local mainAbsSize = Main.AbsoluteSize -- This is the new size of the Main frame itself
+
+		-- Fixed values from original layout
+		local topBarHeight = 38
+		local layersTabXPadding = 9 -- LayersTab X position offset
+		local layersTabWidth = GuiConfig["Tab Width"]
+		local layersTabYPos = 50
+		local generalBottomMargin = 9
+		local paddingBetweenTabsAndContent = 9
+
+		-- Update LayersTab
+		-- LayersTab.Position is UDim2.new(0, layersTabXPadding, 0, layersTabYPos) - this is fixed
+		LayersTab.Size = UDim2.new(0, layersTabWidth, 0, mainAbsSize.Y - layersTabYPos - generalBottomMargin)
+
+		-- ScrollTab is relative (Scale 1, Offset -41 for Y Size) to LayersTab, so its pixel height will adjust automatically
+		-- when LayersTab's absolute Y size changes. No direct update needed for ScrollTab.Size here.
+		-- SeparatorLine and CustomizeTab.Instance are also positioned relative to bottom of LayersTab, should be fine.
+
+		-- Update Layers (main content area)
+		local layersXPos = layersTabXPadding + layersTabWidth + paddingBetweenTabsAndContent
+		-- Layers.Position Y is fixed at layersTabYPos
+		Layers.Position = UDim2.new(0, layersXPos, 0, layersTabYPos)
+		Layers.Size = UDim2.new(0, mainAbsSize.X - layersXPos - layersTabXPadding, 0, mainAbsSize.Y - layersTabYPos - generalBottomMargin)
+														-- Using layersTabXPadding as the right margin for Layers content area
+
+		-- Update SettingsPage (mirrors Layers)
+		if SettingsPage then
+			SettingsPage.Position = Layers.Position
+			SettingsPage.Size = Layers.Size
+		end
+
+		-- MoreBlur is parented to Main with scale 1,1 so it auto-resizes.
+	end)
+
 	--// Blur
 	local MoreBlur = Instance.new("Frame");
 	local DropShadowHolder1 = Instance.new("Frame");
@@ -1691,16 +2026,14 @@ function UBHubLib:MakeGui(GuiConfig)
 	MoreBlur.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	MoreBlur.BorderSizePixel = 0
 	MoreBlur.ClipsDescendants = true
-	MoreBlur.Position = UDim2.new(1, 8, 1, 8)
-	MoreBlur.Size = SizeUI
+	MoreBlur.Position = UDim2.new(0, 0, 0, 0) -- Cover full Main area
+	MoreBlur.Size = UDim2.new(1, 0, 1, 0) -- Cover full Main area
 	MoreBlur.Visible = false
 	MoreBlur.Name = "MoreBlur"
-	MoreBlur.Parent = Layers
-	local blurResizeAPI = MakeResizable(MoreBlur, "Blur")
-	if savedSize then
-		blurResizeAPI:SetSize(savedSize)
-		SaveFile("Blur", string.format("%d,%d", savedSize.X.Offset, savedSize.Y.Offset))
-	end
+	MoreBlur.Parent = Main
+	MoreBlur.Size = UDim2.new(1, 0, 1, 0) -- Verified: Should fill parent
+	MoreBlur.Position = UDim2.new(0, 0, 0, 0) -- Verified: Should align with parent's top-left
+	-- MakeResizable call for MoreBlur and related savedSize logic for "Blur" is confirmed removed from previous steps.
 	DropShadowHolder1.BackgroundTransparency = 1
 	DropShadowHolder1.BorderSizePixel = 0
 	DropShadowHolder1.Size = UDim2.new(1, 0, 1, 0)
@@ -1796,55 +2129,78 @@ function UBHubLib:MakeGui(GuiConfig)
 	--// Tabs
 	local CountTab = 0
 	local CountDropdown = 0
+	local ScrolLayersMap = {} -- Initialize ScrolLayersMap here
 	function UIInstance:CreateTab(TabConfig)
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "Tab"
 		TabConfig.Icon = TabConfig.Icon or ""
+		TabConfig.IsSettingsTab = TabConfig.IsSettingsTab or false -- New parameter
 
-		local ScrolLayers = Instance.new("ScrollingFrame");
-		local UIListLayout1 = Instance.new("UIListLayout");
+		local ScrolLayers -- This will be the content page for the tab
+		local UIListLayout1 -- Layout for the content page
 
-		ScrolLayers.ScrollBarImageColor3 = Color3.fromRGB(80.00000283122063, 80.00000283122063, 80.00000283122063)
-		ScrolLayers.ScrollBarThickness = 0
-		ScrolLayers.Active = true
-		ScrolLayers.LayoutOrder = CountTab
-		ScrolLayers.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		ScrolLayers.BackgroundTransparency = 0.9990000128746033
-		ScrolLayers.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		ScrolLayers.BorderSizePixel = 0
-		ScrolLayers.Size = UDim2.new(1, 0, 1, 0)
-		ScrolLayers.Name = "ScrolLayers"
-		ScrolLayers.Parent = LayersFolder
+		if TabConfig.IsSettingsTab then
+			-- For the settings tab, its content is the existing SettingsPage
+			ScrolLayers = SettingsPage
+			-- SettingsPage should already have its UIListLayout (SettingsPageLayout)
+			UIListLayout1 = SettingsPage:FindFirstChildOfClass("UIListLayout") or SettingsPageLayout
+		else
+			-- For normal tabs, create a new ScrollingFrame and UIListLayout
+			ScrolLayers = Instance.new("ScrollingFrame")
+			ScrolLayers.Name = "ScrolLayers_UserTab_" .. TabConfig.Name
+			ScrolLayers.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+			ScrolLayers.ScrollBarThickness = 0 -- Default for user tabs
+			ScrolLayers.Active = true
+			ScrolLayers.LayoutOrder = CountTab -- Used by LayersPageLayout
+			ScrolLayers.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			ScrolLayers.BackgroundTransparency = 0.9990000128746033
+			ScrolLayers.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			ScrolLayers.BorderSizePixel = 0
+			ScrolLayers.Size = UDim2.new(1, 0, 1, 0)
+			ScrolLayers.Parent = LayersFolder
+
+			UIListLayout1 = Instance.new("UIListLayout")
+			UIListLayout1.Padding = UDim.new(0, 3)
+			UIListLayout1.SortOrder = Enum.SortOrder.LayoutOrder
+			UIListLayout1.Parent = ScrolLayers
+		end
 
 		local TabConfigNameValue = Instance.new("StringValue")
 		TabConfigNameValue.Name = "TabConfig_Name"
 		TabConfigNameValue.Value = TabConfig.Name
-		TabConfigNameValue.Parent = ScrolLayers
+		TabConfigNameValue.Parent = ScrolLayers -- Parent to the respective content scroller
 
-		UIListLayout1.Padding = UDim.new(0, 3)
-		UIListLayout1.SortOrder = Enum.SortOrder.LayoutOrder
-		UIListLayout1.Parent = ScrolLayers
-
-		local Tab = Instance.new("Frame");
-		local UICorner3 = Instance.new("UICorner");
+		local Tab = Instance.new("Frame") -- This is the tab button itself
+		local UICorner3 = Instance.new("UICorner")
 		local TabButton = Instance.new("TextButton");
 		local TabName = Instance.new("TextLabel")
 		local FeatureImg = Instance.new("ImageLabel");
-		local UIStroke2 = Instance.new("UIStroke");
-		local UICorner4 = Instance.new("UICorner");
+		-- UIStroke2 and UICorner4 for ChooseFrame will be handled differently or within normal tab logic
 
-		Tab.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		if CountTab == 0 then
-			Tab.BackgroundTransparency = 0.9200000166893005
-		else
-			Tab.BackgroundTransparency = 0.9990000128746033
-		end
+		Tab.Name = "TabInstance_" .. TabConfig.Name -- Make name more unique
+		Tab.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Base, will be overridden
 		Tab.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Tab.BorderSizePixel = 0
-		Tab.LayoutOrder = CountTab
-		Tab.Size = UDim2.new(1, 0, 0, 30)
-		Tab.Name = "Tab"
-		Tab.Parent = ScrollTab
+
+		if TabConfig.IsSettingsTab then
+			Tab.Parent = LayersTab
+			Tab.LayoutOrder = 999
+			Tab.Size = UDim2.new(1, 0, 0, 40) -- Explicitly set size for settings tab
+			Tab.Position = UDim2.new(0, 0, 1, -40)
+			Tab.AnchorPoint = Vector2.new(0, 1) -- Anchor to bottom left for this positioning
+			Tab.BackgroundTransparency = 0.95 -- Consistent with old Info frame
+		else
+			Tab.Parent = ScrollTab
+			Tab.LayoutOrder = CountTab
+			Tab.Size = UDim2.new(1, 0, 0, 30) -- Standard user tab height
+			if CountTab == 0 and not LayersPageLayout.CurrentPage then -- Ensure first tab is highlighted only if no other tab is set as current
+				Tab.BackgroundTransparency = 0.9200000166893005
+			else
+				Tab.BackgroundTransparency = 0.9990000128746033
+			end
+		end
+
+		ScrolLayersMap[Tab] = ScrolLayers -- Populate the map for both types of tabs
 
 		UICorner3.CornerRadius = UDim.new(0, 4)
 		UICorner3.Parent = Tab
@@ -1885,102 +2241,188 @@ function UBHubLib:MakeGui(GuiConfig)
 		FeatureImg.Size = UDim2.new(0, 16, 0, 16)
 		FeatureImg.Name = "FeatureImg"
 		FeatureImg.Parent = Tab
-		if CountTab == 0 then
-			LayersPageLayout:JumpToIndex(0)
-			NameTab.Text = TabConfig.Name
-			local ChooseFrame = Instance.new("Frame");
-			ChooseFrame.BackgroundColor3 = GetColor("ThemeHighlight",ChooseFrame,"BackgroundColor3")
-			ChooseFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
-			ChooseFrame.BorderSizePixel = 0
-			ChooseFrame.Position = UDim2.new(0, 2, 0, 9)
-			ChooseFrame.Size = UDim2.new(0, 1, 0, 12)
-			ChooseFrame.Name = "ChooseFrame"
-			ChooseFrame.Parent = Tab
 
-			UIStroke2.Color = GetColor("Secondary",UIStroke2,"Color")
-			UIStroke2.Thickness = 1.600000023841858
-			UIStroke2.Parent = ChooseFrame
+		-- REMOVED: Auto-highlighting, JumpTo, NameTab.Text setting, and ChooseFrame creation from CreateTab.
+		-- This will be handled by the new UIInstance:SelectTab method.
 
-			UICorner4.Parent = ChooseFrame
-		end
 		TabButton.Activated:Connect(function()
 			CircleClick(TabButton, Mouse.X, Mouse.Y)
-			local FrameChoose
-			for a, s in ScrollTab:GetChildren() do
-				for i, v in s:GetChildren() do
-					if v.Name == "ChooseFrame" then
-						FrameChoose = v
-						break
-					end
-				end
-			end
-			if FrameChoose ~= nil and Tab.LayoutOrder ~= LayersPageLayout.CurrentPage.LayoutOrder then
-				for _, TabFrame in ScrollTab:GetChildren() do
-					if TabFrame.Name == "Tab" then
-						TweenService:Create(TabFrame,TweenInfo.new(0.2, Enum.EasingStyle.Linear),{BackgroundTransparency = 0.9990000128746033}):Play()
-					end    
-				end
-				TweenService:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.92}):Play()
-				TweenService:Create(FrameChoose,TweenInfo.new(0.2, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 2, 0, 9 + (33 * Tab.LayoutOrder))}):Play()
-				LayersPageLayout:JumpToIndex(Tab.LayoutOrder)
-				NameTab.Text = TabConfig.Name
-				TweenService:Create(FrameChoose,TweenInfo.new(0.2, Enum.EasingStyle.Linear),{Size = UDim2.new(0, 1, 0, 20)}):Play()
+			if UIInstance.SelectTab then
+				UIInstance:SelectTab(TabObject) -- Pass the TabObject created in CreateTab
+			else
+				warn("UIInstance:SelectTab is not yet defined when TabButton was activated for:", TabConfig.Name)
 			end
 		end)
-		--// Section
-		local CountSection = 0 -- Keep this counter for layout order if needed globally for sections
 
-		-- Define Tab object structure and its AddSection method
-		local Tab = {}
-		Tab._ScrolLayers = ScrolLayers -- Store reference to the tab's content scroller
-		Tab._UIListLayout = UIListLayout1 -- Store reference to the tab's content UIListLayout for padding
+		local currentTabSectionCount = 0
 
-		function Tab:AddSection(Title)
-			Title = Title or "Section" -- Default title from InternalCreateSection will apply if nil
+		local TabObject = {}
+		TabObject.Instance = Tab
+		TabObject._ScrolLayers = ScrolLayers
+		TabObject._UIListLayout = UIListLayout1 -- This is the UIListLayout of the ScrolLayers for this tab
+		TabObject._IsSettingsTab = TabConfig.IsSettingsTab
+		TabObject._TabConfig = TabConfig -- Store the original config for reference if needed
 
-			-- Call InternalCreateSection, passing all necessary references
-			-- Note: CountSection is managed globally for now. If sections need to be ordered
-			-- per tab independently, this counter would need to be part of the Tab object.
-			local newSectionObject = InternalCreateSection(
-				self._ScrolLayers,          -- parentScrolLayersInstance
-				Title,                      -- sectionTitle
-				CountSection,               -- sectionLayoutOrder
-				GuiConfig,                  -- guiConfigRef
-				Flags,                      -- flagsRef
-				Themes,                     -- themesRef
-				function() return CurrentTheme end, -- currentThemeNameRef (as a function)
-				GetColor,                   -- getColorFunc
-				SetTheme,                   -- setThemeFunc
-				LoadUIAsset,                -- loadUIAssetFunc
-				SaveFile,                   -- saveFileFunc
-				HttpService,                -- httpServiceRef
-				TweenService,               -- tweenServiceRef
-				Mouse,                      -- mouseRef
-				CircleClick,                -- circleClickFunc
-				function(scroller, padding) -- updateParentScrollFunc
-					-- This is the function that was originally UpdateSizeScroll_Section
-					-- It updates the CanvasSize of the parent scroller (self._ScrolLayers for regular tabs)
-					task.defer(function()
-						local totalHeight = 0
-						for _, child in ipairs(scroller:GetChildren()) do
-							if child:IsA("Frame") and child.Name == "Section" then
-								totalHeight = totalHeight + child.Size.Y.Offset + padding.Offset
-							end
+		FrameToTabObjectMap[Tab] = TabObject -- Populate the new map
+
+		function TabObject:AddSection(Title)
+			Title = Title or "Section"
+
+			-- Define the updateParentScrollFunc specifically for this tab's ScrolLayers
+			local function updateThisTabScrollFunc(scroller, padding)
+				task.defer(function()
+					local totalHeight = 0
+					-- Iterate direct children of the scroller that are sections
+					for _, child in ipairs(scroller:GetChildren()) do
+						if child:IsA("Frame") and child.Name == "Section" then
+							totalHeight = totalHeight + child.Size.Y.Offset + (padding and padding.Offset or 0)
 						end
-						if #scroller:GetChildren() > 0 then totalHeight = totalHeight - padding.Offset end
-						scroller.CanvasSize = UDim2.new(0,0,0, totalHeight)
-					end)
-				end,
-				function() return self._UIListLayout.Padding end -- parentUIListLayoutPaddingRef (as a function returning the UDim value)
-			)
+					end
+					if #scroller:GetChildren() > 0 and padding then totalHeight = totalHeight - padding.Offset end -- Adjust for last padding
+					if totalHeight < 0 then totalHeight = 0 end
+					scroller.CanvasSize = UDim2.new(0, scroller.CanvasSize.X.Offset, 0, totalHeight)
+				end)
+			end
 
-			CountSection = CountSection + 1 -- Increment global section counter
-			return newSectionObject -- Return the SectionObject created by InternalCreateSection
+			-- Define the parentUIListLayoutPaddingRef for this tab's ScrolLayers
+			local function getThisTabLayoutPadding()
+				return self._UIListLayout and self._UIListLayout.Padding or UDim.new(0,3) -- Default if not found
+			end
+
+			local newSectionObject = InternalCreateSection(
+				self._ScrolLayers,          -- parentScrolLayersInstance (this tab's content scroller)
+				Title,                      -- sectionTitle
+				currentTabSectionCount,     -- sectionLayoutOrder (specific to this tab)
+				GuiConfig,                  -- guiConfigRef (from MakeGui scope)
+				Flags,                      -- flagsRef (from MakeGui scope)
+				Themes,                     -- themesRef (from MakeGui scope)
+				function() return CurrentTheme end, -- currentThemeNameRef (CurrentTheme from MakeGui scope)
+				GetColor,                   -- getColorFunc (from MakeGui scope)
+				SetTheme,                   -- setThemeFunc (from MakeGui scope)
+				LoadUIAsset,                -- loadUIAssetFunc (from MakeGui scope)
+				SaveFile,                   -- saveFileFunc (from MakeGui scope)
+				HttpService,                -- httpServiceRef (global or MakeGui scope)
+				TweenService,               -- tweenServiceRef (global or MakeGui scope)
+				Mouse,                      -- mouseRef (global or MakeGui scope)
+				CircleClick,                -- circleClickFunc (from MakeGui scope)
+				updateThisTabScrollFunc,    -- updateParentScrollFunc (specific to this tab's scroller)
+				getThisTabLayoutPadding     -- parentUIListLayoutPaddingRef (specific to this tab's layout)
+			)
+			currentTabSectionCount = currentTabSectionCount + 1
+			return newSectionObject
 		end
 
-		CountTab = CountTab + 1
-		return Tab
+		CountTab = CountTab + 1 -- Global counter for user tabs (used for LayoutOrder in ScrollTab)
+		return TabObject -- Return the created TabObject
 	end
+
+	function UIInstance:SelectTab(tabObject)
+		if not tabObject or not tabObject.Instance or not tabObject._ScrolLayers or not tabObject._TabConfig then
+			warn("SelectTab: Invalid tabObject received.")
+			return
+		end
+
+		local selectedTabFrame = tabObject.Instance
+		local isSettings = tabObject._IsSettingsTab
+
+		-- Unhighlight all user tabs in ScrollTab
+		for _, child in ipairs(ScrollTab:GetChildren()) do
+			if child:IsA("Frame") and child.Name:match("^TabInstance_") and child ~= selectedTabFrame then
+				child.BackgroundTransparency = 0.9990000128746033 -- Default unselected
+				local cf = child:FindFirstChild("ChooseFrame")
+				if cf then cf.Visible = false end
+			end
+		end
+
+		-- Unhighlight Customize tab if it's not the one being selected
+		if customizeButtonInstance and customizeButtonInstance ~= selectedTabFrame then
+			customizeButtonInstance.BackgroundTransparency = 0.95 -- Default unselected for settings tab
+		end
+
+		-- Highlight the selected tab
+		if isSettings then
+			selectedTabFrame.BackgroundTransparency = 0.92 -- Highlight for settings tab
+		else
+			selectedTabFrame.BackgroundTransparency = 0.9200000166893005 -- Highlight for user tab
+			local cf = selectedTabFrame:FindFirstChild("ChooseFrame")
+			if not cf then -- Create ChooseFrame if it doesn't exist for a user tab
+				cf = Instance.new("Frame", selectedTabFrame)
+				cf.Name = "ChooseFrame"
+				cf.BackgroundColor3 = GetColor("ThemeHighlight")
+				cf.BorderColor3 = Color3.fromRGB(0,0,0)
+				cf.BorderSizePixel = 0
+				cf.Position = UDim2.new(0,2,0,9)
+				cf.Size = UDim2.new(0,1,0,12)
+				local stroke = Instance.new("UIStroke", cf); stroke.Color = GetColor("Secondary"); stroke.Thickness = 1.6
+				Instance.new("UICorner", cf)
+			end
+			cf.Visible = true
+			TweenService:Create(cf, TweenInfo.new(0.2), {Size = UDim2.new(0,1,0,20)}):Play()
+		end
+
+		-- View switching
+		if isSettings then
+			if not isSettingsViewActive then -- Store last user tab name only when switching TO settings
+				lastSelectedTabName = NameTab.Text
+			end
+			SettingsPage.Visible = true
+			LayersReal.Visible = false
+			NameTab.Text = "Settings"
+			isSettingsViewActive = true
+		else -- It's a user tab
+			if isSettingsViewActive then -- If switching FROM settings, restore last user tab name (or set current)
+				NameTab.Text = tabObject._TabConfig.Name -- This is more direct
+			else
+				NameTab.Text = tabObject._TabConfig.Name
+			end
+			SettingsPage.Visible = false
+			LayersReal.Visible = true
+			LayersPageLayout:JumpTo(tabObject._ScrolLayers)
+			isSettingsViewActive = false
+		end
+	end
+
+	task.defer(function()
+		local firstUserTabFrame = nil
+		if ScrollTab then -- Ensure ScrollTab exists
+			for _, child in ipairs(ScrollTab:GetChildren()) do
+				if child:IsA("Frame") and child.Name:match("^TabInstance_") and not child.Name:match("_Customize$") then -- Make sure it's not the settings tab if it somehow ended up in ScrollTab
+					firstUserTabFrame = child
+					break
+				end
+			end
+		end
+
+		if firstUserTabFrame then
+			local tabObj = FrameToTabObjectMap[firstUserTabFrame]
+			if tabObj then
+				UIInstance:SelectTab(tabObj)
+			else
+				warn("MakeGui: Could not find TabObject for first user tab frame:", firstUserTabFrame.Name)
+				-- Fallback: if no specific tab is selected, ensure a clean state
+				NameTab.Text = ""
+				SettingsPage.Visible = false
+				LayersReal.Visible = true
+				if LayersPageLayout and #LayersFolder:GetChildren() > 0 then
+					LayersPageLayout:JumpTo(LayersFolder:GetChildren()[1])
+				elseif LayersPageLayout then
+					LayersPageLayout:Clear()
+				end
+			end
+		else
+			-- No user tabs found. Optionally select CustomizeTab or leave blank.
+			-- If CustomizeTab exists and no user tabs, select CustomizeTab.
+			if CustomizeTab and CustomizeTab.Instance then -- CustomizeTab is the TabObject from MakeGui
+				UIInstance:SelectTab(CustomizeTab)
+			else -- Absolute fallback: clear state
+				NameTab.Text = ""
+				SettingsPage.Visible = false
+				LayersReal.Visible = true
+				if LayersPageLayout then LayersPageLayout:Clear() end
+			end
+		end
+	end)
+
 	return UIInstance
 end
 return UBHubLib
