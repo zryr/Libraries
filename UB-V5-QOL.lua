@@ -564,16 +564,37 @@ function UBHubLib:MakeGui(GuiConfig)
 	local Flags = UBHubLib and UBHubLib.Flags or {}
 	local UIInstance = {}
 	local CountTab = 0
-	local CountDropdown = 0
+	local CountDropdown = 0 -- This will be part of dependencies, potentially as a table { Value = 0 } if modified by reference
 
-	-- Local helper function to create dropdown UI elements (replaces the deleted _Internal_CreateDropdown)
-	local function Helper_CreateDropdownElements(parentFrameForItems, DropdownConfig, resources)
+	-- Master Dependencies Table
+	local dependencies = {
+		GetColor = GetColor,
+		SetTheme = SetTheme,
+		LoadUIAsset = LoadUIAsset,
+		SaveFile = SaveFile, -- Will be defined later and added
+		CircleClick = CircleClick,
+		MakeNotify = UBHubLib.MakeNotify, -- Assuming UBHubLib is accessible here or pass UBHubLib itself
+		Flags = Flags,
+		CurrentThemeRef = function() return CurrentTheme end, -- Use a function to get current theme reactively
+		Themes = Themes,
+		TweenService = TweenService,
+		HttpService = HttpService,
+		Mouse = Mouse,
+		UserInputService = UserInputService,
+		GuiConfig = GuiConfig,
+		UIInstance = UIInstance, -- For rare cases where elements might need to create other top-level things via UIInstance
+		CountDropdownRef = { Value = CountDropdown } -- Pass as a table to modify by reference
+		-- DropdownFolder, DropPageLayout, MoreBlur, DropdownSelect will be added later
+	}
+
+	-- Local helper function to create dropdown UI elements
+	local function Helper_CreateDropdownElements(parentFrameForItems, DropdownConfig, dependencies)
 		local DropdownConfig = DropdownConfig or {}
 		DropdownConfig.Title = DropdownConfig.Title or "No Title"
 		DropdownConfig.Content = DropdownConfig.Content or ""
 		DropdownConfig.Multi = DropdownConfig.Multi or false
 		DropdownConfig.Options = DropdownConfig.Options or {}
-		local savedValue = DropdownConfig.Flag and resources.flagsRef[DropdownConfig.Flag]
+		local savedValue = DropdownConfig.Flag and dependencies.Flags[DropdownConfig.Flag]
 		if DropdownConfig.Multi then
 			DropdownConfig.Default = (savedValue and type(savedValue) == "table") and savedValue or (type(DropdownConfig.Default) == "table" and DropdownConfig.Default or {})
 		else
@@ -583,63 +604,65 @@ function UBHubLib:MakeGui(GuiConfig)
 
 		local DropdownFunc = {Value = DropdownConfig.Default, Options = DropdownConfig.Options}
 
+		local currentDropdownID = dependencies.CountDropdownRef.Value
+		dependencies.CountDropdownRef.Value = dependencies.CountDropdownRef.Value + 1
+
 		local DropdownFrame = Instance.new("Frame")
 		DropdownFrame.Name = "Dropdown"
-		DropdownFrame.Parent = parentFrameForItems -- Use passed parent
-		DropdownFrame.LayoutOrder = resources.CountItemRef.Value
+		DropdownFrame.Parent = parentFrameForItems
+		DropdownFrame.LayoutOrder = currentDropdownID -- Use the unique ID for layout order
 		DropdownFrame.Size = UDim2.new(1,0,0,46)
 		DropdownFrame.BackgroundTransparency = 0.935
-		DropdownFrame.BackgroundColor3 = resources.getColorFunc("Secondary", DropdownFrame, "BackgroundColor3")
+		DropdownFrame.BackgroundColor3 = dependencies.GetColor("Secondary", DropdownFrame, "BackgroundColor3")
 		Instance.new("UICorner", DropdownFrame).CornerRadius = UDim.new(0,4)
 
 		local DropdownTitle = Instance.new("TextLabel", DropdownFrame)
 		DropdownTitle.Name = "DropdownTitle"; DropdownTitle.Font = Enum.Font.GothamBold; DropdownTitle.Text = DropdownConfig.Title
-		DropdownTitle.TextColor3 = resources.getColorFunc("Text", DropdownTitle, "TextColor3"); DropdownTitle.TextSize = 13
+		DropdownTitle.TextColor3 = dependencies.GetColor("Text", DropdownTitle, "TextColor3"); DropdownTitle.TextSize = 13
 		DropdownTitle.TextXAlignment = Enum.TextXAlignment.Left; DropdownTitle.TextYAlignment = Enum.TextYAlignment.Top
 		DropdownTitle.BackgroundTransparency=1; DropdownTitle.Position = UDim2.new(0,10,0,10); DropdownTitle.Size = UDim2.new(1,-180,0,13)
 
 		local DropdownContent = Instance.new("TextLabel", DropdownFrame)
 		DropdownContent.Name = "DropdownContent"; DropdownContent.Font = Enum.Font.Gotham; DropdownContent.Text = DropdownConfig.Content
-		DropdownContent.TextColor3 = resources.getColorFunc("Text", DropdownContent, "TextColor3"); DropdownContent.TextSize = 12
+		DropdownContent.TextColor3 = dependencies.GetColor("Text", DropdownContent, "TextColor3"); DropdownContent.TextSize = 12
 		DropdownContent.TextTransparency = 0.4; DropdownContent.TextWrapped = true; DropdownContent.TextXAlignment = Enum.TextXAlignment.Left
 		DropdownContent.TextYAlignment = Enum.TextYAlignment.Bottom; DropdownContent.BackgroundTransparency=1
 		DropdownContent.Position = UDim2.new(0,10,0,0); DropdownContent.Size = UDim2.new(1,-180,1,-10)
 
 		local SelectOptionsFrame = Instance.new("Frame", DropdownFrame)
 		SelectOptionsFrame.Name = "SelectOptionsFrame"; SelectOptionsFrame.AnchorPoint = Vector2.new(1,0.5)
-		SelectOptionsFrame.BackgroundColor3 = resources.getColorFunc("Primary", SelectOptionsFrame, "BackgroundColor3")
+		SelectOptionsFrame.BackgroundColor3 = dependencies.GetColor("Primary", SelectOptionsFrame, "BackgroundColor3")
 		SelectOptionsFrame.BackgroundTransparency = 0.95; SelectOptionsFrame.BorderSizePixel = 0
 		SelectOptionsFrame.Position = UDim2.new(1,-7,0.5,0); SelectOptionsFrame.Size = UDim2.new(0,148,0,30)
 		Instance.new("UICorner",SelectOptionsFrame).CornerRadius = UDim.new(0,4)
 
 		local OptionSelecting = Instance.new("TextLabel",SelectOptionsFrame)
 		OptionSelecting.Name = "OptionSelecting"; OptionSelecting.Font = Enum.Font.Gotham
-		OptionSelecting.TextColor3 = resources.getColorFunc("Text", OptionSelecting, "TextColor3"); OptionSelecting.TextSize = 12
+		OptionSelecting.TextColor3 = dependencies.GetColor("Text", OptionSelecting, "TextColor3"); OptionSelecting.TextSize = 12
 		OptionSelecting.TextTransparency = 0.4; OptionSelecting.TextWrapped = true; OptionSelecting.TextXAlignment = Enum.TextXAlignment.Left
 		OptionSelecting.AnchorPoint = Vector2.new(0,0.5); OptionSelecting.BackgroundTransparency = 1
 		OptionSelecting.Position = UDim2.new(0,5,0.5,0); OptionSelecting.Size = UDim2.new(1,-30,1,-8)
 
 		local OptionImg = Instance.new("ImageLabel",SelectOptionsFrame)
-		OptionImg.Name = "OptionImg"; OptionImg.Image = resources.loadUIAssetFunc("rbxassetid://16851841101", "DropdownArrow_Helper") -- Changed asset name slightly for clarity
-		OptionImg.ImageColor3 = resources.getColorFunc("Text", OptionImg, "ImageColor3"); OptionImg.AnchorPoint = Vector2.new(1,0.5)
+		OptionImg.Name = "OptionImg"; OptionImg.Image = dependencies.LoadUIAsset("rbxassetid://16851841101", "DropdownArrow_Helper")
+		OptionImg.ImageColor3 = dependencies.GetColor("Text", OptionImg, "ImageColor3"); OptionImg.AnchorPoint = Vector2.new(1,0.5)
 		OptionImg.BackgroundTransparency=1; OptionImg.Position = UDim2.new(1,0,0.5,0); OptionImg.Size = UDim2.new(0,25,0,25)
 
 		local DropdownButton = Instance.new("TextButton", DropdownFrame)
 		DropdownButton.Name = "DropdownButton"; DropdownButton.Text = ""; DropdownButton.Size = UDim2.new(1,0,1,0); DropdownButton.BackgroundTransparency = 1
 
-		local currentDropdownID = CountDropdown; CountDropdown = CountDropdown + 1;
-		SelectOptionsFrame.LayoutOrder = currentDropdownID
+		SelectOptionsFrame.LayoutOrder = currentDropdownID -- This seems fine if it's for ordering elements *within* the dropdown frame itself.
 
-		local DropdownContainer = resources.DropdownFolder:FindFirstChild("DropdownContainer_"..tostring(currentDropdownID))
+		local DropdownContainer = dependencies.DropdownFolder:FindFirstChild("DropdownContainer_"..tostring(currentDropdownID))
 		if not DropdownContainer then
-			DropdownContainer = Instance.new("Frame", resources.DropdownFolder); DropdownContainer.Name = "DropdownContainer_"..tostring(currentDropdownID)
+			DropdownContainer = Instance.new("Frame", dependencies.DropdownFolder); DropdownContainer.Name = "DropdownContainer_"..tostring(currentDropdownID)
 			DropdownContainer.BackgroundTransparency = 1; DropdownContainer.Size = UDim2.new(1,0,1,0)
 			local SearchBar = Instance.new("TextBox", DropdownContainer); SearchBar.Name = "SearchBar_Dropdown"
 			SearchBar.Font = Enum.Font.GothamBold; SearchBar.PlaceholderText = "🔎 Search"
-			SearchBar.PlaceholderColor3 = resources.getColorFunc("Text", SearchBar, "PlaceholderColor3"); SearchBar.Text = ""
-			SearchBar.TextColor3 = resources.getColorFunc("Text", SearchBar, "TextColor3"); SearchBar.TextSize = 12
-			SearchBar.BackgroundColor3 = resources.getColorFunc("Secondary", SearchBar, "BackgroundColor3"); SearchBar.BackgroundTransparency = 0
-			SearchBar.BorderColor3 = resources.getColorFunc("Stroke", SearchBar, "BorderColor3"); SearchBar.BorderSizePixel = 1
+			SearchBar.PlaceholderColor3 = dependencies.GetColor("Text", SearchBar, "PlaceholderColor3"); SearchBar.Text = ""
+			SearchBar.TextColor3 = dependencies.GetColor("Text", SearchBar, "TextColor3"); SearchBar.TextSize = 12
+			SearchBar.BackgroundColor3 = dependencies.GetColor("Secondary", SearchBar, "BackgroundColor3"); SearchBar.BackgroundTransparency = 0
+			SearchBar.BorderColor3 = dependencies.GetColor("Stroke", SearchBar, "BorderColor3"); SearchBar.BorderSizePixel = 1
 			SearchBar.Size = UDim2.new(1,-10,0,25); SearchBar.Position = UDim2.new(0,5,0,5)
 
 			local ScrollSel = Instance.new("ScrollingFrame", DropdownContainer); ScrollSel.Name = "ScrollSelect"
@@ -664,16 +687,16 @@ function UBHubLib:MakeGui(GuiConfig)
 		local UIListLayout_Scroll_Instance = ScrollSelect_Instance and ScrollSelect_Instance:FindFirstChildOfClass("UIListLayout")
 
 		DropdownButton.Activated:Connect(function()
-			resources.circleClickFunc(DropdownButton, resources.mouseRef.X, resources.mouseRef.Y)
-			if not resources.MoreBlur.Visible then
-				resources.MoreBlur.Visible = true
-				resources.DropPageLayout:JumpTo(DropdownContainer)
-				resources.tweenServiceRef:Create(resources.MoreBlur, TweenInfo.new(0.2),{BackgroundTransparency = 0.7}):Play()
-				resources.tweenServiceRef:Create(resources.DropdownSelect, TweenInfo.new(0.2),{Position = UDim2.new(1,-11,0.5,0)}):Play()
+			dependencies.CircleClick(DropdownButton, dependencies.Mouse.X, dependencies.Mouse.Y)
+			if not dependencies.MoreBlur.Visible then
+				dependencies.MoreBlur.Visible = true
+				dependencies.DropPageLayout:JumpTo(DropdownContainer)
+				dependencies.TweenService:Create(dependencies.MoreBlur, TweenInfo.new(0.2),{BackgroundTransparency = 0.7}):Play()
+				dependencies.TweenService:Create(dependencies.DropdownSelect, TweenInfo.new(0.2),{Position = UDim2.new(1,-11,0.5,0)}):Play()
 			end
 		end)
 
-		local dropCountLocal = 0
+		local dropCountLocal = 0 -- Local counter for options within this specific dropdown
 		function DropdownFunc:Clear()
 			if not ScrollSelect_Instance then return end
 			for i=#ScrollSelect_Instance:GetChildren(),1,-1 do
@@ -688,26 +711,26 @@ function UBHubLib:MakeGui(GuiConfig)
 			if not ScrollSelect_Instance or not UIListLayout_Scroll_Instance then return end
 			oN = oN or "Option"
 			local oF = Instance.new("Frame",ScrollSelect_Instance); oF.Name="Option"; oF.Size=UDim2.new(1,0,0,30)
-			oF.BackgroundTransparency=0.97; oF.BackgroundColor3=resources.getColorFunc("Secondary",oF,"BackgroundColor3")
+			oF.BackgroundTransparency=0.97; oF.BackgroundColor3=dependencies.GetColor("Secondary",oF,"BackgroundColor3")
 			Instance.new("UICorner",oF).CornerRadius=UDim.new(0,3)
 			local oB=Instance.new("TextButton",oF); oB.Name="OptionButton"; oB.Text=""; oB.Size=UDim2.new(1,0,1,0); oB.BackgroundTransparency=1
 			local oT=Instance.new("TextLabel",oF); oT.Name="OptionText"; oT.Font=Enum.Font.Gotham; oT.Text=oN
-			oT.TextColor3=resources.getColorFunc("Text",oT,"TextColor3"); oT.TextSize=13; oT.TextXAlignment=Enum.TextXAlignment.Left
+			oT.TextColor3=dependencies.GetColor("Text",oT,"TextColor3"); oT.TextSize=13; oT.TextXAlignment=Enum.TextXAlignment.Left
 			oT.BackgroundTransparency=1; oT.Position=UDim2.new(0,8,0,0); oT.Size=UDim2.new(1,-16,1,0)
 			local cF=Instance.new("Frame",oF); cF.Name="ChooseFrame"; cF.AnchorPoint=Vector2.new(0,0.5)
-			cF.BackgroundColor3=resources.getColorFunc("ThemeHighlight",cF,"BackgroundColor3"); cF.BorderSizePixel=0
+			cF.BackgroundColor3=dependencies.GetColor("ThemeHighlight",cF,"BackgroundColor3"); cF.BorderSizePixel=0
 			cF.Position=UDim2.new(0,2,0.5,0); cF.Size=UDim2.new(0,0,0,0); Instance.new("UICorner",cF).CornerRadius=UDim.new(0,3)
-			local cS=Instance.new("UIStroke",cF); cS.Color=resources.getColorFunc("Secondary",cS,"Color"); cS.Thickness=1.6; cS.Transparency=1
+			local cS=Instance.new("UIStroke",cF); cS.Color=dependencies.GetColor("Secondary",cS,"Color"); cS.Thickness=1.6; cS.Transparency=1
 			dropCountLocal=dropCountLocal+1; oF.LayoutOrder=dropCountLocal
 
 			oB.Activated:Connect(function()
-				resources.circleClickFunc(oB, resources.mouseRef.X, resources.mouseRef.Y)
+				dependencies.CircleClick(oB, dependencies.Mouse.X, dependencies.Mouse.Y)
 				if DropdownConfig.Multi then
 					local fI=table.find(DropdownFunc.Value,oN)
 					if fI then table.remove(DropdownFunc.Value,fI) else table.insert(DropdownFunc.Value,oN) end
 				else DropdownFunc.Value={oN} end
 				DropdownFunc:Set(DropdownFunc.Value)
-				if DropdownConfig.Flag then resources.saveFileFunc(DropdownConfig.Flag, DropdownFunc.Value) end
+				if DropdownConfig.Flag then dependencies.SaveFile(DropdownConfig.Flag, DropdownFunc.Value) end
 			end)
 		end
 
@@ -724,9 +747,9 @@ function UBHubLib:MakeGui(GuiConfig)
 					local tII=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
 					local s_S=iTF and UDim2.new(0,1,0,12) or UDim2.new(0,0,0,0)
 					local bT_S=iTF and 0.935 or 0.97; local tr_S=iTF and 0 or 1
-					resources.tweenServiceRef:Create(d_S.ChooseFrame,tII,{Size=s_S}):Play()
-					resources.tweenServiceRef:Create(d_S.ChooseFrame.UIStroke,tII,{Transparency=tr_S}):Play()
-					resources.tweenServiceRef:Create(d_S,tII,{BackgroundTransparency=bT_S}):Play()
+					dependencies.TweenService:Create(d_S.ChooseFrame,tII,{Size=s_S}):Play()
+					dependencies.TweenService:Create(d_S.ChooseFrame.UIStroke,tII,{Transparency=tr_S}):Play()
+					dependencies.TweenService:Create(d_S,tII,{BackgroundTransparency=bT_S}):Play()
 				end
 			end
 			local dT=(DropdownFunc.Value and #DropdownFunc.Value>0) and table.concat(DropdownFunc.Value,", ") or "Select Options"
@@ -748,13 +771,16 @@ function UBHubLib:MakeGui(GuiConfig)
 		task.delay(0, function()
 			local contentHeight = DropdownContent.TextBounds.Y; local titleHeight = DropdownTitle.TextBounds.Y
 			DropdownFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15))
+			-- No need to call parent's UpdateSectionSize from here as this helper creates a self-contained element.
+			-- The parent (SectionObject) will call its own UpdateSectionSize when this dropdown (as an item) is added.
 		end)
-		resources.CountItemRef.Value = resources.CountItemRef.Value + 1
+		-- The 'CountItemRef' from dependencies was for items within a Section, not for this helper's internal use.
+		-- The DropdownFrame itself has its LayoutOrder set by currentDropdownID.
 		return DropdownFunc
 	end
 
 	local function SaveFile(Name, Value)
-		if not (writefile and GuiConfig and GuiConfig.SaveFolder) then
+		if not (writefile and dependencies.GuiConfig and dependencies.GuiConfig.SaveFolder) then -- Used dependencies
 			return false
 		end
 		local valueToSave = Value
@@ -763,10 +789,10 @@ function UBHubLib:MakeGui(GuiConfig)
 		elseif type(Value) == "table" and #Value == 1 then
 			valueToSave = Value[1]
 		end
-		Flags[Name] = valueToSave
+		dependencies.Flags[Name] = valueToSave -- Used dependencies
 		local success, err = pcall(function()
-			local path = GuiConfig.SaveFolder
-			local encoded = HttpService:JSONEncode(Flags)
+			local path = dependencies.GuiConfig.SaveFolder -- Used dependencies
+			local encoded = dependencies.HttpService:JSONEncode(dependencies.Flags) -- Used dependencies
 			writefile(path, encoded)
 		end)
 		if not success then
@@ -775,6 +801,8 @@ function UBHubLib:MakeGui(GuiConfig)
 		end
 		return true
 	end
+	dependencies.SaveFile = SaveFile -- Add to dependencies table now that it's defined
+
 	local function LoadFile()
 		if not (GuiConfig and GuiConfig["SaveFolder"]) then return false end
 		local savePath = GuiConfig["SaveFolder"]
@@ -1607,83 +1635,9 @@ function UBHubLib:MakeGui(GuiConfig)
 	ScrollTab.ChildAdded:Connect(UpdateSize1)
 	ScrollTab.ChildRemoved:Connect(UpdateSize1)
 
-	local Info = Instance.new("Frame");
-	local UICorner = Instance.new("UICorner");
-	local LogoPlayerFrame = Instance.new("Frame")
-	local UICorner1 = Instance.new("UICorner");
-	local LogoPlayer = Instance.new("ImageLabel");
-	local UICorner2 = Instance.new("UICorner");
-	local NamePlayer = Instance.new("TextLabel");
-		
-	Info.AnchorPoint = Vector2.new(1, 1)
-	Info.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	Info.BackgroundTransparency = 0.95
-	Info.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	Info.BorderSizePixel = 0
-	Info.Position = UDim2.new(1, 0, 1, 0)
-	Info.Size = UDim2.new(1, 0, 0, 40)
-	Info.Name = "Info"
-	Info.Visible = true -- Made permanent as per Task #3
-	Info.Parent = LayersTab
-
-	UICorner.CornerRadius = UDim.new(0, 5)
-	UICorner.Parent = Info
-
-	LogoPlayerFrame.AnchorPoint = Vector2.new(0, 0.5)
-	LogoPlayerFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	LogoPlayerFrame.BackgroundTransparency = 0.95
-	LogoPlayerFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	LogoPlayerFrame.BorderSizePixel = 0
-	LogoPlayerFrame.Position = UDim2.new(0, 5, 0.5, 0)
-	LogoPlayerFrame.Size = UDim2.new(0, 30, 0, 30)
-	LogoPlayerFrame.Name = "LogoPlayerFrame"
-	LogoPlayerFrame.Parent = Info
-
-	UICorner1.CornerRadius = UDim.new(0, 1000)
-	UICorner1.Parent = LogoPlayerFrame
-
-	LogoPlayer.Image = GuiConfig["Logo Player"]
-	LogoPlayer.AnchorPoint = Vector2.new(0.5, 0.5)
-	LogoPlayer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	LogoPlayer.BackgroundTransparency = 0.999
-	LogoPlayer.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	LogoPlayer.BorderSizePixel = 0
-	LogoPlayer.Position = UDim2.new(0.5, 0, 0.5, 0)
-	LogoPlayer.Size = UDim2.new(1, -5, 1, -5)
-	LogoPlayer.Name = "LogoPlayer"
-	LogoPlayer.Parent = LogoPlayerFrame
-
-	UICorner2.CornerRadius = UDim.new(0, 1000)
-	UICorner2.Parent = LogoPlayer
-
-	local NamePlayerButton = Instance.new("TextButton")
-	NamePlayerButton.Name = "NamePlayerButton"
-	NamePlayerButton.Text = GuiConfig["Name Player"]
-	NamePlayerButton.Font = Enum.Font.GothamBold
-	NamePlayerButton.TextColor3 = Color3.fromRGB(230, 230, 230)
-	NamePlayerButton.TextSize = 12
-	NamePlayerButton.TextWrapped = true
-	NamePlayerButton.TextXAlignment = Enum.TextXAlignment.Left
-	NamePlayerButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	NamePlayerButton.BackgroundTransparency = 1 -- Make it look like a label initially
-	NamePlayerButton.BorderSizePixel = 0
-	NamePlayerButton.Position = UDim2.new(0, 40, 0, 0)
-	NamePlayerButton.Size = UDim2.new(1, -45, 1, 0)
-	NamePlayerButton.Parent = Info
-	NamePlayerButton.AutoButtonColor = false
-	-- NamePlayerButton.Text is now directly set on the TextLabel part of Info, which is now static "Customize"
-	-- LogoPlayer.Image is set above.
-	-- The NamePlayerButton itself is being repurposed or replaced by an invisible button.
-	-- For clarity, I will rename NamePlayerButton to CustomizeLabel and then add the new invisible button.
-	NamePlayerButton.Name = "NamePlayer" -- Reverted Name
-	NamePlayerButton.Text = GuiConfig["Name Player"] -- Reverted Text
-	NamePlayerButton.BackgroundTransparency = 1 -- Ensure it looks like a label
-	NamePlayerButton.AutoButtonColor = false -- Keep as a non-interactive label look-alike
-	LogoPlayer.Image = GuiConfig["Logo Player"] -- Ensure original logo
-
-	-- Removed CustomizeButton and its logic
-	-- Removed isSettingsViewActive, lastSelectedTabName, lastSelectedTabFrame
-	-- Removed ClearScrollTabHighlights, ClearCustomizeButtonHighlight (will be handled by new logic)
+	-- The old "Info" frame that was at the bottom of LayersTab (previously used for settings access)
+	-- has been removed. Player info is now static at the top, and settings access is via the
+	-- "Settings" tab created by UIInstance:CreateTab.
 
 	local GuiFunc = {}
 	function GuiFunc:DestroyGui()
@@ -1877,10 +1831,22 @@ function UBHubLib:MakeGui(GuiConfig)
 	DropPageLayout.Archivable = false
 	DropPageLayout.Name = "DropPageLayout"
 	DropPageLayout.Parent = DropdownFolder
+
+	-- Add late-initialized UI instances to dependencies table
+	dependencies.DropdownFolder = DropdownFolder
+	dependencies.DropPageLayout = DropPageLayout
+	dependencies.MoreBlur = MoreBlur
+	dependencies.DropdownSelect = DropdownSelect
+	dependencies.LayersPageLayout = LayersPageLayout -- Added LayersPageLayout
+	dependencies.NameTab = NameTab -- Added NameTab for text updates
+	dependencies.ScrollTab = ScrollTab -- Added ScrollTab for highlight management
+	dependencies.LayersTab = LayersTab -- Added LayersTab for finding Settings_TabButton
+	dependencies.UBHubLib = UBHubLib -- Added UBHubLib for MakeNotify
+
 	--// Tabs
 	-- local CountTab = 0 -- Moved to top of MakeGui
-	-- local CountDropdown = 0 -- Moved to top of MakeGui
-	function UIInstance:CreateTab(TabConfig)
+	-- local CountDropdown = 0 -- This is now dependencies.CountDropdownRef.Value
+	function UIInstance:CreateTab(TabConfig, dependencies) -- Added dependencies
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "Tab"
 		TabConfig.Icon = TabConfig.Icon or ""
@@ -2052,7 +2018,7 @@ function UBHubLib:MakeGui(GuiConfig)
 		Tab._UIListLayout = UIListLayout1 -- Store reference to the tab's content UIListLayout for padding
 		local currentSectionCountForTab = 0 -- Sections per tab
 
-		function Tab:AddSection(SectionTitle)
+		function Tab:AddSection(SectionTitle, dependencies) -- Added dependencies
 			SectionTitle = SectionTitle or "Section"
 			local SectionObject = {} -- This will be the returned section object
 			local CountItem = 0 -- Items per section, local to each section
@@ -2133,81 +2099,81 @@ function UBHubLib:MakeGui(GuiConfig)
 			SectionObject._UpdateSizeSection = UpdateSectionSize -- To call when items inside change size
 
 			-- Define item creation methods for this SectionObject (simplified, ensure they use SectionAdd as parent)
-			function SectionObject:AddParagraph(ParagraphConfig)
+			function SectionObject:AddParagraph(ParagraphConfig, dependencies) -- Added dependencies
 				local ParagraphConfig = ParagraphConfig or {}; ParagraphConfig.Title = ParagraphConfig.Title or "Title"; ParagraphConfig.Content = ParagraphConfig.Content or "Content"
 				local ParagraphFunc = {}
-				local Paragraph = Instance.new("Frame", self._SectionAdd); Paragraph.Name = "Paragraph"; Paragraph.LayoutOrder = CountItem; Paragraph.Size = UDim2.new(1,0,0,46); Paragraph.BackgroundTransparency = 0.935; Paragraph.BackgroundColor3 = GetColor("Secondary", Paragraph, "BackgroundColor3"); Instance.new("UICorner", Paragraph).CornerRadius = UDim.new(0,4)
+				local Paragraph = Instance.new("Frame", self._SectionAdd); Paragraph.Name = "Paragraph"; Paragraph.LayoutOrder = CountItem; Paragraph.Size = UDim2.new(1,0,0,46); Paragraph.BackgroundTransparency = 0.935; Paragraph.BackgroundColor3 = dependencies.GetColor("Secondary", Paragraph, "BackgroundColor3"); Instance.new("UICorner", Paragraph).CornerRadius = UDim.new(0,4)
 				local ParagraphTitle = Instance.new("TextLabel", Paragraph); ParagraphTitle.Name = "ParagraphTitle"; ParagraphTitle.Font = Enum.Font.GothamBold; ParagraphTitle.Text = ParagraphConfig.Title .. " | " .. ParagraphConfig.Content; ParagraphTitle.TextColor3 = GetColor("Text", ParagraphTitle, "TextColor3"); ParagraphTitle.TextSize = 13; ParagraphTitle.TextXAlignment = Enum.TextXAlignment.Left; ParagraphTitle.TextYAlignment = Enum.TextYAlignment.Top; ParagraphTitle.BackgroundTransparency = 1; ParagraphTitle.Position = UDim2.new(0,10,0,10); ParagraphTitle.Size = UDim2.new(1,-16,0,13); ParagraphTitle.TextWrapped = true
 				task.delay(0, function() ParagraphTitle.Size = UDim2.new(1, -16, 0, ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0, ParagraphTitle.TextBounds.Y + 20); self._UpdateSizeSection() end)
 				function ParagraphFunc:Set(pConfig) ParagraphTitle.Text = (pConfig.Title or "T") .. " | " .. (pConfig.Content or "C"); task.delay(0,function() ParagraphTitle.Size = UDim2.new(1,-16,0,ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0,ParagraphTitle.TextBounds.Y + 20); self._UpdateSizeSection() end) end
 				CountItem = CountItem + 1; self._UpdateSizeSection(); return ParagraphFunc
 			end
 
-			function SectionObject:AddButton(ButtonConfig)
-				local ButtonConfig = ButtonConfig or {}; ButtonConfig.Title = ButtonConfig.Title or "Button"; ButtonConfig.Content = ButtonConfig.Content or ""; ButtonConfig.Icon = ButtonConfig.Icon or LoadUIAsset("rbxassetid://16932740082", "ButtonDefaultIcon.png"); ButtonConfig.Callback = ButtonConfig.Callback or function() end
-				local ButtonFrame = Instance.new("Frame", self._SectionAdd); ButtonFrame.Name = "Button"; ButtonFrame.LayoutOrder = CountItem; ButtonFrame.Size = UDim2.new(1,0,0,46); ButtonFrame.BackgroundTransparency = 0.935; ButtonFrame.BackgroundColor3 = GetColor("Secondary", ButtonFrame, "BackgroundColor3"); Instance.new("UICorner", ButtonFrame).CornerRadius = UDim.new(0,4)
-				local ButtonTitle = Instance.new("TextLabel", ButtonFrame); ButtonTitle.Name = "ButtonTitle"; ButtonTitle.Font = Enum.Font.GothamBold; ButtonTitle.Text = ButtonConfig.Title; ButtonTitle.TextColor3 = GetColor("Text", ButtonTitle, "TextColor3"); ButtonTitle.TextSize = 13; ButtonTitle.TextXAlignment = Enum.TextXAlignment.Left; ButtonTitle.TextYAlignment = Enum.TextYAlignment.Top; ButtonTitle.BackgroundTransparency=1; ButtonTitle.Position = UDim2.new(0,10,0,10); ButtonTitle.Size = UDim2.new(1,-100,0,13)
-				local ButtonContent = Instance.new("TextLabel", ButtonFrame); ButtonContent.Name = "ButtonContent"; ButtonContent.Font = Enum.Font.Gotham; ButtonContent.Text = ButtonConfig.Content; ButtonContent.TextColor3 = GetColor("Text", ButtonContent, "TextColor3"); ButtonContent.TextSize = 12; ButtonContent.TextTransparency = 0.4; ButtonContent.TextXAlignment = Enum.TextXAlignment.Left; ButtonContent.TextYAlignment = Enum.TextYAlignment.Bottom; ButtonContent.BackgroundTransparency=1; ButtonContent.Position = UDim2.new(0,10,0,0); ButtonContent.Size = UDim2.new(1,-100,1,-10); ButtonContent.TextWrapped = true
-				local ActualButton = Instance.new("TextButton", ButtonFrame); ActualButton.Name = "ActualButton"; ActualButton.Text = ""; ActualButton.Size = UDim2.new(1,0,1,0); ActualButton.BackgroundTransparency = 1; ActualButton.Activated:Connect(function() CircleClick(ActualButton, Mouse.X, Mouse.Y); ButtonConfig.Callback() end)
+			function SectionObject:AddButton(ButtonConfig, dependencies) -- Added dependencies
+				local ButtonConfig = ButtonConfig or {}; ButtonConfig.Title = ButtonConfig.Title or "Button"; ButtonConfig.Content = ButtonConfig.Content or ""; ButtonConfig.Icon = ButtonConfig.Icon or dependencies.LoadUIAsset("rbxassetid://16932740082", "ButtonDefaultIcon.png"); ButtonConfig.Callback = ButtonConfig.Callback or function() end
+				local ButtonFrame = Instance.new("Frame", self._SectionAdd); ButtonFrame.Name = "Button"; ButtonFrame.LayoutOrder = CountItem; ButtonFrame.Size = UDim2.new(1,0,0,46); ButtonFrame.BackgroundTransparency = 0.935; ButtonFrame.BackgroundColor3 = dependencies.GetColor("Secondary", ButtonFrame, "BackgroundColor3"); Instance.new("UICorner", ButtonFrame).CornerRadius = UDim.new(0,4)
+				local ButtonTitle = Instance.new("TextLabel", ButtonFrame); ButtonTitle.Name = "ButtonTitle"; ButtonTitle.Font = Enum.Font.GothamBold; ButtonTitle.Text = ButtonConfig.Title; ButtonTitle.TextColor3 = dependencies.GetColor("Text", ButtonTitle, "TextColor3"); ButtonTitle.TextSize = 13; ButtonTitle.TextXAlignment = Enum.TextXAlignment.Left; ButtonTitle.TextYAlignment = Enum.TextYAlignment.Top; ButtonTitle.BackgroundTransparency=1; ButtonTitle.Position = UDim2.new(0,10,0,10); ButtonTitle.Size = UDim2.new(1,-100,0,13)
+				local ButtonContent = Instance.new("TextLabel", ButtonFrame); ButtonContent.Name = "ButtonContent"; ButtonContent.Font = Enum.Font.Gotham; ButtonContent.Text = ButtonConfig.Content; ButtonContent.TextColor3 = dependencies.GetColor("Text", ButtonContent, "TextColor3"); ButtonContent.TextSize = 12; ButtonContent.TextTransparency = 0.4; ButtonContent.TextXAlignment = Enum.TextXAlignment.Left; ButtonContent.TextYAlignment = Enum.TextYAlignment.Bottom; ButtonContent.BackgroundTransparency=1; ButtonContent.Position = UDim2.new(0,10,0,0); ButtonContent.Size = UDim2.new(1,-100,1,-10); ButtonContent.TextWrapped = true
+				local ActualButton = Instance.new("TextButton", ButtonFrame); ActualButton.Name = "ActualButton"; ActualButton.Text = ""; ActualButton.Size = UDim2.new(1,0,1,0); ActualButton.BackgroundTransparency = 1; ActualButton.Activated:Connect(function() dependencies.CircleClick(ActualButton, dependencies.Mouse.X, dependencies.Mouse.Y); ButtonConfig.Callback() end)
 				if ButtonConfig.Icon then local FeatureFrame1_Button = Instance.new("Frame", ButtonFrame); FeatureFrame1_Button.Name = "FeatureFrame"; FeatureFrame1_Button.AnchorPoint = Vector2.new(1,0.5); FeatureFrame1_Button.BackgroundTransparency = 1; FeatureFrame1_Button.Position = UDim2.new(1,-15,0.5,0); FeatureFrame1_Button.Size = UDim2.new(0,25,0,25); local FeatureImg3_Button = Instance.new("ImageLabel", FeatureFrame1_Button); FeatureImg3_Button.Name = "FeatureImg"; FeatureImg3_Button.Image = ButtonConfig.Icon; FeatureImg3_Button.AnchorPoint = Vector2.new(0.5,0.5); FeatureImg3_Button.BackgroundTransparency = 1; FeatureImg3_Button.Position = UDim2.new(0.5,0,0.5,0); FeatureImg3_Button.Size = UDim2.new(1,0,1,0) end
 				task.delay(0, function() local contentHeight = ButtonContent.TextBounds.Y; local titleHeight = ButtonTitle.TextBounds.Y; ButtonFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); self._UpdateSizeSection() end)
 				CountItem = CountItem + 1; self._UpdateSizeSection(); return {}
 			end
 
-			function SectionObject:AddToggle(ToggleConfig)
-				local ToggleConfig = ToggleConfig or {}; ToggleConfig.Title = ToggleConfig.Title or "Toggle"; ToggleConfig.Content = ToggleConfig.Content or ""; ToggleConfig.Default = (ToggleConfig.Flag and Flags[ToggleConfig.Flag] ~= nil) and Flags[ToggleConfig.Flag] or ToggleConfig.Default or false; ToggleConfig.Callback = ToggleConfig.Callback or function() end
-				local ToggleFrame = Instance.new("Frame", self._SectionAdd); ToggleFrame.Name = "Toggle"; ToggleFrame.LayoutOrder = CountItem; ToggleFrame.Size = UDim2.new(1,0,0,46); ToggleFrame.BackgroundTransparency = 0.935; ToggleFrame.BackgroundColor3 = GetColor("Secondary", ToggleFrame, "BackgroundColor3"); Instance.new("UICorner", ToggleFrame).CornerRadius = UDim.new(0,4)
-				local ToggleTitle = Instance.new("TextLabel", ToggleFrame); ToggleTitle.Name = "ToggleTitle"; ToggleTitle.Font = Enum.Font.GothamBold; ToggleTitle.Text = ToggleConfig.Title; ToggleTitle.TextColor3 = GetColor("Text", ToggleTitle, "TextColor3"); ToggleTitle.TextSize = 13; ToggleTitle.TextXAlignment = Enum.TextXAlignment.Left; ToggleTitle.TextYAlignment = Enum.TextYAlignment.Top; ToggleTitle.BackgroundTransparency=1; ToggleTitle.Position = UDim2.new(0,10,0,10); ToggleTitle.Size = UDim2.new(1,-100,0,13)
-				local ToggleContent = Instance.new("TextLabel", ToggleFrame); ToggleContent.Name = "ToggleContent"; ToggleContent.Font = Enum.Font.Gotham; ToggleContent.Text = ToggleConfig.Content; ToggleContent.TextColor3 = GetColor("Text", ToggleContent, "TextColor3"); ToggleContent.TextSize = 12; ToggleContent.TextTransparency = 0.4; ToggleContent.TextXAlignment = Enum.TextXAlignment.Left; ToggleContent.TextYAlignment = Enum.TextYAlignment.Bottom; ToggleContent.BackgroundTransparency=1; ToggleContent.Position = UDim2.new(0,10,0,0); ToggleContent.Size = UDim2.new(1,-100,1,-10); ToggleContent.TextWrapped = true
-				local SwitchFrame = Instance.new("Frame", ToggleFrame); SwitchFrame.Name = "SwitchFrame"; SwitchFrame.AnchorPoint = Vector2.new(1,0.5); SwitchFrame.BackgroundColor3 = GetColor("Accent", SwitchFrame, "BackgroundColor3"); SwitchFrame.BackgroundTransparency = 0.5; SwitchFrame.BorderSizePixel = 0; SwitchFrame.Position = UDim2.new(1,-15,0.5,0); SwitchFrame.Size = UDim2.new(0,30,0,15); Instance.new("UICorner", SwitchFrame).CornerRadius = UDim.new(0,100)
-				local SwitchCircle = Instance.new("Frame", SwitchFrame); SwitchCircle.Name = "SwitchCircle"; SwitchCircle.BackgroundColor3 = GetColor("ThemeHighlight", SwitchCircle, "BackgroundColor3"); SwitchCircle.BorderSizePixel = 0; SwitchCircle.Position = UDim2.new(ToggleConfig.Default and 0.5 or 0, ToggleConfig.Default and -1 or 1, 0.5, -6); SwitchCircle.Size = UDim2.new(0,12,0,12); Instance.new("UICorner", SwitchCircle).CornerRadius = UDim.new(0,100)
+			function SectionObject:AddToggle(ToggleConfig, dependencies) -- Added dependencies
+				local ToggleConfig = ToggleConfig or {}; ToggleConfig.Title = ToggleConfig.Title or "Toggle"; ToggleConfig.Content = ToggleConfig.Content or ""; ToggleConfig.Default = (ToggleConfig.Flag and dependencies.Flags[ToggleConfig.Flag] ~= nil) and dependencies.Flags[ToggleConfig.Flag] or ToggleConfig.Default or false; ToggleConfig.Callback = ToggleConfig.Callback or function() end
+				local ToggleFrame = Instance.new("Frame", self._SectionAdd); ToggleFrame.Name = "Toggle"; ToggleFrame.LayoutOrder = CountItem; ToggleFrame.Size = UDim2.new(1,0,0,46); ToggleFrame.BackgroundTransparency = 0.935; ToggleFrame.BackgroundColor3 = dependencies.GetColor("Secondary", ToggleFrame, "BackgroundColor3"); Instance.new("UICorner", ToggleFrame).CornerRadius = UDim.new(0,4)
+				local ToggleTitle = Instance.new("TextLabel", ToggleFrame); ToggleTitle.Name = "ToggleTitle"; ToggleTitle.Font = Enum.Font.GothamBold; ToggleTitle.Text = ToggleConfig.Title; ToggleTitle.TextColor3 = dependencies.GetColor("Text", ToggleTitle, "TextColor3"); ToggleTitle.TextSize = 13; ToggleTitle.TextXAlignment = Enum.TextXAlignment.Left; ToggleTitle.TextYAlignment = Enum.TextYAlignment.Top; ToggleTitle.BackgroundTransparency=1; ToggleTitle.Position = UDim2.new(0,10,0,10); ToggleTitle.Size = UDim2.new(1,-100,0,13)
+				local ToggleContent = Instance.new("TextLabel", ToggleFrame); ToggleContent.Name = "ToggleContent"; ToggleContent.Font = Enum.Font.Gotham; ToggleContent.Text = ToggleConfig.Content; ToggleContent.TextColor3 = dependencies.GetColor("Text", ToggleContent, "TextColor3"); ToggleContent.TextSize = 12; ToggleContent.TextTransparency = 0.4; ToggleContent.TextXAlignment = Enum.TextXAlignment.Left; ToggleContent.TextYAlignment = Enum.TextYAlignment.Bottom; ToggleContent.BackgroundTransparency=1; ToggleContent.Position = UDim2.new(0,10,0,0); ToggleContent.Size = UDim2.new(1,-100,1,-10); ToggleContent.TextWrapped = true
+				local SwitchFrame = Instance.new("Frame", ToggleFrame); SwitchFrame.Name = "SwitchFrame"; SwitchFrame.AnchorPoint = Vector2.new(1,0.5); SwitchFrame.BackgroundColor3 = dependencies.GetColor("Accent", SwitchFrame, "BackgroundColor3"); SwitchFrame.BackgroundTransparency = 0.5; SwitchFrame.BorderSizePixel = 0; SwitchFrame.Position = UDim2.new(1,-15,0.5,0); SwitchFrame.Size = UDim2.new(0,30,0,15); Instance.new("UICorner", SwitchFrame).CornerRadius = UDim.new(0,100)
+				local SwitchCircle = Instance.new("Frame", SwitchFrame); SwitchCircle.Name = "SwitchCircle"; SwitchCircle.BackgroundColor3 = dependencies.GetColor("ThemeHighlight", SwitchCircle, "BackgroundColor3"); SwitchCircle.BorderSizePixel = 0; SwitchCircle.Position = UDim2.new(ToggleConfig.Default and 0.5 or 0, ToggleConfig.Default and -1 or 1, 0.5, -6); SwitchCircle.Size = UDim2.new(0,12,0,12); Instance.new("UICorner", SwitchCircle).CornerRadius = UDim.new(0,100)
 				local ActualButton = Instance.new("TextButton", ToggleFrame); ActualButton.Name = "ActualButton"; ActualButton.Text = ""; ActualButton.Size = UDim2.new(1,0,1,0); ActualButton.BackgroundTransparency = 1
 				local currentValue = ToggleConfig.Default; local function setToggleVisual(value) SwitchCircle:TweenPosition(UDim2.new(value and 0.5 or 0, value and -1 or 1, 0.5, -6), "Out", "Quad", 0.15, true) end; setToggleVisual(currentValue)
-				ActualButton.Activated:Connect(function() CircleClick(ActualButton, Mouse.X, Mouse.Y); currentValue = not currentValue; if ToggleConfig.Flag then SaveFile(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue) end)
+				ActualButton.Activated:Connect(function() dependencies.CircleClick(ActualButton, dependencies.Mouse.X, dependencies.Mouse.Y); currentValue = not currentValue; if ToggleConfig.Flag then dependencies.SaveFile(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue) end)
 				task.delay(0, function() local contentHeight = ToggleContent.TextBounds.Y; local titleHeight = ToggleTitle.TextBounds.Y; ToggleFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); self._UpdateSizeSection() end)
-				CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; if ToggleConfig.Flag then SaveFile(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue); end }
+				CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; if ToggleConfig.Flag then dependencies.SaveFile(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue); end }
 			end
 
-			function SectionObject:AddSlider(SliderConfig)
-				local SliderConfig = SliderConfig or {}; SliderConfig.Title = SliderConfig.Title or "Slider"; SliderConfig.Content = SliderConfig.Content or ""; SliderConfig.Min = SliderConfig.Min or 0; SliderConfig.Max = SliderConfig.Max or 100; SliderConfig.Increment = SliderConfig.Increment or 1; local savedVal = SliderConfig.Flag and Flags[SliderConfig.Flag]; SliderConfig.Default = tonumber(savedVal or SliderConfig.Default or SliderConfig.Min); SliderConfig.Callback = SliderConfig.Callback or function() end
-				local SliderFrame = Instance.new("Frame", self._SectionAdd); SliderFrame.Name = "Slider"; SliderFrame.LayoutOrder = CountItem; SliderFrame.Size = UDim2.new(1,0,0,55); SliderFrame.BackgroundTransparency = 0.935; SliderFrame.BackgroundColor3 = GetColor("Secondary", SliderFrame, "BackgroundColor3"); Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(0,4)
-				local SliderTitle = Instance.new("TextLabel", SliderFrame); SliderTitle.Name = "SliderTitle"; SliderTitle.Font = Enum.Font.GothamBold; SliderTitle.Text = SliderConfig.Title; SliderTitle.TextColor3 = GetColor("Text", SliderTitle, "TextColor3"); SliderTitle.TextSize = 13; SliderTitle.TextXAlignment = Enum.TextXAlignment.Left; SliderTitle.TextYAlignment = Enum.TextYAlignment.Top; SliderTitle.BackgroundTransparency=1; SliderTitle.Position = UDim2.new(0,10,0,10); SliderTitle.Size = UDim2.new(1,-60,0,13)
-				local SliderValueText = Instance.new("TextBox", SliderFrame); SliderValueText.Name = "SliderValueText"; SliderValueText.Font = Enum.Font.GothamBold; SliderValueText.Text = tostring(SliderConfig.Default); SliderValueText.TextColor3 = GetColor("Text", SliderValueText, "TextColor3"); SliderValueText.TextSize = 12; SliderValueText.BackgroundTransparency = 0.8; SliderValueText.BackgroundColor3 = GetColor("Accent", SliderValueText, "BackgroundColor3"); SliderValueText.Position = UDim2.new(1,-45,0,5); SliderValueText.Size = UDim2.new(0,40,0,20); Instance.new("UICorner", SliderValueText).CornerRadius = UDim.new(0,3)
-				local Bar = Instance.new("Frame", SliderFrame); Bar.Name = "Bar"; Bar.BackgroundColor3 = GetColor("Accent", Bar, "BackgroundColor3"); Bar.BorderSizePixel = 0; Bar.Position = UDim2.new(0,10,1,-20); Bar.Size = UDim2.new(1,-20,0,5); Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,100)
-				local Progress = Instance.new("Frame", Bar); Progress.Name = "Progress"; Progress.BackgroundColor3 = GetColor("ThemeHighlight", Progress, "BackgroundColor3"); Progress.BorderSizePixel = 0; Instance.new("UICorner", Progress).CornerRadius = UDim.new(0,100)
+			function SectionObject:AddSlider(SliderConfig, dependencies) -- Added dependencies
+				local SliderConfig = SliderConfig or {}; SliderConfig.Title = SliderConfig.Title or "Slider"; SliderConfig.Content = SliderConfig.Content or ""; SliderConfig.Min = SliderConfig.Min or 0; SliderConfig.Max = SliderConfig.Max or 100; SliderConfig.Increment = SliderConfig.Increment or 1; local savedVal = SliderConfig.Flag and dependencies.Flags[SliderConfig.Flag]; SliderConfig.Default = tonumber(savedVal or SliderConfig.Default or SliderConfig.Min); SliderConfig.Callback = SliderConfig.Callback or function() end
+				local SliderFrame = Instance.new("Frame", self._SectionAdd); SliderFrame.Name = "Slider"; SliderFrame.LayoutOrder = CountItem; SliderFrame.Size = UDim2.new(1,0,0,55); SliderFrame.BackgroundTransparency = 0.935; SliderFrame.BackgroundColor3 = dependencies.GetColor("Secondary", SliderFrame, "BackgroundColor3"); Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(0,4)
+				local SliderTitle = Instance.new("TextLabel", SliderFrame); SliderTitle.Name = "SliderTitle"; SliderTitle.Font = Enum.Font.GothamBold; SliderTitle.Text = SliderConfig.Title; SliderTitle.TextColor3 = dependencies.GetColor("Text", SliderTitle, "TextColor3"); SliderTitle.TextSize = 13; SliderTitle.TextXAlignment = Enum.TextXAlignment.Left; SliderTitle.TextYAlignment = Enum.TextYAlignment.Top; SliderTitle.BackgroundTransparency=1; SliderTitle.Position = UDim2.new(0,10,0,10); SliderTitle.Size = UDim2.new(1,-60,0,13)
+				local SliderValueText = Instance.new("TextBox", SliderFrame); SliderValueText.Name = "SliderValueText"; SliderValueText.Font = Enum.Font.GothamBold; SliderValueText.Text = tostring(SliderConfig.Default); SliderValueText.TextColor3 = dependencies.GetColor("Text", SliderValueText, "TextColor3"); SliderValueText.TextSize = 12; SliderValueText.BackgroundTransparency = 0.8; SliderValueText.BackgroundColor3 = dependencies.GetColor("Accent", SliderValueText, "BackgroundColor3"); SliderValueText.Position = UDim2.new(1,-45,0,5); SliderValueText.Size = UDim2.new(0,40,0,20); Instance.new("UICorner", SliderValueText).CornerRadius = UDim.new(0,3)
+				local Bar = Instance.new("Frame", SliderFrame); Bar.Name = "Bar"; Bar.BackgroundColor3 = dependencies.GetColor("Accent", Bar, "BackgroundColor3"); Bar.BorderSizePixel = 0; Bar.Position = UDim2.new(0,10,1,-20); Bar.Size = UDim2.new(1,-20,0,5); Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,100)
+				local Progress = Instance.new("Frame", Bar); Progress.Name = "Progress"; Progress.BackgroundColor3 = dependencies.GetColor("ThemeHighlight", Progress, "BackgroundColor3"); Progress.BorderSizePixel = 0; Instance.new("UICorner", Progress).CornerRadius = UDim.new(0,100)
 				local DraggerHitbox = Instance.new("TextButton", Bar); DraggerHitbox.Name = "DraggerHitbox"; DraggerHitbox.Text = ""; DraggerHitbox.Size = UDim2.new(0,20,0,20); DraggerHitbox.AnchorPoint = Vector2.new(0.5,0.5); DraggerHitbox.BackgroundTransparency=1; DraggerHitbox.ZIndex=3
-				local VisualDragger = Instance.new("Frame", DraggerHitbox); VisualDragger.Name = "VisualDragger"; VisualDragger.Size=UDim2.new(0,10,0,10); VisualDragger.AnchorPoint=Vector2.new(0.5,0.5); VisualDragger.Position=UDim2.new(0.5,0,0.5,0); VisualDragger.BackgroundColor3=GetColor("ThemeHighlight",VisualDragger,"BackgroundColor3"); VisualDragger.BorderSizePixel=0; Instance.new("UICorner",VisualDragger).CornerRadius=UDim.new(0,100)
-				local currentValue = SliderConfig.Default; local function UpdateSlider(value) value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max); currentValue = value; SliderValueText.Text = tostring(value); local percent=(SliderConfig.Max-SliderConfig.Min==0) and 0 or (value-SliderConfig.Min)/(SliderConfig.Max-SliderConfig.Min); Progress.Size=UDim2.new(percent,0,1,0); DraggerHitbox.Position=UDim2.new(percent,0,0.5,0); if SliderConfig.Flag then SaveFile(SliderConfig.Flag, currentValue) end; SliderConfig.Callback(currentValue) end; UpdateSlider(currentValue)
-				DraggerHitbox.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then local dragging=true; local conn; conn=UserInputService.InputChanged:Connect(function(subInput) if not dragging then conn:Disconnect() return end; if subInput.UserInputType==Enum.UserInputType.MouseMovement or subInput.UserInputType==Enum.UserInputType.Touch then local localPos=Bar.AbsolutePosition.X; local mousePos=subInput.Position.X; local percent=math.clamp((mousePos-localPos)/Bar.AbsoluteSize.X,0,1); UpdateSlider(SliderConfig.Min+percent*(SliderConfig.Max-SliderConfig.Min)) end end); local inputEndedConn; inputEndedConn=input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false; if conn then conn:Disconnect() end; if inputEndedConn then inputEndedConn:Disconnect() end end end); local draggerInputEndedConn; draggerInputEndedConn=DraggerHitbox.InputEnded:Connect(function(endInput) if endInput.UserInputType==input.UserInputType then dragging=false; if conn then conn:Disconnect() end; if inputEndedConn then inputEndedConn:Disconnect() end; if draggerInputEndedConn then draggerInputEndedConn:Disconnect() end end end) end end)
+				local VisualDragger = Instance.new("Frame", DraggerHitbox); VisualDragger.Name = "VisualDragger"; VisualDragger.Size=UDim2.new(0,10,0,10); VisualDragger.AnchorPoint=Vector2.new(0.5,0.5); VisualDragger.Position=UDim2.new(0.5,0,0.5,0); VisualDragger.BackgroundColor3=dependencies.GetColor("ThemeHighlight",VisualDragger,"BackgroundColor3"); VisualDragger.BorderSizePixel=0; Instance.new("UICorner",VisualDragger).CornerRadius=UDim.new(0,100)
+				local currentValue = SliderConfig.Default; local function UpdateSlider(value) value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max); currentValue = value; SliderValueText.Text = tostring(value); local percent=(SliderConfig.Max-SliderConfig.Min==0) and 0 or (value-SliderConfig.Min)/(SliderConfig.Max-SliderConfig.Min); Progress.Size=UDim2.new(percent,0,1,0); DraggerHitbox.Position=UDim2.new(percent,0,0.5,0); if SliderConfig.Flag then dependencies.SaveFile(SliderConfig.Flag, currentValue) end; SliderConfig.Callback(currentValue) end; UpdateSlider(currentValue)
+				DraggerHitbox.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then local dragging=true; local conn; conn=dependencies.UserInputService.InputChanged:Connect(function(subInput) if not dragging then conn:Disconnect() return end; if subInput.UserInputType==Enum.UserInputType.MouseMovement or subInput.UserInputType==Enum.UserInputType.Touch then local localPos=Bar.AbsolutePosition.X; local mousePos=subInput.Position.X; local percent=math.clamp((mousePos-localPos)/Bar.AbsoluteSize.X,0,1); UpdateSlider(SliderConfig.Min+percent*(SliderConfig.Max-SliderConfig.Min)) end end); local inputEndedConn; inputEndedConn=input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false; if conn then conn:Disconnect() end; if inputEndedConn then inputEndedConn:Disconnect() end end end); local draggerInputEndedConn; draggerInputEndedConn=DraggerHitbox.InputEnded:Connect(function(endInput) if endInput.UserInputType==input.UserInputType then dragging=false; if conn then conn:Disconnect() end; if inputEndedConn then inputEndedConn:Disconnect() end; if draggerInputEndedConn then draggerInputEndedConn:Disconnect() end end end) end end)
 				SliderValueText.FocusLost:Connect(function(enterPressed) if enterPressed then local num=tonumber(SliderValueText.Text); if num then UpdateSlider(num) else UpdateSlider(currentValue) end end end)
 				CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = UpdateSlider }
 			end
 
-			function SectionObject:AddInput(InputConfig)
-				local InputConfig = InputConfig or {}; InputConfig.Title = InputConfig.Title or "Input"; InputConfig.Content = InputConfig.Content or ""; local savedVal = InputConfig.Flag and Flags[InputConfig.Flag]; InputConfig.Default = savedVal or InputConfig.Default or ""; InputConfig.Callback = InputConfig.Callback or function() end
-				local InputFrame = Instance.new("Frame", self._SectionAdd); InputFrame.Name = "Input"; InputFrame.LayoutOrder = CountItem; InputFrame.Size = UDim2.new(1,0,0,46); InputFrame.BackgroundTransparency = 0.935; InputFrame.BackgroundColor3 = GetColor("Secondary", InputFrame, "BackgroundColor3"); Instance.new("UICorner", InputFrame).CornerRadius = UDim.new(0,4)
-				local InputTitle = Instance.new("TextLabel", InputFrame); InputTitle.Name = "InputTitle"; InputTitle.Font = Enum.Font.GothamBold; InputTitle.Text = InputConfig.Title; InputTitle.TextColor3 = GetColor("Text", InputTitle, "TextColor3"); InputTitle.TextSize = 13; InputTitle.TextXAlignment = Enum.TextXAlignment.Left; InputTitle.TextYAlignment = Enum.TextYAlignment.Top; InputTitle.BackgroundTransparency=1; InputTitle.Position = UDim2.new(0,10,0,10); InputTitle.Size = UDim2.new(1,-100,0,13)
-				local InputContent = Instance.new("TextLabel", InputFrame); InputContent.Name = "InputContent"; InputContent.Font = Enum.Font.Gotham; InputContent.Text = InputConfig.Content; InputContent.TextColor3 = GetColor("Text", InputContent, "TextColor3"); InputContent.TextSize = 12; InputContent.TextTransparency = 0.4; InputContent.TextXAlignment = Enum.TextXAlignment.Left; InputContent.TextYAlignment = Enum.TextYAlignment.Bottom; InputContent.BackgroundTransparency=1; InputContent.Position = UDim2.new(0,10,0,0); InputContent.Size = UDim2.new(1,-100,1,-10); InputContent.TextWrapped = true
-				local TextBox = Instance.new("TextBox", InputFrame); TextBox.Name = "TextBox"; TextBox.Font = Enum.Font.Gotham; TextBox.Text = InputConfig.Default; TextBox.TextColor3 = GetColor("Text", TextBox, "TextColor3"); TextBox.TextSize = 12; TextBox.BackgroundColor3 = GetColor("Accent", TextBox, "BackgroundColor3"); TextBox.Position = UDim2.new(1,-155,0.5,-12); TextBox.Size = UDim2.new(0,150,0,24); Instance.new("UICorner", TextBox).CornerRadius = UDim.new(0,3); TextBox.ClearTextOnFocus = false
+			function SectionObject:AddInput(InputConfig, dependencies) -- Added dependencies
+				local InputConfig = InputConfig or {}; InputConfig.Title = InputConfig.Title or "Input"; InputConfig.Content = InputConfig.Content or ""; local savedVal = InputConfig.Flag and dependencies.Flags[InputConfig.Flag]; InputConfig.Default = savedVal or InputConfig.Default or ""; InputConfig.Callback = InputConfig.Callback or function() end
+				local InputFrame = Instance.new("Frame", self._SectionAdd); InputFrame.Name = "Input"; InputFrame.LayoutOrder = CountItem; InputFrame.Size = UDim2.new(1,0,0,46); InputFrame.BackgroundTransparency = 0.935; InputFrame.BackgroundColor3 = dependencies.GetColor("Secondary", InputFrame, "BackgroundColor3"); Instance.new("UICorner", InputFrame).CornerRadius = UDim.new(0,4)
+				local InputTitle = Instance.new("TextLabel", InputFrame); InputTitle.Name = "InputTitle"; InputTitle.Font = Enum.Font.GothamBold; InputTitle.Text = InputConfig.Title; InputTitle.TextColor3 = dependencies.GetColor("Text", InputTitle, "TextColor3"); InputTitle.TextSize = 13; InputTitle.TextXAlignment = Enum.TextXAlignment.Left; InputTitle.TextYAlignment = Enum.TextYAlignment.Top; InputTitle.BackgroundTransparency=1; InputTitle.Position = UDim2.new(0,10,0,10); InputTitle.Size = UDim2.new(1,-100,0,13)
+				local InputContent = Instance.new("TextLabel", InputFrame); InputContent.Name = "InputContent"; InputContent.Font = Enum.Font.Gotham; InputContent.Text = InputConfig.Content; InputContent.TextColor3 = dependencies.GetColor("Text", InputContent, "TextColor3"); InputContent.TextSize = 12; InputContent.TextTransparency = 0.4; InputContent.TextXAlignment = Enum.TextXAlignment.Left; InputContent.TextYAlignment = Enum.TextYAlignment.Bottom; InputContent.BackgroundTransparency=1; InputContent.Position = UDim2.new(0,10,0,0); InputContent.Size = UDim2.new(1,-100,1,-10); InputContent.TextWrapped = true
+				local TextBox = Instance.new("TextBox", InputFrame); TextBox.Name = "TextBox"; TextBox.Font = Enum.Font.Gotham; TextBox.Text = InputConfig.Default; TextBox.TextColor3 = dependencies.GetColor("Text", TextBox, "TextColor3"); TextBox.TextSize = 12; TextBox.BackgroundColor3 = dependencies.GetColor("Accent", TextBox, "BackgroundColor3"); TextBox.Position = UDim2.new(1,-155,0.5,-12); TextBox.Size = UDim2.new(0,150,0,24); Instance.new("UICorner", TextBox).CornerRadius = UDim.new(0,3); TextBox.ClearTextOnFocus = false
 				local currentValue = InputConfig.Default
-				TextBox.FocusLost:Connect(function(enterPressed) if enterPressed then currentValue = TextBox.Text; if InputConfig.Flag then SaveFile(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) else TextBox.Text = currentValue end end)
+				TextBox.FocusLost:Connect(function(enterPressed) if enterPressed then currentValue = TextBox.Text; if InputConfig.Flag then dependencies.SaveFile(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) else TextBox.Text = currentValue end end)
 				task.delay(0, function() local contentHeight = InputContent.TextBounds.Y; local titleHeight = InputTitle.TextBounds.Y; InputFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); self._UpdateSizeSection() end)
-				CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; TextBox.Text = val; if InputConfig.Flag then SaveFile(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) end }
+				CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; TextBox.Text = val; if InputConfig.Flag then dependencies.SaveFile(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) end }
 			end
 
-			function SectionObject:AddDropdown(DropdownConfig)
-				local resources = { getColorFunc=GetColor, loadUIAssetFunc=LoadUIAsset, DropdownFolder=DropdownFolder, DropPageLayout=DropPageLayout, MoreBlur=MoreBlur, DropdownSelect=DropdownSelect, circleClickFunc=CircleClick, mouseRef=Mouse, tweenServiceRef=TweenService, saveFileFunc=SaveFile, flagsRef=Flags, CountItemRef={Value=CountItem} }
-				local dropdownApi = Helper_CreateDropdownElements(self._SectionAdd, DropdownConfig, resources)
-				CountItem = resources.CountItemRef.Value
+			function SectionObject:AddDropdown(DropdownConfig, dependencies) -- Added dependencies
+				-- The 'resources' table passed to Helper_CreateDropdownElements is now effectively the 'dependencies' table.
+				local dropdownApi = Helper_CreateDropdownElements(self._SectionAdd, DropdownConfig, dependencies)
+				-- CountItem is managed by Helper_CreateDropdownElements via dependencies.CountItemRef or similar
 				self._UpdateSizeSection()
 				return dropdownApi
 			end
 
-			function SectionObject:AddDivider(DividerConfig)
+			function SectionObject:AddDivider(DividerConfig, dependencies) -- Added dependencies
 				local DividerConfig = DividerConfig or {}; DividerConfig.Text = DividerConfig.Text or nil
 				local DividerContainer = Instance.new("Frame", self._SectionAdd); DividerContainer.Name = "Divider"; DividerContainer.Size = UDim2.new(1,0,0,20); DividerContainer.BackgroundTransparency=1; DividerContainer.LayoutOrder=CountItem
-				if not DividerConfig.Text or DividerConfig.Text == "" then local Line=Instance.new("Frame",DividerContainer); Line.Name="FullLine"; Line.BackgroundColor3=DividerConfig.Color or GetColor("Stroke",Line,"BackgroundColor3"); Line.BorderSizePixel=0; Line.AnchorPoint=Vector2.new(0.5,0.5); Line.Position=UDim2.new(0.5,0,0.5,0); Line.Size=UDim2.new(1,-10,0,1)
-				else DividerContainer.Size = UDim2.new(1,0,0,(DividerConfig.TextSize or 12)+8); local ListLayout=Instance.new("UIListLayout",DividerContainer); ListLayout.FillDirection=Enum.FillDirection.Horizontal; ListLayout.VerticalAlignment=Enum.VerticalAlignment.Center; ListLayout.HorizontalAlignment=Enum.HorizontalAlignment.Center; ListLayout.SortOrder=Enum.SortOrder.LayoutOrder; ListLayout.Padding=UDim.new(0,8); local Line1=Instance.new("Frame",DividerContainer); Line1.Name="Line1"; Line1.BackgroundColor3=DividerConfig.Color or GetColor("Stroke",Line1,"BackgroundColor3"); Line1.BorderSizePixel=0; Line1.Size=UDim2.new(1,0,0,1); Line1.LayoutOrder=1; local DividerText=Instance.new("TextLabel",DividerContainer); DividerText.Name="DividerText"; DividerText.Text=DividerConfig.Text; DividerText.TextColor3=DividerConfig.TextColor or GetColor("Text",DividerText,"TextColor3"); DividerText.Font=DividerConfig.Font or Enum.Font.GothamBold; DividerText.TextSize=DividerConfig.TextSize or 12; DividerText.BackgroundTransparency=1; DividerText.AutomaticSize=Enum.AutomaticSize.X; DividerText.Size=UDim2.new(0,0,1,0); DividerText.LayoutOrder=2; local Line2=Instance.new("Frame",DividerContainer); Line2.Name="Line2"; Line2.BackgroundColor3=DividerConfig.Color or GetColor("Stroke",Line2,"BackgroundColor3"); Line2.BorderSizePixel=0; Line2.Size=UDim2.new(1,0,0,1); Line2.LayoutOrder=3 end
+				if not DividerConfig.Text or DividerConfig.Text == "" then local Line=Instance.new("Frame",DividerContainer); Line.Name="FullLine"; Line.BackgroundColor3=DividerConfig.Color or dependencies.GetColor("Stroke",Line,"BackgroundColor3"); Line.BorderSizePixel=0; Line.AnchorPoint=Vector2.new(0.5,0.5); Line.Position=UDim2.new(0.5,0,0.5,0); Line.Size=UDim2.new(1,-10,0,1)
+				else DividerContainer.Size = UDim2.new(1,0,0,(DividerConfig.TextSize or 12)+8); local ListLayout=Instance.new("UIListLayout",DividerContainer); ListLayout.FillDirection=Enum.FillDirection.Horizontal; ListLayout.VerticalAlignment=Enum.VerticalAlignment.Center; ListLayout.HorizontalAlignment=Enum.HorizontalAlignment.Center; ListLayout.SortOrder=Enum.SortOrder.LayoutOrder; ListLayout.Padding=UDim.new(0,8); local Line1=Instance.new("Frame",DividerContainer); Line1.Name="Line1"; Line1.BackgroundColor3=DividerConfig.Color or dependencies.GetColor("Stroke",Line1,"BackgroundColor3"); Line1.BorderSizePixel=0; Line1.Size=UDim2.new(1,0,0,1); Line1.LayoutOrder=1; local DividerText=Instance.new("TextLabel",DividerContainer); DividerText.Name="DividerText"; DividerText.Text=DividerConfig.Text; DividerText.TextColor3=DividerConfig.TextColor or dependencies.GetColor("Text",DividerText,"TextColor3"); DividerText.Font=DividerConfig.Font or Enum.Font.GothamBold; DividerText.TextSize=DividerConfig.TextSize or 12; DividerText.BackgroundTransparency=1; DividerText.AutomaticSize=Enum.AutomaticSize.X; DividerText.Size=UDim2.new(0,0,1,0); DividerText.LayoutOrder=2; local Line2=Instance.new("Frame",DividerContainer); Line2.Name="Line2"; Line2.BackgroundColor3=DividerConfig.Color or dependencies.GetColor("Stroke",Line2,"BackgroundColor3"); Line2.BorderSizePixel=0; Line2.Size=UDim2.new(1,0,0,1); Line2.LayoutOrder=3 end
 				CountItem=CountItem+1; self._UpdateSizeSection(); return {}
 			end
 
@@ -2231,70 +2197,146 @@ function UBHubLib:MakeGui(GuiConfig)
 		-- ... entire function body removed ...
 	-- end -- Removed
 
-	-- Populate the SettingsTabObject (Example: Re-implementing Preset Management)
-	local PresetManagementSettingsSection_InSettings = SettingsTabObject:AddSection("Preset Management") -- Changed ActualSettingsTab to SettingsTabObject
-	local defaultThemesDropdown_InSettings = PresetManagementSettingsSection_InSettings:AddDropdown({ -- Changed variable name for clarity
+	-- Instantiate the Settings Tab using the modified CreateTab method
+	local SettingsTabObject = UIInstance:CreateTab({
+		Name = "Settings",
+		Icon = "rbxassetid://16932740082", -- Placeholder Icon, replace with actual settings icon ID
+		IsSettingsTab = true
+	}, dependencies)
+
+	-- Populate the SettingsTabObject
+	local PresetManagementSettingsSection_InSettings = SettingsTabObject:AddSection("Preset Management", dependencies)
+	local defaultThemesDropdown_InSettings = PresetManagementSettingsSection_InSettings:AddDropdown({
 		Title = "Default Themes",
 		Options = GetThemes(),
-	})
-	PresetManagementSettingsSection_InSettings:AddButton({ -- Changed variable name
+	}, dependencies)
+	PresetManagementSettingsSection_InSettings:AddButton({
 		Title = "Apply Default Theme", Content = "Apply the selected default theme",
 		Callback = function()
-			local val = defaultThemesDropdown_InSettings:GetValue() -- Changed variable name
-			if val and #val > 0 then SetTheme(val[1]); UBHubLib:MakeNotify({Title="Theme Applied", Content="'"..val[1].."' applied."}) end
+			local val = defaultThemesDropdown_InSettings:GetValue()
+			if val and #val > 0 then SetTheme(val[1]); dependencies.UBHubLib:MakeNotify({Title="Theme Applied", Content="'"..val[1].."' applied."}) end
 		end
-	})
-	-- ... (re-implement other settings sections and items here for SettingsTabObject) ...
+	}, dependencies)
+
+	PresetManagementSettingsSection_InSettings:AddDivider({Text = "Custom Preset Settings"}, dependencies)
+
+	local customPresetNameInput_InSettings = PresetManagementSettingsSection_InSettings:AddInput({
+		Title = "Custom Preset Name", Content = "Enter a name for your custom preset", Default = ""
+	}, dependencies)
+
+	PresetManagementSettingsSection_InSettings:AddButton({
+		Title = "Save Current Colors", Content = "Save the current color configuration as a new preset",
+		Callback = function()
+			local presetName = customPresetNameInput_InSettings:GetValue()
+			if not presetName or presetName == "" then dependencies.UBHubLib:MakeNotify({ Title = "Preset Name Required", Content = "Please enter a name for your custom preset."}); return end
+			if dependencies.Flags.CustomUserThemes[presetName] then dependencies.UBHubLib:MakeNotify({ Title = "Preset Exists", Content = "A preset with this name already exists."}); return end
+			local currentColorsHex = {}
+			if Themes[CurrentTheme] then
+				for colorKey, colorValue in pairs(Themes[CurrentTheme]) do if typeof(colorValue) == "Color3" then currentColorsHex[colorKey] = ColorToHex(colorValue) end end
+				dependencies.Flags.CustomUserThemes[presetName] = currentColorsHex
+				dependencies.SaveFile("CustomUserThemes", dependencies.Flags.CustomUserThemes)
+				dependencies.UBHubLib:MakeNotify({ Title = "Preset Saved", Content = "'" .. presetName .. "' has been saved."})
+				local savedNames = GetSavedThemeNames()
+				-- Need to re-fetch the dropdown instances if they are not in scope here or pass them if this callback needs to refresh them.
+				-- For now, assuming MakeNotify is sufficient.
+				customPresetNameInput_InSettings:SetValue("")
+			end
+		end
+	}, dependencies)
+
+	PresetManagementSettingsSection_InSettings:AddDivider({}, dependencies)
+
+	local savedPresetsDropdown_InSettings = PresetManagementSettingsSection_InSettings:AddDropdown({
+		Title = "Saved Custom Presets", Options = GetSavedThemeNames(),
+	}, dependencies)
+
+	PresetManagementSettingsSection_InSettings:AddButton({
+		Title = "Apply Saved Preset", Content = "Apply the selected saved custom preset",
+		Callback = function()
+			local selectedPresetNameTable = savedPresetsDropdown_InSettings:GetValue()
+			if selectedPresetNameTable and #selectedPresetNameTable > 0 then
+				local presetName = selectedPresetNameTable[1]
+				if dependencies.Flags.CustomUserThemes and dependencies.Flags.CustomUserThemes[presetName] then
+					local themeToApply = {}
+					for colorKey, hexValue in pairs(dependencies.Flags.CustomUserThemes[presetName]) do themeToApply[colorKey] = HexToColor(hexValue) end
+					local tempThemeName = "__CUSTOM__" .. presetName
+					Themes[tempThemeName] = themeToApply
+					SetTheme(tempThemeName)
+					dependencies.UBHubLib:MakeNotify({ Title = "Preset Applied", Content = "'" .. presetName .. "' applied."})
+				end
+			end
+		end
+	}, dependencies)
+
+	PresetManagementSettingsSection_InSettings:AddDivider({}, dependencies)
+
+	local deletePresetDropdown_InSettings = PresetManagementSettingsSection_InSettings:AddDropdown({
+		Title = "Select Preset to Delete", Options = GetSavedThemeNames(),
+	}, dependencies)
+
+	PresetManagementSettingsSection_InSettings:AddButton({
+		Title = "Delete Saved Preset", Content = "Delete the selected saved custom preset",
+		Callback = function()
+			local selectedPresetNameTable = deletePresetDropdown_InSettings:GetValue()
+			if selectedPresetNameTable and #selectedPresetNameTable > 0 then
+				local presetName = selectedPresetNameTable[1]
+				if dependencies.Flags.CustomUserThemes and dependencies.Flags.CustomUserThemes[presetName] then
+					dependencies.Flags.CustomUserThemes[presetName] = nil
+					dependencies.SaveFile("CustomUserThemes", dependencies.Flags.CustomUserThemes)
+					dependencies.UBHubLib:MakeNotify({ Title = "Preset Deleted", Content = "'" .. presetName .. "' has been deleted."})
+					-- Refresh dropdowns (similar to save, might need direct references or a refresh all mechanism)
+				end
+			end
+		end
+	}, dependencies)
 
 	-- Re-implement Interface Customization Section
-	local InterfaceSettingsSection_InSettings = SettingsTabObject:AddSection("Interface Customization") -- Changed ActualSettingsTab to SettingsTabObject
-	InterfaceSettingsSection_InSettings:AddToggle({ -- Changed variable name
+	local InterfaceSettingsSection_InSettings = SettingsTabObject:AddSection("Interface Customization", dependencies)
+	InterfaceSettingsSection_InSettings:AddToggle({
 		Title = "Undetected Mode", Content = "Attempts to load assets in a way less likely to be detected. May not work with all assets.",
 		Flag = "UndetectedMode", Default = LibraryCfg.Undetected,
 		Callback = function(val) LibraryCfg.Undetected = val end
-	})
-	InterfaceSettingsSection:AddSlider({
+	}, dependencies)
+	InterfaceSettingsSection_InSettings:AddSlider({
 		Title = "Tab Width", Content = "Adjust the width of the tab list.",
 		Min = 80, Max = 250, Default = GuiConfig["Tab Width"], Increment = 1,
 		Flag = "TabWidth",
 		Callback = function(val)
-			LayersTab.Size = UDim2.new(0, val, LayersTab.Size.Y.Scale, LayersTab.Size.Y.Offset)
+			dependencies.LayersTab.Size = UDim2.new(0, val, dependencies.LayersTab.Size.Y.Scale, dependencies.LayersTab.Size.Y.Offset)
 			Layers.Position = UDim2.new(0, val + 18, Layers.Position.Y.Scale, Layers.Position.Y.Offset)
 			Layers.Size = UDim2.new(1, -(val + 9 + 18), Layers.Size.Y.Scale, Layers.Size.Y.Offset)
-			GuiConfig["Tab Width"] = val -- Update GuiConfig for persistence if saved elsewhere
+			dependencies.GuiConfig["Tab Width"] = val
 		end
-	})
-	InterfaceSettingsSection:AddInput({
+	}, dependencies)
+	InterfaceSettingsSection_InSettings:AddInput({
 		Title = "Background Asset URL/Path", Content = "Set a custom background image/video. Type 'Reset' to clear.",
-		Flag = "BackgroundAsset", Default = "",
+		Flag = "BackgroundAsset", Default = dependencies.Flags["BackgroundAsset"] or "",
 		Callback = function(val)
 			if val:lower() == "reset" then
 				Reset()
-				SaveFile("BackgroundAsset", "") -- Save reset state
+				dependencies.SaveFile("BackgroundAsset", "")
 			else
-				-- Attempt to determine if it's an image or video based on common extensions (basic check)
-				local assetType = "Image" -- Default
+				local assetType = "Image"
 				if val:match("%.mp4") or val:match("%.webm") then assetType = "Video" end
-				ChangeAsset(assetType, val, "CustomBackground") -- Name could be more dynamic if needed
-				-- SaveFile("BackgroundAsset", val) -- Already saved by AddInput's internal logic
+				ChangeAsset(assetType, val, "CustomBackground")
 			end
 		end
-	})
-	InterfaceSettingsSection:AddSlider({
+	}, dependencies)
+	InterfaceSettingsSection_InSettings:AddSlider({
 		Title = "UI Background Transparency", Content = "Adjust the main UI background transparency.",
 		Min = 0, Max = 1, Default = Main.BackgroundTransparency, Increment = 0.01,
 		Flag = "BackgroundTransparency",
 		Callback = function(val) ChangeTransparency(val) end
-	})
+	}, dependencies)
 
 
 	-- Re-implement Customize Colors Section
-	local CustomizeColorsSettingsSection_InSettings = SettingsTabObject:AddSection("Customize Colors") -- Changed ActualSettingsTab to SettingsTabObject
-	local colorControls_InSettings = {} -- Changed variable name
+	local CustomizeColorsSettingsSection_InSettings = SettingsTabObject:AddSection("Customize Colors", dependencies)
+	local colorControls_InSettings = {}
 
-	local function updateColorFromSliders_InSettings(colorKeyName, component, value) -- Changed function name
+	local function updateColorFromSliders_InSettings(colorKeyName, component, value)
 		local r, g, b
-		local currentHex = colorControls_InSettings[colorKeyName].hexInput:GetValue() -- Changed variable name
+		local currentHex = colorControls_InSettings[colorKeyName].hexInput:GetValue()
 		local currentColor = HexToColor(currentHex)
 		r = (component == "R") and value or math.floor(currentColor.R * 255)
 		g = (component == "G") and value or math.floor(currentColor.G * 255)
@@ -2302,67 +2344,67 @@ function UBHubLib:MakeGui(GuiConfig)
 		local newColor = Color3.fromRGB(r, g, b)
 		Themes[CurrentTheme][colorKeyName] = newColor
 		SetTheme(CurrentTheme)
-		colorControls_InSettings[colorKeyName].hexInput:SetValue(ColorToHex(newColor)) -- Changed variable name
+		colorControls_InSettings[colorKeyName].hexInput:SetValue(ColorToHex(newColor))
 	end
 
-	local function updateSlidersFromHex_InSettings(colorKeyName, hexValue) -- Changed function name
+	local function updateSlidersFromHex_InSettings(colorKeyName, hexValue)
 		if not hexValue or not hexValue:match("^#%x%x%x%x%x%x$") then return end
 		local color = HexToColor(hexValue)
 		Themes[CurrentTheme][colorKeyName] = color
 		SetTheme(CurrentTheme)
-		colorControls_InSettings[colorKeyName].rSlider:SetValue(math.floor(color.R * 255)) -- Changed variable name
-		colorControls_InSettings[colorKeyName].gSlider:SetValue(math.floor(color.G * 255)) -- Changed variable name
-		colorControls_InSettings[colorKeyName].bSlider:SetValue(math.floor(color.B * 255)) -- Changed variable name
+		colorControls_InSettings[colorKeyName].rSlider:SetValue(math.floor(color.R * 255))
+		colorControls_InSettings[colorKeyName].gSlider:SetValue(math.floor(color.G * 255))
+		colorControls_InSettings[colorKeyName].bSlider:SetValue(math.floor(color.B * 255))
 	end
 
-	local baseThemeForKeys_InSettings = Themes[next(Themes)] -- Changed variable name
+	local baseThemeForKeys_InSettings = Themes[next(Themes)]
 	if baseThemeForKeys_InSettings then
-		local sortedColorKeys_InSettings = {} -- Changed variable name
+		local sortedColorKeys_InSettings = {}
 		for key, _ in pairs(baseThemeForKeys_InSettings) do
 			if typeof(baseThemeForKeys_InSettings[key]) == "Color3" then
-				table.insert(sortedColorKeys_InSettings, key) -- Changed variable name
+				table.insert(sortedColorKeys_InSettings, key)
 			end
 		end
-		table.sort(sortedColorKeys_InSettings) -- Changed variable name
+		table.sort(sortedColorKeys_InSettings)
 
-		for _, colorKeyName in ipairs(sortedColorKeys_InSettings) do -- Changed variable name
+		for _, colorKeyName in ipairs(sortedColorKeys_InSettings) do
 			local initialColor = Themes[CurrentTheme][colorKeyName] or baseThemeForKeys_InSettings[colorKeyName]
 			local displayName = FormatColorNameForDisplay(colorKeyName)
-			CustomizeColorsSettingsSection_InSettings:AddDivider({ Text = displayName }) -- Changed variable name
-			colorControls_InSettings[colorKeyName] = {} -- Changed variable name
+			CustomizeColorsSettingsSection_InSettings:AddDivider({ Text = displayName }, dependencies)
+			colorControls_InSettings[colorKeyName] = {}
 			local initialHex = ColorToHex(initialColor)
 
-			local hexInput_InSettings = CustomizeColorsSettingsSection_InSettings:AddInput({ -- Changed variable name
+			local hexInput_InSettings = CustomizeColorsSettingsSection_InSettings:AddInput({
 				Title = displayName .. " Hex", Content = "Hexadecimal color code (e.g., #FF0000)",
 				Default = initialHex, Flag = "CustomColorHex_"..colorKeyName,
 				Callback = function(hexValue)
 					if hexValue:match("^#%x%x%x%x%x%x$") then
-						updateSlidersFromHex_InSettings(colorKeyName, hexValue) -- Changed function name
+						updateSlidersFromHex_InSettings(colorKeyName, hexValue)
 					else
-						UBHubLib:MakeNotify({Title="Invalid Hex", Content="Please use format #RRGGBB."})
-						hexInput_InSettings:SetValue(ColorToHex(Themes[CurrentTheme][colorKeyName])) -- Changed variable name
+						dependencies.UBHubLib:MakeNotify({Title="Invalid Hex", Content="Please use format #RRGGBB."})
+						hexInput_InSettings:SetValue(ColorToHex(Themes[CurrentTheme][colorKeyName]))
 					end
 				end
-			})
-			colorControls_InSettings[colorKeyName].hexInput = hexInput_InSettings -- Changed variable name
+			}, dependencies)
+			colorControls_InSettings[colorKeyName].hexInput = hexInput_InSettings
 
-			local rSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({ -- Changed variable name
+			local rSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({
 				Title = "Red", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor.R * 255),
-				Flag = "CustomColorR_"..colorKeyName,  Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "R", value) end -- Changed function name
-			})
-			colorControls_InSettings[colorKeyName].rSlider = rSlider_InSettings -- Changed variable name
+				Flag = "CustomColorR_"..colorKeyName,  Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "R", value) end
+			}, dependencies)
+			colorControls_InSettings[colorKeyName].rSlider = rSlider_InSettings
 
-			local gSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({ -- Changed variable name
+			local gSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({
 				Title = "Green", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor.G * 255),
-				Flag = "CustomColorG_"..colorKeyName, Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "G", value) end -- Changed function name
-			})
-			colorControls_InSettings[colorKeyName].gSlider = gSlider_InSettings -- Changed variable name
+				Flag = "CustomColorG_"..colorKeyName, Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "G", value) end
+			}, dependencies)
+			colorControls_InSettings[colorKeyName].gSlider = gSlider_InSettings
 
-			local bSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({ -- Changed variable name
+			local bSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({
 				Title = "Blue", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor.B * 255),
-				Flag = "CustomColorB_"..colorKeyName, Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "B", value) end -- Changed function name
-			})
-			colorControls_InSettings[colorKeyName].bSlider = bSlider_InSettings -- Changed variable name
+				Flag = "CustomColorB_"..colorKeyName, Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "B", value) end
+			}, dependencies)
+			colorControls_InSettings[colorKeyName].bSlider = bSlider_InSettings
 		end
 	end
 
