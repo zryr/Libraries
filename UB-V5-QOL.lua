@@ -1843,570 +1843,987 @@ function UBHubLib:MakeGui(GuiConfig)
 	dependencies.LayersTab = LayersTab -- Added LayersTab for finding Settings_TabButton
 	dependencies.UBHubLib = UBHubLib -- Added UBHubLib for MakeNotify
 
+	-- =================================================================
+	-- BLOCK 2: Element Helper Functions
+	-- These are placed before UIInstance:CreateTab
+	-- =================================================================
+	local function Helper_CreateButton(parent, config, dependencies, updateVisualsCallback)
+		local config = config or {}
+		config.Title = config.Title or "Button"
+		config.Content = config.Content or ""
+		config.Icon = config.Icon -- Keep as nil if not provided, let LoadUIAsset handle defaults if necessary
+		config.Callback = config.Callback or function() end
+
+		local ButtonFrame = Instance.new("Frame")
+		ButtonFrame.Name = "ButtonElement"
+		ButtonFrame.Parent = parent
+		ButtonFrame.Size = UDim2.new(1,0,0,46) -- Default size, can be adjusted
+		ButtonFrame.BackgroundTransparency = 0.935
+		ButtonFrame.BackgroundColor3 = dependencies.GetColor("Secondary", ButtonFrame, "BackgroundColor3")
+		Instance.new("UICorner", ButtonFrame).CornerRadius = UDim.new(0,4)
+		-- LayoutOrder will be handled by the parent's UIListLayout
+
+		local ButtonTitle = Instance.new("TextLabel", ButtonFrame)
+		ButtonTitle.Name = "ButtonTitle"
+		ButtonTitle.Font = Enum.Font.GothamBold
+		ButtonTitle.Text = config.Title
+		ButtonTitle.TextColor3 = dependencies.GetColor("Text", ButtonTitle, "TextColor3")
+		ButtonTitle.TextSize = 13
+		ButtonTitle.TextXAlignment = Enum.TextXAlignment.Left
+		ButtonTitle.TextYAlignment = Enum.TextYAlignment.Top
+		ButtonTitle.BackgroundTransparency=1
+		ButtonTitle.Position = UDim2.new(0,10,0,10)
+		ButtonTitle.Size = UDim2.new(1,- (config.Icon and 40 or 15) ,0,13) -- Adjust size if icon is present
+
+		local ButtonContent = Instance.new("TextLabel", ButtonFrame)
+		ButtonContent.Name = "ButtonContent"
+		ButtonContent.Font = Enum.Font.Gotham
+		ButtonContent.Text = config.Content
+		ButtonContent.TextColor3 = dependencies.GetColor("Text", ButtonContent, "TextColor3")
+		ButtonContent.TextSize = 12
+		ButtonContent.TextTransparency = 0.4
+		ButtonContent.TextWrapped = true
+		ButtonContent.TextXAlignment = Enum.TextXAlignment.Left
+		ButtonContent.TextYAlignment = Enum.TextYAlignment.Bottom
+		ButtonContent.BackgroundTransparency=1
+		ButtonContent.Position = UDim2.new(0,10,0,0)
+		ButtonContent.Size = UDim2.new(1,- (config.Icon and 40 or 15),1,-10)
+
+		local ActualButton = Instance.new("TextButton", ButtonFrame)
+		ActualButton.Name = "ActualButton"
+		ActualButton.Text = ""
+		ActualButton.Size = UDim2.new(1,0,1,0)
+		ActualButton.BackgroundTransparency = 1
+		ActualButton.Activated:Connect(function()
+			dependencies.CircleClick(ActualButton, dependencies.Mouse.X, dependencies.Mouse.Y)
+			if config.Callback then config.Callback() end
+		end)
+
+		if config.Icon then
+			local IconFrame = Instance.new("Frame", ButtonFrame)
+			IconFrame.Name = "IconFrame"
+			IconFrame.AnchorPoint = Vector2.new(1,0.5)
+			IconFrame.BackgroundTransparency = 1
+			IconFrame.Position = UDim2.new(1,-10,0.5,0)
+			IconFrame.Size = UDim2.new(0,25,0,25)
+			local IconImage = Instance.new("ImageLabel", IconFrame)
+			IconImage.Name = "ButtonIcon"
+			IconImage.Image = dependencies.LoadUIAsset(config.Icon, "ButtonIcon_"..config.Title)
+			IconImage.AnchorPoint = Vector2.new(0.5,0.5)
+			IconImage.BackgroundTransparency = 1
+			IconImage.Position = UDim2.new(0.5,0,0.5,0)
+			IconImage.Size = UDim2.new(1,0,1,0)
+		end
+
+		task.defer(updateVisualsCallback)
+		return {} -- Return an empty API table for now
+	end
+
+	local function Helper_CreateSlider(parent, config, dependencies, updateVisualsCallback)
+		local config = config or {}
+		config.Title = config.Title or "Slider"
+		config.Min = config.Min or 0
+		config.Max = config.Max or 100
+		config.Increment = config.Increment or 1
+		local savedValue = config.Flag and dependencies.Flags[config.Flag]
+		config.Default = tonumber(savedValue or config.Default or config.Min)
+		config.Callback = config.Callback or function() end
+
+		local SliderFrame = Instance.new("Frame")
+		SliderFrame.Name = "SliderElement"
+		SliderFrame.Parent = parent
+		SliderFrame.Size = UDim2.new(1,0,0,55)
+		SliderFrame.BackgroundTransparency = 0.935
+		SliderFrame.BackgroundColor3 = dependencies.GetColor("Secondary", SliderFrame, "BackgroundColor3")
+		Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(0,4)
+
+		local SliderTitle = Instance.new("TextLabel", SliderFrame)
+		SliderTitle.Name = "SliderTitle"; SliderTitle.Font = Enum.Font.GothamBold; SliderTitle.Text = config.Title
+		SliderTitle.TextColor3 = dependencies.GetColor("Text", SliderTitle, "TextColor3"); SliderTitle.TextSize = 13
+		SliderTitle.TextXAlignment = Enum.TextXAlignment.Left; SliderTitle.TextYAlignment = Enum.TextYAlignment.Top
+		SliderTitle.BackgroundTransparency=1; SliderTitle.Position = UDim2.new(0,10,0,10); SliderTitle.Size = UDim2.new(1,-60,0,13)
+
+		local SliderValueText = Instance.new("TextBox", SliderFrame)
+		SliderValueText.Name = "SliderValueText"; SliderValueText.Font = Enum.Font.GothamBold
+		SliderValueText.TextColor3 = dependencies.GetColor("Text", SliderValueText, "TextColor3"); SliderValueText.TextSize = 12
+		SliderValueText.BackgroundTransparency = 0.8
+		SliderValueText.BackgroundColor3 = dependencies.GetColor("Accent", SliderValueText, "BackgroundColor3")
+		SliderValueText.Position = UDim2.new(1,-45,0,5); SliderValueText.Size = UDim2.new(0,40,0,20)
+		Instance.new("UICorner", SliderValueText).CornerRadius = UDim.new(0,3)
+
+		local Bar = Instance.new("Frame", SliderFrame)
+		Bar.Name = "Bar"; Bar.BackgroundColor3 = dependencies.GetColor("Accent", Bar, "BackgroundColor3")
+		Bar.BorderSizePixel = 0; Bar.Position = UDim2.new(0,10,1,-20); Bar.Size = UDim2.new(1,-20,0,5)
+		Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,100)
+
+		local Progress = Instance.new("Frame", Bar)
+		Progress.Name = "Progress"; Progress.BackgroundColor3 = dependencies.GetColor("ThemeHighlight", Progress, "BackgroundColor3")
+		Progress.BorderSizePixel = 0; Instance.new("UICorner", Progress).CornerRadius = UDim.new(0,100)
+
+		local DraggerHitbox = Instance.new("TextButton", Bar)
+		DraggerHitbox.Name = "DraggerHitbox"; DraggerHitbox.Text = ""; DraggerHitbox.Size = UDim2.new(0,20,0,20)
+		DraggerHitbox.AnchorPoint = Vector2.new(0.5,0.5); DraggerHitbox.BackgroundTransparency=1; DraggerHitbox.ZIndex=3
+
+		local VisualDragger = Instance.new("Frame", DraggerHitbox)
+		VisualDragger.Name = "VisualDragger"; VisualDragger.Size=UDim2.new(0,10,0,10); VisualDragger.AnchorPoint=Vector2.new(0.5,0.5)
+		VisualDragger.Position=UDim2.new(0.5,0,0.5,0); VisualDragger.BackgroundColor3=dependencies.GetColor("ThemeHighlight",VisualDragger,"BackgroundColor3")
+		VisualDragger.BorderSizePixel=0; Instance.new("UICorner",VisualDragger).CornerRadius=UDim.new(0,100)
+
+		local SliderAPI = {}
+		local currentValue = config.Default
+
+		local function UpdateSliderVisuals(value)
+			value = math.clamp(math.floor(value/config.Increment + 0.5) * config.Increment, config.Min, config.Max)
+			currentValue = value
+			SliderValueText.Text = tostring(value)
+			local percent = (config.Max - config.Min == 0) and 0 or (value - config.Min) / (config.Max - config.Min)
+			Progress.Size = UDim2.new(percent,0,1,0)
+			DraggerHitbox.Position = UDim2.new(percent,0,0.5,0)
+		end
+
+		function SliderAPI:SetValue(value)
+			UpdateSliderVisuals(value)
+			if config.Flag and dependencies.SaveFile then dependencies.SaveFile(config.Flag, currentValue) end
+			config.Callback(currentValue)
+		end
+		function SliderAPI:GetValue() return currentValue end
+
+		DraggerHitbox.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				local dragging = true
+				local inputChangedConn, inputEndedConn, draggerEndedConn
+				inputChangedConn = dependencies.UserInputService.InputChanged:Connect(function(subInput)
+					if dragging and (subInput.UserInputType == Enum.UserInputType.MouseMovement or subInput.UserInputType == Enum.UserInputType.Touch) then
+						local localPos = Bar.AbsolutePosition.X
+						local mousePos = subInput.Position.X
+						local percent = math.clamp((mousePos - localPos) / Bar.AbsoluteSize.X, 0, 1)
+						SliderAPI:SetValue(config.Min + percent * (config.Max - config.Min))
+					end
+				end)
+				inputEndedConn = input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then dragging = false; if inputChangedConn then inputChangedConn:Disconnect() end; if inputEndedConn then inputEndedConn:Disconnect() end; if draggerEndedConn then draggerEndedConn:Disconnect() end end
+				end)
+				draggerEndedConn = DraggerHitbox.InputEnded:Connect(function(endInput)
+					if endInput.UserInputType == input.UserInputType then dragging = false; if inputChangedConn then inputChangedConn:Disconnect() end; if inputEndedConn then inputEndedConn:Disconnect() end; if draggerEndedConn then draggerEndedConn:Disconnect() end end
+				end)
+			end
+		end)
+		SliderValueText.FocusLost:Connect(function(enterPressed)
+			if enterPressed then
+				local num = tonumber(SliderValueText.Text)
+				if num then SliderAPI:SetValue(num) else SliderAPI:SetValue(currentValue) -- Revert if not a number
+				end
+			else
+				SliderValueText.Text = tostring(currentValue) -- Revert if focus lost without enter
+			end
+		end)
+
+		SliderAPI:SetValue(config.Default) -- Initialize
+		task.defer(updateVisualsCallback)
+		return SliderAPI
+	end
+
+	local function Helper_CreateToggle(parent, config, dependencies, updateVisualsCallback)
+		local config = config or {}
+		config.Title = config.Title or "Toggle"
+		config.Content = config.Content or ""
+		local savedValue = config.Flag and dependencies.Flags[config.Flag]
+		config.Default = (savedValue ~= nil) and savedValue or config.Default or false
+		config.Callback = config.Callback or function() end
+
+		local ToggleFrame = Instance.new("Frame")
+		ToggleFrame.Name = "ToggleElement"; ToggleFrame.Parent = parent
+		ToggleFrame.Size = UDim2.new(1,0,0,46); ToggleFrame.BackgroundTransparency = 0.935
+		ToggleFrame.BackgroundColor3 = dependencies.GetColor("Secondary", ToggleFrame, "BackgroundColor3")
+		Instance.new("UICorner", ToggleFrame).CornerRadius = UDim.new(0,4)
+
+		local ToggleTitle = Instance.new("TextLabel", ToggleFrame)
+		ToggleTitle.Name = "ToggleTitle"; ToggleTitle.Font = Enum.Font.GothamBold; ToggleTitle.Text = config.Title
+		ToggleTitle.TextColor3 = dependencies.GetColor("Text", ToggleTitle, "TextColor3"); ToggleTitle.TextSize = 13
+		ToggleTitle.TextXAlignment = Enum.TextXAlignment.Left; ToggleTitle.TextYAlignment = Enum.TextYAlignment.Top
+		ToggleTitle.BackgroundTransparency=1; ToggleTitle.Position = UDim2.new(0,10,0,10); ToggleTitle.Size = UDim2.new(1,-50,0,13)
+
+		local ToggleContent = Instance.new("TextLabel", ToggleFrame)
+		ToggleContent.Name = "ToggleContent"; ToggleContent.Font = Enum.Font.Gotham; ToggleContent.Text = config.Content
+		ToggleContent.TextColor3 = dependencies.GetColor("Text", ToggleContent, "TextColor3"); ToggleContent.TextSize = 12
+		ToggleContent.TextTransparency = 0.4; ToggleContent.TextWrapped = true; ToggleContent.TextXAlignment = Enum.TextXAlignment.Left
+		ToggleContent.TextYAlignment = Enum.TextYAlignment.Bottom; ToggleContent.BackgroundTransparency=1
+		ToggleContent.Position = UDim2.new(0,10,0,0); ToggleContent.Size = UDim2.new(1,-50,1,-10)
+
+		local SwitchFrame = Instance.new("Frame", ToggleFrame)
+		SwitchFrame.Name = "SwitchFrame"; SwitchFrame.AnchorPoint = Vector2.new(1,0.5)
+		SwitchFrame.BackgroundColor3 = dependencies.GetColor("Accent", SwitchFrame, "BackgroundColor3")
+		SwitchFrame.BackgroundTransparency = 0.5; SwitchFrame.BorderSizePixel = 0
+		SwitchFrame.Position = UDim2.new(1,-10,0.5,0); SwitchFrame.Size = UDim2.new(0,30,0,15)
+		Instance.new("UICorner", SwitchFrame).CornerRadius = UDim.new(0,100)
+
+		local SwitchCircle = Instance.new("Frame", SwitchFrame)
+		SwitchCircle.Name = "SwitchCircle"; SwitchCircle.BackgroundColor3 = dependencies.GetColor("ThemeHighlight", SwitchCircle, "BackgroundColor3")
+		SwitchCircle.BorderSizePixel = 0; SwitchCircle.Size = UDim2.new(0,12,0,12)
+		Instance.new("UICorner", SwitchCircle).CornerRadius = UDim.new(0,100)
+
+		local ActualButton = Instance.new("TextButton", ToggleFrame)
+		ActualButton.Name = "ActualButton"; ActualButton.Text = ""; ActualButton.Size = UDim2.new(1,0,1,0); ActualButton.BackgroundTransparency = 1
+
+		local ToggleAPI = {}
+		local currentValue = config.Default
+
+		local function UpdateToggleVisual(value)
+			SwitchCircle:TweenPosition(UDim2.new(value and 0.5 or 0, value and -1 or 1, 0.5, -6), "Out", "Quad", 0.15, true)
+		end
+
+		function ToggleAPI:SetValue(value)
+			currentValue = value
+			UpdateToggleVisual(currentValue)
+			if config.Flag and dependencies.SaveFile then dependencies.SaveFile(config.Flag, currentValue) end
+			config.Callback(currentValue)
+		end
+		function ToggleAPI:GetValue() return currentValue end
+
+		ActualButton.Activated:Connect(function()
+			dependencies.CircleClick(ActualButton, dependencies.Mouse.X, dependencies.Mouse.Y)
+			ToggleAPI:SetValue(not currentValue)
+		end)
+
+		ToggleAPI:SetValue(config.Default) -- Initialize
+		task.defer(updateVisualsCallback)
+		return ToggleAPI
+	end
+
+	local function Helper_CreateInput(parent, config, dependencies, updateVisualsCallback)
+		local config = config or {}
+		config.Title = config.Title or "Input"
+		config.Content = config.Content or ""
+		config.Placeholder = config.Placeholder or "Enter text..."
+		local savedValue = config.Flag and dependencies.Flags[config.Flag]
+		config.Default = savedValue or config.Default or ""
+		config.Callback = config.Callback or function() end
+
+		local InputFrame = Instance.new("Frame")
+		InputFrame.Name = "InputElement"; InputFrame.Parent = parent
+		InputFrame.Size = UDim2.new(1,0,0,46); InputFrame.BackgroundTransparency = 0.935
+		InputFrame.BackgroundColor3 = dependencies.GetColor("Secondary", InputFrame, "BackgroundColor3")
+		Instance.new("UICorner", InputFrame).CornerRadius = UDim.new(0,4)
+
+		local InputTitle = Instance.new("TextLabel", InputFrame)
+		InputTitle.Name = "InputTitle"; InputTitle.Font = Enum.Font.GothamBold; InputTitle.Text = config.Title
+		InputTitle.TextColor3 = dependencies.GetColor("Text", InputTitle, "TextColor3"); InputTitle.TextSize = 13
+		InputTitle.TextXAlignment = Enum.TextXAlignment.Left; InputTitle.TextYAlignment = Enum.TextYAlignment.Top
+		InputTitle.BackgroundTransparency=1; InputTitle.Position = UDim2.new(0,10,0,10); InputTitle.Size = UDim2.new(1,-160,0,13)
+
+		local InputContent = Instance.new("TextLabel", InputFrame)
+		InputContent.Name = "InputContent"; InputContent.Font = Enum.Font.Gotham; InputContent.Text = config.Content
+		InputContent.TextColor3 = dependencies.GetColor("Text", InputContent, "TextColor3"); InputContent.TextSize = 12
+		InputContent.TextTransparency = 0.4; InputContent.TextWrapped = true; InputContent.TextXAlignment = Enum.TextXAlignment.Left
+		InputContent.TextYAlignment = Enum.TextYAlignment.Bottom; InputContent.BackgroundTransparency=1
+		InputContent.Position = UDim2.new(0,10,0,0); InputContent.Size = UDim2.new(1,-160,1,-10)
+
+		local TextBox = Instance.new("TextBox", InputFrame)
+		TextBox.Name = "TextBox"; TextBox.Font = Enum.Font.Gotham; TextBox.Text = config.Default
+		TextBox.PlaceholderText = config.Placeholder
+		TextBox.PlaceholderColor3 = Color3.fromRGB(180,180,180) -- Standard placeholder color
+		TextBox.TextColor3 = dependencies.GetColor("Text", TextBox, "TextColor3"); TextBox.TextSize = 12
+		TextBox.BackgroundColor3 = dependencies.GetColor("Accent", TextBox, "BackgroundColor3")
+		TextBox.AnchorPoint = Vector2.new(1,0.5)
+		TextBox.Position = UDim2.new(1,-10,0.5,0); TextBox.Size = UDim2.new(0,140,0,24)
+		Instance.new("UICorner", TextBox).CornerRadius = UDim.new(0,3); TextBox.ClearTextOnFocus = false
+
+		local InputAPI = {}
+		local currentValue = config.Default
+
+		function InputAPI:SetValue(value)
+			currentValue = value
+			TextBox.Text = currentValue
+			if config.Flag and dependencies.SaveFile then dependencies.SaveFile(config.Flag, currentValue) end
+			config.Callback(currentValue)
+		end
+		function InputAPI:GetValue() return currentValue end
+
+		TextBox.FocusLost:Connect(function(enterPressed)
+			if enterPressed then
+				InputAPI:SetValue(TextBox.Text)
+			else
+				TextBox.Text = currentValue -- Revert if focus lost without enter
+			end
+		end)
+
+		InputAPI:SetValue(config.Default) -- Initialize
+		task.defer(updateVisualsCallback)
+		return InputAPI
+	end
+
+	local function Helper_CreateDropdown(parent, config, dependencies, updateVisualsCallback)
+		-- This helper will reuse the more complex Helper_CreateDropdownElements from the main library body
+		-- It acts as a simple wrapper to fit the pattern for section elements.
+		local dropdownApi = Helper_CreateDropdownElements(parent, config, dependencies)
+		-- Helper_CreateDropdownElements should handle its own sizing and add itself to parent.
+		-- It needs 'parent' to be the frame where the dropdown UI is created.
+		-- The LayoutOrder of the DropdownFrame created by Helper_CreateDropdownElements will be handled
+		-- by the UIListLayout in 'parent' (which is SectionContentFrame).
+		task.defer(updateVisualsCallback)
+		return dropdownApi
+	end
+
+	local function Helper_CreateDivider(parent, config, dependencies, updateVisualsCallback)
+		local config = config or {}
+		config.Text = config.Text or nil -- Optional text for the divider
+		config.Color = config.Color or dependencies.GetColor("Stroke")
+		config.Thickness = config.Thickness or 1
+		config.TextSize = config.TextSize or 12
+		config.TextColor = config.TextColor or dependencies.GetColor("Text")
+		config.Font = config.Font or Enum.Font.GothamBold
+
+		local DividerContainer = Instance.new("Frame", parent)
+		DividerContainer.Name = "DividerElement"
+		DividerContainer.BackgroundTransparency = 1
+
+		if not config.Text or config.Text == "" then
+			DividerContainer.Size = UDim2.new(1,0,0,config.Thickness + 4) -- Line + padding
+			local Line = Instance.new("Frame", DividerContainer)
+			Line.Name = "FullLine"
+			Line.BackgroundColor3 = config.Color
+			Line.BorderSizePixel = 0
+			Line.AnchorPoint = Vector2.new(0.5,0.5)
+			Line.Position = UDim2.new(0.5,0,0.5,0)
+			Line.Size = UDim2.new(1,-10,0,config.Thickness) -- -10 for padding
+		else
+			DividerContainer.Size = UDim2.new(1,0,0,config.TextSize + 8) -- Text height + padding
+			local ListLayout = Instance.new("UIListLayout", DividerContainer)
+			ListLayout.FillDirection = Enum.FillDirection.Horizontal
+			ListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+			ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			ListLayout.Padding = UDim.new(0,8)
+
+			local Line1 = Instance.new("Frame", DividerContainer)
+			Line1.Name="Line1"; Line1.BackgroundColor3=config.Color; Line1.BorderSizePixel=0
+			Line1.Size=UDim2.new(0.35,0,0,config.Thickness); Line1.LayoutOrder=1 -- Flexible width
+
+			local DividerText = Instance.new("TextLabel", DividerContainer)
+			DividerText.Name="DividerText"; DividerText.Text=config.Text; DividerText.TextColor3=config.TextColor
+			DividerText.Font=config.Font; DividerText.TextSize=config.TextSize; DividerText.BackgroundTransparency=1
+			DividerText.AutomaticSize=Enum.AutomaticSize.X; DividerText.Size=UDim2.new(0,0,1,0); DividerText.LayoutOrder=2
+
+			local Line2=Instance.new("Frame", DividerContainer)
+			Line2.Name="Line2"; Line2.BackgroundColor3=config.Color; Line2.BorderSizePixel=0
+			Line2.Size=UDim2.new(0.35,0,0,config.Thickness); Line2.LayoutOrder=3 -- Flexible width
+
+			-- Use Change listener to adjust line widths to fill space
+			local function adjustLines()
+				local containerWidth = DividerContainer.AbsoluteSize.X - ListLayout.Padding.Offset * 2
+				local textWidth = DividerText.AbsoluteSize.X
+				local remainingWidth = containerWidth - textWidth
+				local lineWidth = math.max(5, remainingWidth / 2) -- Min width of 5px
+				Line1.Size = UDim2.new(0, lineWidth, 0, config.Thickness)
+				Line2.Size = UDim2.new(0, lineWidth, 0, config.Thickness)
+			end
+			DividerContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(adjustLines)
+			DividerText:GetPropertyChangedSignal("AbsoluteSize"):Connect(adjustLines)
+			task.defer(adjustLines)
+		end
+
+		task.defer(updateVisualsCallback)
+		return {}
+	end
+
+	local function Helper_CreateParagraph(parent, config, dependencies, updateVisualsCallback)
+		local config = config or {}
+		config.Title = config.Title or "Paragraph" -- Can be used as a header for the text
+		config.Content = config.Content or "Some descriptive text."
+		config.TitleColor = config.TitleColor or dependencies.GetColor("Text")
+		config.ContentColor = config.ContentColor or dependencies.GetColor("Text")
+		config.TitleFont = config.TitleFont or Enum.Font.GothamBold
+		config.ContentFont = config.ContentFont or Enum.Font.Gotham
+		config.TitleSize = config.TitleSize or 13
+		config.ContentSize = config.ContentSize or 12
+
+		local ParagraphFrame = Instance.new("Frame")
+		ParagraphFrame.Name = "ParagraphElement"; ParagraphFrame.Parent = parent
+		ParagraphFrame.BackgroundTransparency = 1 -- Usually transparent, just a container for text
+		ParagraphFrame.Size = UDim2.new(1,0,0,10) -- Initial small height, will auto-size
+
+		local UIList = Instance.new("UIListLayout", ParagraphFrame)
+		UIList.Padding = UDim.new(0,3)
+		UIList.SortOrder = Enum.SortOrder.LayoutOrder
+
+		local ParagraphTitleLabel
+		if config.Title and config.Title ~= "" then
+			ParagraphTitleLabel = Instance.new("TextLabel", ParagraphFrame)
+			ParagraphTitleLabel.Name = "ParagraphTitle"
+			ParagraphTitleLabel.Font = config.TitleFont
+			ParagraphTitleLabel.Text = config.Title
+			ParagraphTitleLabel.TextColor3 = config.TitleColor
+			ParagraphTitleLabel.TextSize = config.TitleSize
+			ParagraphTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+			ParagraphTitleLabel.TextWrapped = true
+			ParagraphTitleLabel.BackgroundTransparency = 1
+			ParagraphTitleLabel.Size = UDim2.new(1,-10,0,0) -- Full width, auto Y height
+			ParagraphTitleLabel.AutomaticSize = Enum.AutomaticSize.Y
+			ParagraphTitleLabel.LayoutOrder = 1
+		end
+
+		local ParagraphContentLabel = Instance.new("TextLabel", ParagraphFrame)
+		ParagraphContentLabel.Name = "ParagraphContent"
+		ParagraphContentLabel.Font = config.ContentFont
+		ParagraphContentLabel.Text = config.Content
+		ParagraphContentLabel.TextColor3 = config.ContentColor
+		ParagraphContentLabel.TextTransparency = 0.1 -- Slightly less prominent than title
+		ParagraphContentLabel.TextSize = config.ContentSize
+		ParagraphContentLabel.TextXAlignment = Enum.TextXAlignment.Left
+		ParagraphContentLabel.TextWrapped = true
+		ParagraphContentLabel.BackgroundTransparency = 1
+		ParagraphContentLabel.Size = UDim2.new(1,-10,0,0) -- Full width, auto Y height
+		ParagraphContentLabel.AutomaticSize = Enum.AutomaticSize.Y
+		ParagraphContentLabel.LayoutOrder = 2
+
+		local ParagraphAPI = {}
+		function ParagraphAPI:SetText(newContent, newTitle)
+			ParagraphContentLabel.Text = newContent or config.Content
+			if ParagraphTitleLabel and newTitle then
+				ParagraphTitleLabel.Text = newTitle
+			end
+			task.defer(updateVisualsCallback) -- Text change might affect height
+		end
+
+		task.defer(updateVisualsCallback) -- Initial call after elements are created
+		return ParagraphAPI
+	end
+
+	-- This master 'dependencies' table will hold all shared resources.
+	local dependencies = {
+		-- Helper Functions
+		GetColor = GetColor,
+		SetTheme = SetTheme,
+		GetThemes = GetThemes,
+		LoadUIAsset = LoadUIAsset,
+		SaveFile = SaveFile, -- Will be defined by the library and added, ensure it's here
+		CircleClick = CircleClick,
+		-- Shared UI Instances & Variables
+		MoreBlur = MoreBlur,
+		DropdownFolder = DropdownFolder,
+		DropPageLayout = DropPageLayout,
+		DropdownSelect = DropdownSelect,
+		Mouse = Mouse,
+		TweenService = TweenService,
+		Flags = Flags,
+		-- Global Counters (passed by reference via the table)
+		CountDropdown = { Value = CountDropdown }, -- Pass as a table { Value = ... }
+		-- Other necessary items from the old dependencies table that might be used by helpers
+		HttpService = HttpService,
+		UserInputService = UserInputService,
+		GuiConfig = GuiConfig,
+		UIInstance = UIInstance, -- For rare cases
+		MakeNotify = UBHubLib.MakeNotify, -- Already in old dependencies
+		CurrentThemeRef = function() return CurrentTheme end, -- Already in old dependencies
+		LayersPageLayout = LayersPageLayout,
+		NameTab = NameTab,
+		ScrollTab = ScrollTab,
+		LayersTab = LayersTab
+	}
+	-- Ensure SaveFile is part of dependencies, it's created locally in MakeGui
+	-- If SaveFile is defined after this dependencies table, it needs to be added:
+	-- dependencies.SaveFile = SaveFile (this is handled by the existing code structure)
+
 	--// Tabs
-	-- local CountTab = 0 -- Moved to top of MakeGui
-	-- local CountDropdown = 0 -- This is now dependencies.CountDropdownRef.Value
-	function UIInstance:CreateTab(TabConfig, dependencies) -- Added dependencies
+	-- local CountTab = 0 -- This is initialized near the top of MakeGui
+	-- local CountDropdown = 0 -- This is now dependencies.CountDropdown.Value
+
+	-- API: CreateTab
+	function UIInstance:CreateTab(TabConfig)
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "Tab"
 		TabConfig.Icon = TabConfig.Icon or ""
-		TabConfig.IsSettingsTab = TabConfig.IsSettingsTab or false -- Default to false
 
-		local ScrolLayers = Instance.new("ScrollingFrame");
-		local UIListLayout1 = Instance.new("UIListLayout");
+		local isSettingsTab = TabConfig.IsSettingsTab or false
+		local parentForTabButton = isSettingsTab and LayersTab or ScrollTab -- Parent to main list or scroll frame
 
-		ScrolLayers.ScrollBarImageColor3 = Color3.fromRGB(80.00000283122063, 80.00000283122063, 80.00000283122063)
-		ScrolLayers.ScrollBarThickness = 0
-		ScrolLayers.Active = true
-		ScrolLayers.LayoutOrder = CountTab
-		ScrolLayers.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		ScrolLayers.BackgroundTransparency = 0.9990000128746033
-		ScrolLayers.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		ScrolLayers.BorderSizePixel = 0
-		ScrolLayers.Size = UDim2.new(1, 0, 1, 0)
-		ScrolLayers.Name = "ScrolLayers"
-		ScrolLayers.Parent = LayersFolder
+		-- Tab Button UI Creation (Frame, TextLabel, ImageLabel, etc.)
+		local TabButtonFrame = Instance.new("Frame")
+		TabButtonFrame.Name = TabConfig.Name .. "_TabButton"
+		TabButtonFrame.Parent = parentForTabButton
+		TabButtonFrame.Size = UDim2.new(1, 0, 0, 40) -- Standard height
+		TabButtonFrame.BackgroundColor3 = dependencies.GetColor("Secondary") -- Example, adjust as needed
+		TabButtonFrame.BackgroundTransparency = 0.95
+		TabButtonFrame.LayoutOrder = isSettingsTab and 999 or CountTab -- Ensure settings tab is at the bottom
+		Instance.new("UICorner", TabButtonFrame).CornerRadius = UDim.new(0, 4)
 
-		local TabConfigNameValue = Instance.new("StringValue")
-		TabConfigNameValue.Name = "TabConfig_Name"
-		TabConfigNameValue.Value = TabConfig.Name
-		TabConfigNameValue.Parent = ScrolLayers
-
-		UIListLayout1.Padding = UDim.new(0, 3)
-		UIListLayout1.SortOrder = Enum.SortOrder.LayoutOrder
-		UIListLayout1.Parent = ScrolLayers
-
-		local Tab = Instance.new("Frame");
-		local UICorner3 = Instance.new("UICorner");
-		local TabButton = Instance.new("TextButton");
-		local TabName = Instance.new("TextLabel")
-		local FeatureImg = Instance.new("ImageLabel");
-		local UIStroke2 = Instance.new("UIStroke");
-		local UICorner4 = Instance.new("UICorner");
-
-		Tab.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		if CountTab == 0 then
-			Tab.BackgroundTransparency = 0.9200000166893005
-		else
-			Tab.BackgroundTransparency = 0.9990000128746033
-		end
-		Tab.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		Tab.BorderSizePixel = 0
-		Tab.LayoutOrder = TabConfig.IsSettingsTab and 99 or CountTab -- High LayoutOrder for settings tab
-		Tab.Size = UDim2.new(1, 0, 0, 40) -- Standardized height, can be adjusted if settings tab needs different height
-		Tab.Name = TabConfig.Name .. "_TabButton" -- More specific name
-		Tab.Parent = TabConfig.IsSettingsTab and LayersTab or ScrollTab -- Conditional Parent
-
-		-- Style adjustments for settings tab button if needed (e.g., different background)
-		if TabConfig.IsSettingsTab then
-			-- Example: Make settings tab button visually distinct if desired, or use standard tab styling
-			Tab.BackgroundColor3 = GetColor("Secondary", Tab, "BackgroundColor3") -- Or a specific color
-			Tab.BackgroundTransparency = 0.85 -- Slightly more opaque for emphasis
-			Tab.BorderSizePixel = 1
-			Tab.BorderColor3 = GetColor("Stroke", Tab, "BorderColor3")
-
-			-- Ensure the icon and text elements are correctly set up if they were part of the old SettingsTabButton
-			local settingsIcon = FeatureImg -- Assuming FeatureImg is the icon instance
-			settingsIcon.Image = TabConfig.Icon
-			settingsIcon.Size = UDim2.new(0, 20, 0, 20)
-			settingsIcon.Position = UDim2.new(0, 8, 0.5, -10) -- Adjust as needed
-
-			local settingsText = TabName -- Assuming TabName is the text label instance
-			settingsText.Text = TabConfig.Name
-			settingsText.Position = UDim2.new(0, 36, 0.5, -settingsText.TextBounds.Y/2) -- Adjust as needed
-
-			-- If LayersTab uses a UIListLayout, the LayoutOrder will handle positioning.
-			-- If not, manual positioning would be needed here based on ScrollTab's end and separator.
-			-- For now, assuming LayersTabMainLayout (UIListLayout in LayersTab) will handle it.
-		end
-
-		UICorner3.CornerRadius = UDim.new(0, 4)
-		UICorner3.Parent = Tab
-
-		TabButton.Font = Enum.Font.GothamBold
-		TabButton.Text = ""
-		TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-		TabButton.TextSize = 13
-		TabButton.TextXAlignment = Enum.TextXAlignment.Left
-		TabButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		TabButton.BackgroundTransparency = 0.9990000128746033
-		TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		TabButton.BorderSizePixel = 0
-		TabButton.Size = UDim2.new(1, 0, 1, 0)
+		local TabButton = Instance.new("TextButton", TabButtonFrame)
 		TabButton.Name = "TabButton"
-		TabButton.Parent = Tab
+		TabButton.Text = ""
+		TabButton.Size = UDim2.new(1,0,1,0)
+		TabButton.BackgroundTransparency = 1
 
-		TabName.Font = Enum.Font.GothamBold
-		TabName.Text = TabConfig.Name
-		TabName.TextColor3 = Color3.fromRGB(255, 255, 255)
-		TabName.TextSize = 13
-		TabName.TextXAlignment = Enum.TextXAlignment.Left
-		TabName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		TabName.BackgroundTransparency = 0.9990000128746033
-		TabName.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		TabName.BorderSizePixel = 0
-		TabName.Size = UDim2.new(1, 0, 1, 0)
-		TabName.Position = UDim2.new(0, 30, 0, 0)
-		TabName.Name = "TabName"
-		TabName.Parent = Tab
+		local TabIcon = Instance.new("ImageLabel", TabButtonFrame)
+		TabIcon.Name = "FeatureImg"
+		TabIcon.Image = TabConfig.Icon
+		TabIcon.Size = UDim2.new(0, 16, 0, 16) -- Adjust as needed
+		TabIcon.Position = UDim2.new(0, 9, 0.5, -8) -- Adjust as needed
+		TabIcon.BackgroundTransparency = 1
 
-		FeatureImg.Image = TabConfig.Icon
-		FeatureImg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		FeatureImg.BackgroundTransparency = 0.9990000128746033
-		FeatureImg.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		FeatureImg.BorderSizePixel = 0
-		FeatureImg.Position = UDim2.new(0, 9, 0, 7)
-		FeatureImg.Size = UDim2.new(0, 16, 0, 16)
-		FeatureImg.Name = "FeatureImg"
-		FeatureImg.Parent = Tab
-		if CountTab == 0 then
-			LayersPageLayout:JumpToIndex(0)
-			NameTab.Text = TabConfig.Name
-			local ChooseFrame = Instance.new("Frame");
-			ChooseFrame.BackgroundColor3 = GetColor("ThemeHighlight",ChooseFrame,"BackgroundColor3")
-			ChooseFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
-			ChooseFrame.BorderSizePixel = 0
-			ChooseFrame.Position = UDim2.new(0, 2, 0, 9)
-			ChooseFrame.Size = UDim2.new(0, 1, 0, 12)
-			ChooseFrame.Name = "ChooseFrame"
-			ChooseFrame.Parent = Tab
+		local TabNameLabel = Instance.new("TextLabel", TabButtonFrame)
+		TabNameLabel.Name = "TabName"
+		TabNameLabel.Text = TabConfig.Name
+		TabNameLabel.Font = Enum.Font.GothamBold
+		TabNameLabel.TextColor3 = dependencies.GetColor("Text")
+		TabNameLabel.TextSize = 13
+		TabNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+		TabNameLabel.BackgroundTransparency = 1
+		TabNameLabel.Position = UDim2.new(0, 30, 0, 0) -- Adjust as needed
+		TabNameLabel.Size = UDim2.new(1, -35, 1, 0) -- Adjust as needed
 
-			UIStroke2.Color = GetColor("Secondary",UIStroke2,"Color")
-			UIStroke2.Thickness = 1.600000023841858
-			UIStroke2.Parent = ChooseFrame
+		local ChooseFrame = Instance.new("Frame", TabButtonFrame)
+		ChooseFrame.Name = "ChooseFrame"
+		ChooseFrame.BackgroundColor3 = dependencies.GetColor("ThemeHighlight")
+		ChooseFrame.BorderSizePixel = 0
+		ChooseFrame.Position = UDim2.new(0,2,0,9) -- Example position
+		ChooseFrame.Size = UDim2.new(0,1,0,12) -- Example size
+		ChooseFrame.Visible = false -- Initially hidden
+		Instance.new("UICorner", ChooseFrame).CornerRadius = UDim.new(0,3)
+		local chooseFrameStroke = Instance.new("UIStroke", ChooseFrame)
+		chooseFrameStroke.Color = dependencies.GetColor("Secondary")
+		chooseFrameStroke.Thickness = 1.6
 
-			UICorner4.Parent = ChooseFrame
-		end
-		TabButton.Activated:Connect(function()
-			CircleClick(TabButton, Mouse.X, Mouse.Y)
+		if not isSettingsTab then
+			-- Create the corresponding content page for normal tabs
+			local ScrolLayers = Instance.new("ScrollingFrame")
+			ScrolLayers.Name = "ScrolLayers_" .. TabConfig.Name -- Unique name
+			ScrolLayers.Parent = LayersFolder -- Parent to the folder holding all tab content pages
+			ScrolLayers.LayoutOrder = CountTab
+			ScrolLayers.Size = UDim2.new(1,0,1,0)
+			ScrolLayers.BackgroundTransparency = 1
+			ScrolLayers.ScrollBarThickness = 3
+			ScrolLayers.CanvasSize = UDim2.new(0,0,0,0) -- Will be updated by UIListLayout
+			local UIListLayoutContent = Instance.new("UIListLayout", ScrolLayers)
+			UIListLayoutContent.Padding = UDim.new(0,3)
+			UIListLayoutContent.SortOrder = Enum.SortOrder.LayoutOrder
 
-			-- Check if this tab is already active (no need to do anything if LayersPageLayout.CurrentPage is this tab's ScrolLayers)
-			if LayersPageLayout.CurrentPage == ScrolLayers and NameTab.Text == TabConfig.Name then
-				return
-			end
+			-- Connect button click for normal tabs
+			TabButton.Activated:Connect(function()
+				dependencies.CircleClick(TabButton, dependencies.Mouse.X, dependencies.Mouse.Y)
 
-			ClearAllTabHighlights() -- Clears highlights from all tabs in ScrollTab and the static SettingsTabButton
-
-			-- Highlight the clicked tab (Tab instance)
-			TweenService:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.92}):Play()
-			local currentChooseFrame = Tab:FindFirstChild("ChooseFrame")
-			if not currentChooseFrame then
-				currentChooseFrame = Instance.new("Frame")
-				currentChooseFrame.Name = "ChooseFrame"
-				currentChooseFrame.BackgroundColor3 = GetColor("ThemeHighlight", currentChooseFrame, "BackgroundColor3")
-				currentChooseFrame.BorderSizePixel = 0
-				currentChooseFrame.Position = UDim2.new(0, 2, 0, 9)
-				currentChooseFrame.Size = UDim2.new(0, 1, 0, 12)
-				currentChooseFrame.Parent = Tab
-				local stroke = Instance.new("UIStroke", currentChooseFrame)
-				stroke.Color = GetColor("Secondary", stroke, "Color")
-				stroke.Thickness = 1.6
-				Instance.new("UICorner", currentChooseFrame)
-			end
-			currentChooseFrame.Visible = true
-
-			-- Show its content page
-			LayersPageLayout:JumpTo(ScrolLayers)
-			NameTab.Text = TabConfig.Name
-		end)
-		--// Section
-		local CountSection = 0 -- Keep this counter for layout order if needed globally for sections
-
-		-- Define Tab object structure and its AddSection method
-		local Tab = {}
-		Tab._ScrolLayers = ScrolLayers -- Store reference to the tab's content scroller
-		Tab._UIListLayout = UIListLayout1 -- Store reference to the tab's content UIListLayout for padding
-		local currentSectionCountForTab = 0 -- Sections per tab
-
-		function Tab:AddSection(SectionTitle, dependencies) -- Added dependencies
-			SectionTitle = SectionTitle or "Section"
-			local SectionObject = {} -- This will be the returned section object
-			local CountItem = 0 -- Items per section, local to each section
-
-			-- Create SectionFrame UI
-			local SectionFrame = Instance.new("Frame")
-			SectionFrame.Name = "Section"
-			SectionFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			SectionFrame.BackgroundTransparency = 0.999
-			SectionFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
-			SectionFrame.BorderSizePixel = 0
-			SectionFrame.LayoutOrder = currentSectionCountForTab
-			SectionFrame.ClipsDescendants = true
-			SectionFrame.Size = UDim2.new(1, 0, 0, 30) -- Initial collapsed size
-			SectionFrame.Parent = self._ScrolLayers -- Parent to the tab's scroller
-
-			local SectionReal = Instance.new("Frame", SectionFrame)
-			SectionReal.Name = "SectionReal"; SectionReal.AnchorPoint = Vector2.new(0.5,0); SectionReal.BackgroundColor3 = GetColor("Secondary", SectionReal, "BackgroundColor3"); SectionReal.BackgroundTransparency=0.935; SectionReal.Position=UDim2.new(0.5,0,0,0); SectionReal.Size=UDim2.new(1,-0,0,30)
-			Instance.new("UICorner", SectionReal).CornerRadius = UDim.new(0,4)
-
-			local SectionButton = Instance.new("TextButton", SectionReal)
-			SectionButton.Name="SectionButton"; SectionButton.Text=""; SectionButton.Size=UDim2.new(1,0,1,0); SectionButton.BackgroundTransparency=1
-
-			local FeatureFrame_Section = Instance.new("Frame", SectionReal); FeatureFrame_Section.Name="FeatureFrame"; FeatureFrame_Section.AnchorPoint=Vector2.new(1,0.5); FeatureFrame_Section.BackgroundTransparency=1; FeatureFrame_Section.Position=UDim2.new(1,-5,0.5,0); FeatureFrame_Section.Size=UDim2.new(0,20,0,20)
-			local FeatureImg_Section = Instance.new("ImageLabel", FeatureFrame_Section); FeatureImg_Section.Name="FeatureImg"; FeatureImg_Section.Image=LoadUIAsset("rbxassetid://16851841101","SectionArrow.png"); FeatureImg_Section.AnchorPoint=Vector2.new(0.5,0.5); FeatureImg_Section.BackgroundTransparency=1; FeatureImg_Section.Position=UDim2.new(0.5,0,0.5,0); FeatureImg_Section.Rotation = -90; FeatureImg_Section.Size=UDim2.new(1,6,1,6)
-
-			local SectionTitleText = Instance.new("TextLabel", SectionReal)
-			SectionTitleText.Name="SectionTitle"; SectionTitleText.Font=Enum.Font.GothamBold; SectionTitleText.Text=SectionTitle; SectionTitleText.TextColor3=GetColor("Text",SectionTitleText,"TextColor3"); SectionTitleText.TextSize=13; SectionTitleText.TextXAlignment=Enum.TextXAlignment.Left; SectionTitleText.AnchorPoint=Vector2.new(0,0.5); SectionTitleText.BackgroundTransparency=1; SectionTitleText.Position=UDim2.new(0,10,0.5,0); SectionTitleText.Size=UDim2.new(1,-50,0,13)
-
-			local SectionAdd = Instance.new("Frame", SectionFrame) -- Parent to SectionFrame for correct clipping and sizing
-			SectionAdd.Name="SectionAdd"; SectionAdd.AnchorPoint=Vector2.new(0.5,0); SectionAdd.BackgroundTransparency=1; SectionAdd.ClipsDescendants=true; SectionAdd.Position=UDim2.new(0.5,0,0,33); SectionAdd.Size=UDim2.new(1,0,0,0) -- Start with 0 height
-			Instance.new("UICorner", SectionAdd).CornerRadius = UDim.new(0,2)
-			local UIListLayout_SectionAdd = Instance.new("UIListLayout", SectionAdd); UIListLayout_SectionAdd.Padding=UDim.new(0,3); UIListLayout_SectionAdd.SortOrder = Enum.SortOrder.LayoutOrder
-
-			local OpenSection = false
-			local function UpdateSectionSize()
-				local baseHeight = 30 -- Height of SectionReal
-				local contentHeight = 0
-				if OpenSection then
-					contentHeight = UIListLayout_SectionAdd.AbsoluteContentSize.Y
-					if #SectionAdd:GetChildren() > 1 then -- More than just UIListLayout
-						contentHeight = contentHeight + UIListLayout_SectionAdd.Padding.Offset * (#SectionAdd:GetChildren() - 2)
+				-- Clear all other highlights (including settings tab if it exists)
+				for _, child in ipairs(dependencies.ScrollTab:GetChildren()) do
+					if child:IsA("Frame") and child.Name:match("_TabButton$") then
+						child.BackgroundTransparency = 0.95
+						local cf = child:FindFirstChild("ChooseFrame")
+						if cf then cf.Visible = false end
 					end
 				end
-				local totalHeight = baseHeight + (OpenSection and 3 + contentHeight or 0) -- 3 for padding between SectionReal and SectionAdd
-				SectionFrame.Size = UDim2.new(1,0,0,totalHeight)
-				SectionAdd.Size = UDim2.new(1,0,0,contentHeight)
+				local settingsBtn = dependencies.LayersTab:FindFirstChild("Settings_TabButton")
+				if settingsBtn then
+					settingsBtn.BackgroundTransparency = 0.95
+					local cfSettings = settingsBtn:FindFirstChild("ChooseFrame")
+					if cfSettings then cfSettings.Visible = false end
+				end
 
-				-- Update parent scroller's CanvasSize
-				task.defer(function()
-					if self._ScrolLayers and self._UIListLayout then
-						local scrollerTotalHeight = 0
-						for _, child in ipairs(self._ScrolLayers:GetChildren()) do
-							if child:IsA("Frame") then -- Assuming all top-level children are sections or similar frames
-								scrollerTotalHeight = scrollerTotalHeight + child.Size.Y.Offset
-							end
-						end
-						if #self._ScrolLayers:GetChildren() > 1 then
-							scrollerTotalHeight = scrollerTotalHeight + self._UIListLayout.Padding.Offset * (#self._ScrolLayers:GetChildren() -1)
-						end
-						self._ScrolLayers.CanvasSize = UDim2.new(0,0,0,scrollerTotalHeight)
-					end
-				end)
-			end
-
-			SectionButton.Activated:Connect(function()
-				CircleClick(SectionButton, Mouse.X, Mouse.Y)
-				OpenSection = not OpenSection
-				FeatureImg_Section:TweenRotation(UDim.new(0, OpenSection and 0 or -90), "Out", "Quad", 0.2, true)
-				UpdateSectionSize()
+				TabButtonFrame.BackgroundTransparency = 0.85 -- Highlight
+				ChooseFrame.Visible = true
+				dependencies.LayersPageLayout:JumpTo(ScrolLayers)
+				dependencies.NameTab.Text = TabConfig.Name
 			end)
 
-			SectionAdd.ChildAdded:Connect(UpdateSectionSize)
-			SectionAdd.ChildRemoved:Connect(UpdateSectionSize)
-			UpdateSectionSize() -- Initial size update
+			local Tab = {}
+			Tab.ContentPage = ScrolLayers -- This is the ScrollingFrame where sections will be added
 
-			SectionObject._SectionAdd = SectionAdd -- For parenting items
-			SectionObject._UpdateSizeSection = UpdateSectionSize -- To call when items inside change size
+			-- API: AddSection
+			function Tab:AddSection(SectionTitle)
+				SectionTitle = SectionTitle or "Section"
+				local Section = {} -- This will be the returned Section object API
 
-			-- Define item creation methods for this SectionObject (simplified, ensure they use SectionAdd as parent)
-			function SectionObject:AddParagraph(ParagraphConfig, dependencies) -- Added dependencies
-				local ParagraphConfig = ParagraphConfig or {}; ParagraphConfig.Title = ParagraphConfig.Title or "Title"; ParagraphConfig.Content = ParagraphConfig.Content or "Content"
-				local ParagraphFunc = {}
-				local Paragraph = Instance.new("Frame", self._SectionAdd); Paragraph.Name = "Paragraph"; Paragraph.LayoutOrder = CountItem; Paragraph.Size = UDim2.new(1,0,0,46); Paragraph.BackgroundTransparency = 0.935; Paragraph.BackgroundColor3 = dependencies.GetColor("Secondary", Paragraph, "BackgroundColor3"); Instance.new("UICorner", Paragraph).CornerRadius = UDim.new(0,4)
-				local ParagraphTitle = Instance.new("TextLabel", Paragraph); ParagraphTitle.Name = "ParagraphTitle"; ParagraphTitle.Font = Enum.Font.GothamBold; ParagraphTitle.Text = ParagraphConfig.Title .. " | " .. ParagraphConfig.Content; ParagraphTitle.TextColor3 = GetColor("Text", ParagraphTitle, "TextColor3"); ParagraphTitle.TextSize = 13; ParagraphTitle.TextXAlignment = Enum.TextXAlignment.Left; ParagraphTitle.TextYAlignment = Enum.TextYAlignment.Top; ParagraphTitle.BackgroundTransparency = 1; ParagraphTitle.Position = UDim2.new(0,10,0,10); ParagraphTitle.Size = UDim2.new(1,-16,0,13); ParagraphTitle.TextWrapped = true
-				task.delay(0, function() ParagraphTitle.Size = UDim2.new(1, -16, 0, ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0, ParagraphTitle.TextBounds.Y + 20); self._UpdateSizeSection() end)
-				function ParagraphFunc:Set(pConfig) ParagraphTitle.Text = (pConfig.Title or "T") .. " | " .. (pConfig.Content or "C"); task.delay(0,function() ParagraphTitle.Size = UDim2.new(1,-16,0,ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0,ParagraphTitle.TextBounds.Y + 20); self._UpdateSizeSection() end) end
-				CountItem = CountItem + 1; self._UpdateSizeSection(); return ParagraphFunc
-			end
+				-- Create Section UI (SectionFrame, SectionReal, SectionButton, Title, Arrow, SectionAdd for content)
+				local SectionFrame = Instance.new("Frame")
+				SectionFrame.Name = "Section_" .. SectionTitle
+				SectionFrame.Parent = Tab.ContentPage -- Parent to the Tab's ScrollingFrame
+				SectionFrame.BackgroundColor3 = dependencies.GetColor("Secondary")
+				SectionFrame.BackgroundTransparency = 0.97
+				SectionFrame.Size = UDim2.new(1,0,0,30) -- Initial collapsed height
+				SectionFrame.ClipsDescendants = true
+				Instance.new("UICorner", SectionFrame).CornerRadius = UDim.new(0,4)
+				-- LayoutOrder for sections within a tab will be handled by the UIListLayout in Tab.ContentPage
 
-			function SectionObject:AddButton(ButtonConfig, dependencies) -- Added dependencies
-				local ButtonConfig = ButtonConfig or {}; ButtonConfig.Title = ButtonConfig.Title or "Button"; ButtonConfig.Content = ButtonConfig.Content or ""; ButtonConfig.Icon = ButtonConfig.Icon or dependencies.LoadUIAsset("rbxassetid://16932740082", "ButtonDefaultIcon.png"); ButtonConfig.Callback = ButtonConfig.Callback or function() end
-				local ButtonFrame = Instance.new("Frame", self._SectionAdd); ButtonFrame.Name = "Button"; ButtonFrame.LayoutOrder = CountItem; ButtonFrame.Size = UDim2.new(1,0,0,46); ButtonFrame.BackgroundTransparency = 0.935; ButtonFrame.BackgroundColor3 = dependencies.GetColor("Secondary", ButtonFrame, "BackgroundColor3"); Instance.new("UICorner", ButtonFrame).CornerRadius = UDim.new(0,4)
-				local ButtonTitle = Instance.new("TextLabel", ButtonFrame); ButtonTitle.Name = "ButtonTitle"; ButtonTitle.Font = Enum.Font.GothamBold; ButtonTitle.Text = ButtonConfig.Title; ButtonTitle.TextColor3 = dependencies.GetColor("Text", ButtonTitle, "TextColor3"); ButtonTitle.TextSize = 13; ButtonTitle.TextXAlignment = Enum.TextXAlignment.Left; ButtonTitle.TextYAlignment = Enum.TextYAlignment.Top; ButtonTitle.BackgroundTransparency=1; ButtonTitle.Position = UDim2.new(0,10,0,10); ButtonTitle.Size = UDim2.new(1,-100,0,13)
-				local ButtonContent = Instance.new("TextLabel", ButtonFrame); ButtonContent.Name = "ButtonContent"; ButtonContent.Font = Enum.Font.Gotham; ButtonContent.Text = ButtonConfig.Content; ButtonContent.TextColor3 = dependencies.GetColor("Text", ButtonContent, "TextColor3"); ButtonContent.TextSize = 12; ButtonContent.TextTransparency = 0.4; ButtonContent.TextXAlignment = Enum.TextXAlignment.Left; ButtonContent.TextYAlignment = Enum.TextYAlignment.Bottom; ButtonContent.BackgroundTransparency=1; ButtonContent.Position = UDim2.new(0,10,0,0); ButtonContent.Size = UDim2.new(1,-100,1,-10); ButtonContent.TextWrapped = true
-				local ActualButton = Instance.new("TextButton", ButtonFrame); ActualButton.Name = "ActualButton"; ActualButton.Text = ""; ActualButton.Size = UDim2.new(1,0,1,0); ActualButton.BackgroundTransparency = 1; ActualButton.Activated:Connect(function() dependencies.CircleClick(ActualButton, dependencies.Mouse.X, dependencies.Mouse.Y); ButtonConfig.Callback() end)
-				if ButtonConfig.Icon then local FeatureFrame1_Button = Instance.new("Frame", ButtonFrame); FeatureFrame1_Button.Name = "FeatureFrame"; FeatureFrame1_Button.AnchorPoint = Vector2.new(1,0.5); FeatureFrame1_Button.BackgroundTransparency = 1; FeatureFrame1_Button.Position = UDim2.new(1,-15,0.5,0); FeatureFrame1_Button.Size = UDim2.new(0,25,0,25); local FeatureImg3_Button = Instance.new("ImageLabel", FeatureFrame1_Button); FeatureImg3_Button.Name = "FeatureImg"; FeatureImg3_Button.Image = ButtonConfig.Icon; FeatureImg3_Button.AnchorPoint = Vector2.new(0.5,0.5); FeatureImg3_Button.BackgroundTransparency = 1; FeatureImg3_Button.Position = UDim2.new(0.5,0,0.5,0); FeatureImg3_Button.Size = UDim2.new(1,0,1,0) end
-				task.delay(0, function() local contentHeight = ButtonContent.TextBounds.Y; local titleHeight = ButtonTitle.TextBounds.Y; ButtonFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); self._UpdateSizeSection() end)
-				CountItem = CountItem + 1; self._UpdateSizeSection(); return {}
-			end
+				local SectionHeader = Instance.new("TextButton", SectionFrame) -- Header acts as the button
+				SectionHeader.Name = "SectionHeaderButton"
+				SectionHeader.Text = ""
+				SectionHeader.Size = UDim2.new(1,0,0,30)
+				SectionHeader.BackgroundTransparency = 1
 
-			function SectionObject:AddToggle(ToggleConfig, dependencies) -- Added dependencies
-				local ToggleConfig = ToggleConfig or {}; ToggleConfig.Title = ToggleConfig.Title or "Toggle"; ToggleConfig.Content = ToggleConfig.Content or ""; ToggleConfig.Default = (ToggleConfig.Flag and dependencies.Flags[ToggleConfig.Flag] ~= nil) and dependencies.Flags[ToggleConfig.Flag] or ToggleConfig.Default or false; ToggleConfig.Callback = ToggleConfig.Callback or function() end
-				local ToggleFrame = Instance.new("Frame", self._SectionAdd); ToggleFrame.Name = "Toggle"; ToggleFrame.LayoutOrder = CountItem; ToggleFrame.Size = UDim2.new(1,0,0,46); ToggleFrame.BackgroundTransparency = 0.935; ToggleFrame.BackgroundColor3 = dependencies.GetColor("Secondary", ToggleFrame, "BackgroundColor3"); Instance.new("UICorner", ToggleFrame).CornerRadius = UDim.new(0,4)
-				local ToggleTitle = Instance.new("TextLabel", ToggleFrame); ToggleTitle.Name = "ToggleTitle"; ToggleTitle.Font = Enum.Font.GothamBold; ToggleTitle.Text = ToggleConfig.Title; ToggleTitle.TextColor3 = dependencies.GetColor("Text", ToggleTitle, "TextColor3"); ToggleTitle.TextSize = 13; ToggleTitle.TextXAlignment = Enum.TextXAlignment.Left; ToggleTitle.TextYAlignment = Enum.TextYAlignment.Top; ToggleTitle.BackgroundTransparency=1; ToggleTitle.Position = UDim2.new(0,10,0,10); ToggleTitle.Size = UDim2.new(1,-100,0,13)
-				local ToggleContent = Instance.new("TextLabel", ToggleFrame); ToggleContent.Name = "ToggleContent"; ToggleContent.Font = Enum.Font.Gotham; ToggleContent.Text = ToggleConfig.Content; ToggleContent.TextColor3 = dependencies.GetColor("Text", ToggleContent, "TextColor3"); ToggleContent.TextSize = 12; ToggleContent.TextTransparency = 0.4; ToggleContent.TextXAlignment = Enum.TextXAlignment.Left; ToggleContent.TextYAlignment = Enum.TextYAlignment.Bottom; ToggleContent.BackgroundTransparency=1; ToggleContent.Position = UDim2.new(0,10,0,0); ToggleContent.Size = UDim2.new(1,-100,1,-10); ToggleContent.TextWrapped = true
-				local SwitchFrame = Instance.new("Frame", ToggleFrame); SwitchFrame.Name = "SwitchFrame"; SwitchFrame.AnchorPoint = Vector2.new(1,0.5); SwitchFrame.BackgroundColor3 = dependencies.GetColor("Accent", SwitchFrame, "BackgroundColor3"); SwitchFrame.BackgroundTransparency = 0.5; SwitchFrame.BorderSizePixel = 0; SwitchFrame.Position = UDim2.new(1,-15,0.5,0); SwitchFrame.Size = UDim2.new(0,30,0,15); Instance.new("UICorner", SwitchFrame).CornerRadius = UDim.new(0,100)
-				local SwitchCircle = Instance.new("Frame", SwitchFrame); SwitchCircle.Name = "SwitchCircle"; SwitchCircle.BackgroundColor3 = dependencies.GetColor("ThemeHighlight", SwitchCircle, "BackgroundColor3"); SwitchCircle.BorderSizePixel = 0; SwitchCircle.Position = UDim2.new(ToggleConfig.Default and 0.5 or 0, ToggleConfig.Default and -1 or 1, 0.5, -6); SwitchCircle.Size = UDim2.new(0,12,0,12); Instance.new("UICorner", SwitchCircle).CornerRadius = UDim.new(0,100)
-				local ActualButton = Instance.new("TextButton", ToggleFrame); ActualButton.Name = "ActualButton"; ActualButton.Text = ""; ActualButton.Size = UDim2.new(1,0,1,0); ActualButton.BackgroundTransparency = 1
-				local currentValue = ToggleConfig.Default; local function setToggleVisual(value) SwitchCircle:TweenPosition(UDim2.new(value and 0.5 or 0, value and -1 or 1, 0.5, -6), "Out", "Quad", 0.15, true) end; setToggleVisual(currentValue)
-				ActualButton.Activated:Connect(function() dependencies.CircleClick(ActualButton, dependencies.Mouse.X, dependencies.Mouse.Y); currentValue = not currentValue; if ToggleConfig.Flag then dependencies.SaveFile(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue) end)
-				task.delay(0, function() local contentHeight = ToggleContent.TextBounds.Y; local titleHeight = ToggleTitle.TextBounds.Y; ToggleFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); self._UpdateSizeSection() end)
-				CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; if ToggleConfig.Flag then dependencies.SaveFile(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue); end }
-			end
+				local SectionTitleLabel = Instance.new("TextLabel", SectionHeader)
+				SectionTitleLabel.Name = "SectionTitle"
+				SectionTitleLabel.Text = SectionTitle
+				SectionTitleLabel.Font = Enum.Font.GothamBold
+				SectionTitleLabel.TextColor3 = dependencies.GetColor("Text")
+				SectionTitleLabel.TextSize = 13
+				SectionTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+				SectionTitleLabel.BackgroundTransparency = 1
+				SectionTitleLabel.Position = UDim2.new(0,10,0.5,-7)
+				SectionTitleLabel.Size = UDim2.new(1,-30,0,14)
 
-			function SectionObject:AddSlider(SliderConfig, dependencies) -- Added dependencies
-				local SliderConfig = SliderConfig or {}; SliderConfig.Title = SliderConfig.Title or "Slider"; SliderConfig.Content = SliderConfig.Content or ""; SliderConfig.Min = SliderConfig.Min or 0; SliderConfig.Max = SliderConfig.Max or 100; SliderConfig.Increment = SliderConfig.Increment or 1; local savedVal = SliderConfig.Flag and dependencies.Flags[SliderConfig.Flag]; SliderConfig.Default = tonumber(savedVal or SliderConfig.Default or SliderConfig.Min); SliderConfig.Callback = SliderConfig.Callback or function() end
-				local SliderFrame = Instance.new("Frame", self._SectionAdd); SliderFrame.Name = "Slider"; SliderFrame.LayoutOrder = CountItem; SliderFrame.Size = UDim2.new(1,0,0,55); SliderFrame.BackgroundTransparency = 0.935; SliderFrame.BackgroundColor3 = dependencies.GetColor("Secondary", SliderFrame, "BackgroundColor3"); Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(0,4)
-				local SliderTitle = Instance.new("TextLabel", SliderFrame); SliderTitle.Name = "SliderTitle"; SliderTitle.Font = Enum.Font.GothamBold; SliderTitle.Text = SliderConfig.Title; SliderTitle.TextColor3 = dependencies.GetColor("Text", SliderTitle, "TextColor3"); SliderTitle.TextSize = 13; SliderTitle.TextXAlignment = Enum.TextXAlignment.Left; SliderTitle.TextYAlignment = Enum.TextYAlignment.Top; SliderTitle.BackgroundTransparency=1; SliderTitle.Position = UDim2.new(0,10,0,10); SliderTitle.Size = UDim2.new(1,-60,0,13)
-				local SliderValueText = Instance.new("TextBox", SliderFrame); SliderValueText.Name = "SliderValueText"; SliderValueText.Font = Enum.Font.GothamBold; SliderValueText.Text = tostring(SliderConfig.Default); SliderValueText.TextColor3 = dependencies.GetColor("Text", SliderValueText, "TextColor3"); SliderValueText.TextSize = 12; SliderValueText.BackgroundTransparency = 0.8; SliderValueText.BackgroundColor3 = dependencies.GetColor("Accent", SliderValueText, "BackgroundColor3"); SliderValueText.Position = UDim2.new(1,-45,0,5); SliderValueText.Size = UDim2.new(0,40,0,20); Instance.new("UICorner", SliderValueText).CornerRadius = UDim.new(0,3)
-				local Bar = Instance.new("Frame", SliderFrame); Bar.Name = "Bar"; Bar.BackgroundColor3 = dependencies.GetColor("Accent", Bar, "BackgroundColor3"); Bar.BorderSizePixel = 0; Bar.Position = UDim2.new(0,10,1,-20); Bar.Size = UDim2.new(1,-20,0,5); Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,100)
-				local Progress = Instance.new("Frame", Bar); Progress.Name = "Progress"; Progress.BackgroundColor3 = dependencies.GetColor("ThemeHighlight", Progress, "BackgroundColor3"); Progress.BorderSizePixel = 0; Instance.new("UICorner", Progress).CornerRadius = UDim.new(0,100)
-				local DraggerHitbox = Instance.new("TextButton", Bar); DraggerHitbox.Name = "DraggerHitbox"; DraggerHitbox.Text = ""; DraggerHitbox.Size = UDim2.new(0,20,0,20); DraggerHitbox.AnchorPoint = Vector2.new(0.5,0.5); DraggerHitbox.BackgroundTransparency=1; DraggerHitbox.ZIndex=3
-				local VisualDragger = Instance.new("Frame", DraggerHitbox); VisualDragger.Name = "VisualDragger"; VisualDragger.Size=UDim2.new(0,10,0,10); VisualDragger.AnchorPoint=Vector2.new(0.5,0.5); VisualDragger.Position=UDim2.new(0.5,0,0.5,0); VisualDragger.BackgroundColor3=dependencies.GetColor("ThemeHighlight",VisualDragger,"BackgroundColor3"); VisualDragger.BorderSizePixel=0; Instance.new("UICorner",VisualDragger).CornerRadius=UDim.new(0,100)
-				local currentValue = SliderConfig.Default; local function UpdateSlider(value) value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max); currentValue = value; SliderValueText.Text = tostring(value); local percent=(SliderConfig.Max-SliderConfig.Min==0) and 0 or (value-SliderConfig.Min)/(SliderConfig.Max-SliderConfig.Min); Progress.Size=UDim2.new(percent,0,1,0); DraggerHitbox.Position=UDim2.new(percent,0,0.5,0); if SliderConfig.Flag then dependencies.SaveFile(SliderConfig.Flag, currentValue) end; SliderConfig.Callback(currentValue) end; UpdateSlider(currentValue)
-				DraggerHitbox.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then local dragging=true; local conn; conn=dependencies.UserInputService.InputChanged:Connect(function(subInput) if not dragging then conn:Disconnect() return end; if subInput.UserInputType==Enum.UserInputType.MouseMovement or subInput.UserInputType==Enum.UserInputType.Touch then local localPos=Bar.AbsolutePosition.X; local mousePos=subInput.Position.X; local percent=math.clamp((mousePos-localPos)/Bar.AbsoluteSize.X,0,1); UpdateSlider(SliderConfig.Min+percent*(SliderConfig.Max-SliderConfig.Min)) end end); local inputEndedConn; inputEndedConn=input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false; if conn then conn:Disconnect() end; if inputEndedConn then inputEndedConn:Disconnect() end end end); local draggerInputEndedConn; draggerInputEndedConn=DraggerHitbox.InputEnded:Connect(function(endInput) if endInput.UserInputType==input.UserInputType then dragging=false; if conn then conn:Disconnect() end; if inputEndedConn then inputEndedConn:Disconnect() end; if draggerInputEndedConn then draggerInputEndedConn:Disconnect() end end end) end end)
-				SliderValueText.FocusLost:Connect(function(enterPressed) if enterPressed then local num=tonumber(SliderValueText.Text); if num then UpdateSlider(num) else UpdateSlider(currentValue) end end end)
-				CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = UpdateSlider }
-			end
+				local SectionArrow = Instance.new("ImageLabel", SectionHeader)
+				SectionArrow.Name = "SectionArrow"
+				SectionArrow.Image = dependencies.LoadUIAsset("rbxassetid://16851841101", "DropdownArrowHelper.png") -- Generic Arrow
+				SectionArrow.ImageColor3 = dependencies.GetColor("Text")
+				SectionArrow.AnchorPoint = Vector2.new(1,0.5)
+				SectionArrow.Position = UDim2.new(1,-10,0.5,0)
+				SectionArrow.Size = UDim2.new(0,15,0,15)
+				SectionArrow.Rotation = -90 -- Collapsed state
+				SectionArrow.BackgroundTransparency = 1
 
-			function SectionObject:AddInput(InputConfig, dependencies) -- Added dependencies
-				local InputConfig = InputConfig or {}; InputConfig.Title = InputConfig.Title or "Input"; InputConfig.Content = InputConfig.Content or ""; local savedVal = InputConfig.Flag and dependencies.Flags[InputConfig.Flag]; InputConfig.Default = savedVal or InputConfig.Default or ""; InputConfig.Callback = InputConfig.Callback or function() end
-				local InputFrame = Instance.new("Frame", self._SectionAdd); InputFrame.Name = "Input"; InputFrame.LayoutOrder = CountItem; InputFrame.Size = UDim2.new(1,0,0,46); InputFrame.BackgroundTransparency = 0.935; InputFrame.BackgroundColor3 = dependencies.GetColor("Secondary", InputFrame, "BackgroundColor3"); Instance.new("UICorner", InputFrame).CornerRadius = UDim.new(0,4)
-				local InputTitle = Instance.new("TextLabel", InputFrame); InputTitle.Name = "InputTitle"; InputTitle.Font = Enum.Font.GothamBold; InputTitle.Text = InputConfig.Title; InputTitle.TextColor3 = dependencies.GetColor("Text", InputTitle, "TextColor3"); InputTitle.TextSize = 13; InputTitle.TextXAlignment = Enum.TextXAlignment.Left; InputTitle.TextYAlignment = Enum.TextYAlignment.Top; InputTitle.BackgroundTransparency=1; InputTitle.Position = UDim2.new(0,10,0,10); InputTitle.Size = UDim2.new(1,-100,0,13)
-				local InputContent = Instance.new("TextLabel", InputFrame); InputContent.Name = "InputContent"; InputContent.Font = Enum.Font.Gotham; InputContent.Text = InputConfig.Content; InputContent.TextColor3 = dependencies.GetColor("Text", InputContent, "TextColor3"); InputContent.TextSize = 12; InputContent.TextTransparency = 0.4; InputContent.TextXAlignment = Enum.TextXAlignment.Left; InputContent.TextYAlignment = Enum.TextYAlignment.Bottom; InputContent.BackgroundTransparency=1; InputContent.Position = UDim2.new(0,10,0,0); InputContent.Size = UDim2.new(1,-100,1,-10); InputContent.TextWrapped = true
-				local TextBox = Instance.new("TextBox", InputFrame); TextBox.Name = "TextBox"; TextBox.Font = Enum.Font.Gotham; TextBox.Text = InputConfig.Default; TextBox.TextColor3 = dependencies.GetColor("Text", TextBox, "TextColor3"); TextBox.TextSize = 12; TextBox.BackgroundColor3 = dependencies.GetColor("Accent", TextBox, "BackgroundColor3"); TextBox.Position = UDim2.new(1,-155,0.5,-12); TextBox.Size = UDim2.new(0,150,0,24); Instance.new("UICorner", TextBox).CornerRadius = UDim.new(0,3); TextBox.ClearTextOnFocus = false
-				local currentValue = InputConfig.Default
-				TextBox.FocusLost:Connect(function(enterPressed) if enterPressed then currentValue = TextBox.Text; if InputConfig.Flag then dependencies.SaveFile(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) else TextBox.Text = currentValue end end)
-				task.delay(0, function() local contentHeight = InputContent.TextBounds.Y; local titleHeight = InputTitle.TextBounds.Y; InputFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); self._UpdateSizeSection() end)
-				CountItem = CountItem + 1; self._UpdateSizeSection(); return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; TextBox.Text = val; if InputConfig.Flag then dependencies.SaveFile(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) end }
-			end
+				local SectionContentFrame = Instance.new("Frame", SectionFrame)
+				SectionContentFrame.Name = "SectionContent"
+				SectionContentFrame.BackgroundTransparency = 1
+				SectionContentFrame.Size = UDim2.new(1,0,1,-30) -- Full width, height calculated dynamically
+				SectionContentFrame.Position = UDim2.new(0,0,0,30) -- Below header
+				SectionContentFrame.ClipsDescendants = true
+				SectionContentFrame.Visible = false -- Collapsed by default
+				local SectionContentLayout = Instance.new("UIListLayout", SectionContentFrame)
+				SectionContentLayout.Padding = UDim.new(0,3)
+				SectionContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-			function SectionObject:AddDropdown(DropdownConfig, dependencies) -- Added dependencies
-				-- The 'resources' table passed to Helper_CreateDropdownElements is now effectively the 'dependencies' table.
-				local dropdownApi = Helper_CreateDropdownElements(self._SectionAdd, DropdownConfig, dependencies)
-				-- CountItem is managed by Helper_CreateDropdownElements via dependencies.CountItemRef or similar
-				self._UpdateSizeSection()
-				return dropdownApi
-			end
+				local isSectionOpen = false
+				local function UpdateSectionVisuals()
+					SectionContentFrame.Visible = isSectionOpen
+					SectionArrow.Rotation = isSectionOpen and 0 or -90
 
-			function SectionObject:AddDivider(DividerConfig, dependencies) -- Added dependencies
-				local DividerConfig = DividerConfig or {}; DividerConfig.Text = DividerConfig.Text or nil
-				local DividerContainer = Instance.new("Frame", self._SectionAdd); DividerContainer.Name = "Divider"; DividerContainer.Size = UDim2.new(1,0,0,20); DividerContainer.BackgroundTransparency=1; DividerContainer.LayoutOrder=CountItem
-				if not DividerConfig.Text or DividerConfig.Text == "" then local Line=Instance.new("Frame",DividerContainer); Line.Name="FullLine"; Line.BackgroundColor3=DividerConfig.Color or dependencies.GetColor("Stroke",Line,"BackgroundColor3"); Line.BorderSizePixel=0; Line.AnchorPoint=Vector2.new(0.5,0.5); Line.Position=UDim2.new(0.5,0,0.5,0); Line.Size=UDim2.new(1,-10,0,1)
-				else DividerContainer.Size = UDim2.new(1,0,0,(DividerConfig.TextSize or 12)+8); local ListLayout=Instance.new("UIListLayout",DividerContainer); ListLayout.FillDirection=Enum.FillDirection.Horizontal; ListLayout.VerticalAlignment=Enum.VerticalAlignment.Center; ListLayout.HorizontalAlignment=Enum.HorizontalAlignment.Center; ListLayout.SortOrder=Enum.SortOrder.LayoutOrder; ListLayout.Padding=UDim.new(0,8); local Line1=Instance.new("Frame",DividerContainer); Line1.Name="Line1"; Line1.BackgroundColor3=DividerConfig.Color or dependencies.GetColor("Stroke",Line1,"BackgroundColor3"); Line1.BorderSizePixel=0; Line1.Size=UDim2.new(1,0,0,1); Line1.LayoutOrder=1; local DividerText=Instance.new("TextLabel",DividerContainer); DividerText.Name="DividerText"; DividerText.Text=DividerConfig.Text; DividerText.TextColor3=DividerConfig.TextColor or dependencies.GetColor("Text",DividerText,"TextColor3"); DividerText.Font=DividerConfig.Font or Enum.Font.GothamBold; DividerText.TextSize=DividerConfig.TextSize or 12; DividerText.BackgroundTransparency=1; DividerText.AutomaticSize=Enum.AutomaticSize.X; DividerText.Size=UDim2.new(0,0,1,0); DividerText.LayoutOrder=2; local Line2=Instance.new("Frame",DividerContainer); Line2.Name="Line2"; Line2.BackgroundColor3=DividerConfig.Color or dependencies.GetColor("Stroke",Line2,"BackgroundColor3"); Line2.BorderSizePixel=0; Line2.Size=UDim2.new(1,0,0,1); Line2.LayoutOrder=3 end
-				CountItem=CountItem+1; self._UpdateSizeSection(); return {}
-			end
+					-- Recalculate SectionFrame height
+					local contentHeight = 0
+					if isSectionOpen then
+						contentHeight = SectionContentLayout.AbsoluteContentSize.Y
+						if #SectionContentFrame:GetChildren() > 1 then -- Has items besides layout
+							contentHeight = contentHeight + (#SectionContentFrame:GetChildren() - 2) * SectionContentLayout.Padding.Offset
+						end
+					end
+					SectionFrame.Size = UDim2.new(1,0,0, 30 + (isSectionOpen and contentHeight + 5 or 0)) -- 30 for header, 5 for padding
 
-			currentSectionCountForTab = currentSectionCountForTab + 1
-			self._UpdateSizeSection() -- Update tab scroller for the new section
-			return SectionObject
-		end
-
-		CountTab = CountTab + 1
-		return Tab
-	end
-
-	-- Setup for the new dedicated Settings Tab
-	-- local ActualSettingsTab = {} -- Removed
-	-- ActualSettingsTab._ScrolLayers = SettingsContentPage -- Removed
-	-- ActualSettingsTab._UIListLayout = SettingsContentLayout -- Removed
-	-- local currentSectionCountForSettingsTab = 0 -- Removed
-
-	-- Replicated AddSection for ActualSettingsTab -- Removed
-	-- function ActualSettingsTab:AddSection(SectionTitle) -- Removed
-		-- ... entire function body removed ...
-	-- end -- Removed
-
-	-- Instantiate the Settings Tab using the modified CreateTab method
-	local SettingsTabObject = UIInstance:CreateTab({
-		Name = "Settings",
-		Icon = "rbxassetid://16932740082", -- Placeholder Icon, replace with actual settings icon ID
-		IsSettingsTab = true
-	}, dependencies)
-
-	-- Populate the SettingsTabObject
-	local PresetManagementSettingsSection_InSettings = SettingsTabObject:AddSection("Preset Management", dependencies)
-	local defaultThemesDropdown_InSettings = PresetManagementSettingsSection_InSettings:AddDropdown({
-		Title = "Default Themes",
-		Options = GetThemes(),
-	}, dependencies)
-	PresetManagementSettingsSection_InSettings:AddButton({
-		Title = "Apply Default Theme", Content = "Apply the selected default theme",
-		Callback = function()
-			local val = defaultThemesDropdown_InSettings:GetValue()
-			if val and #val > 0 then SetTheme(val[1]); dependencies.UBHubLib:MakeNotify({Title="Theme Applied", Content="'"..val[1].."' applied."}) end
-		end
-	}, dependencies)
-
-	PresetManagementSettingsSection_InSettings:AddDivider({Text = "Custom Preset Settings"}, dependencies)
-
-	local customPresetNameInput_InSettings = PresetManagementSettingsSection_InSettings:AddInput({
-		Title = "Custom Preset Name", Content = "Enter a name for your custom preset", Default = ""
-	}, dependencies)
-
-	PresetManagementSettingsSection_InSettings:AddButton({
-		Title = "Save Current Colors", Content = "Save the current color configuration as a new preset",
-		Callback = function()
-			local presetName = customPresetNameInput_InSettings:GetValue()
-			if not presetName or presetName == "" then dependencies.UBHubLib:MakeNotify({ Title = "Preset Name Required", Content = "Please enter a name for your custom preset."}); return end
-			if dependencies.Flags.CustomUserThemes[presetName] then dependencies.UBHubLib:MakeNotify({ Title = "Preset Exists", Content = "A preset with this name already exists."}); return end
-			local currentColorsHex = {}
-			if Themes[CurrentTheme] then
-				for colorKey, colorValue in pairs(Themes[CurrentTheme]) do if typeof(colorValue) == "Color3" then currentColorsHex[colorKey] = ColorToHex(colorValue) end end
-				dependencies.Flags.CustomUserThemes[presetName] = currentColorsHex
-				dependencies.SaveFile("CustomUserThemes", dependencies.Flags.CustomUserThemes)
-				dependencies.UBHubLib:MakeNotify({ Title = "Preset Saved", Content = "'" .. presetName .. "' has been saved."})
-				local savedNames = GetSavedThemeNames()
-				-- Need to re-fetch the dropdown instances if they are not in scope here or pass them if this callback needs to refresh them.
-				-- For now, assuming MakeNotify is sufficient.
-				customPresetNameInput_InSettings:SetValue("")
-			end
-		end
-	}, dependencies)
-
-	PresetManagementSettingsSection_InSettings:AddDivider({}, dependencies)
-
-	local savedPresetsDropdown_InSettings = PresetManagementSettingsSection_InSettings:AddDropdown({
-		Title = "Saved Custom Presets", Options = GetSavedThemeNames(),
-	}, dependencies)
-
-	PresetManagementSettingsSection_InSettings:AddButton({
-		Title = "Apply Saved Preset", Content = "Apply the selected saved custom preset",
-		Callback = function()
-			local selectedPresetNameTable = savedPresetsDropdown_InSettings:GetValue()
-			if selectedPresetNameTable and #selectedPresetNameTable > 0 then
-				local presetName = selectedPresetNameTable[1]
-				if dependencies.Flags.CustomUserThemes and dependencies.Flags.CustomUserThemes[presetName] then
-					local themeToApply = {}
-					for colorKey, hexValue in pairs(dependencies.Flags.CustomUserThemes[presetName]) do themeToApply[colorKey] = HexToColor(hexValue) end
-					local tempThemeName = "__CUSTOM__" .. presetName
-					Themes[tempThemeName] = themeToApply
-					SetTheme(tempThemeName)
-					dependencies.UBHubLib:MakeNotify({ Title = "Preset Applied", Content = "'" .. presetName .. "' applied."})
+					-- Force update of parent ScrollingFrame's CanvasSize
+					task.defer(function()
+						if Tab.ContentPage and Tab.ContentPage:FindFirstChildOfClass("UIListLayout") then
+							local listLayout = Tab.ContentPage:FindFirstChildOfClass("UIListLayout")
+							Tab.ContentPage.CanvasSize = UDim2.new(0,0,0, listLayout.AbsoluteContentSize.Y)
+						end
+					end)
 				end
-			end
-		end
-	}, dependencies)
 
-	PresetManagementSettingsSection_InSettings:AddDivider({}, dependencies)
+				SectionHeader.Activated:Connect(function()
+					dependencies.CircleClick(SectionHeader, dependencies.Mouse.X, dependencies.Mouse.Y)
+					isSectionOpen = not isSectionOpen
+					UpdateSectionVisuals()
+				end)
 
-	local deletePresetDropdown_InSettings = PresetManagementSettingsSection_InSettings:AddDropdown({
-		Title = "Select Preset to Delete", Options = GetSavedThemeNames(),
-	}, dependencies)
-
-	PresetManagementSettingsSection_InSettings:AddButton({
-		Title = "Delete Saved Preset", Content = "Delete the selected saved custom preset",
-		Callback = function()
-			local selectedPresetNameTable = deletePresetDropdown_InSettings:GetValue()
-			if selectedPresetNameTable and #selectedPresetNameTable > 0 then
-				local presetName = selectedPresetNameTable[1]
-				if dependencies.Flags.CustomUserThemes and dependencies.Flags.CustomUserThemes[presetName] then
-					dependencies.Flags.CustomUserThemes[presetName] = nil
-					dependencies.SaveFile("CustomUserThemes", dependencies.Flags.CustomUserThemes)
-					dependencies.UBHubLib:MakeNotify({ Title = "Preset Deleted", Content = "'" .. presetName .. "' has been deleted."})
-					-- Refresh dropdowns (similar to save, might need direct references or a refresh all mechanism)
+				-- Define all element functions for the Section object
+				function Section:AddButton(config)
+					return Helper_CreateButton(SectionContentFrame, config, dependencies, UpdateSectionVisuals)
 				end
+				function Section:AddSlider(config)
+					return Helper_CreateSlider(SectionContentFrame, config, dependencies, UpdateSectionVisuals)
+				end
+				function Section:AddToggle(config)
+					return Helper_CreateToggle(SectionContentFrame, config, dependencies, UpdateSectionVisuals)
+				end
+				function Section:AddInput(config)
+					return Helper_CreateInput(SectionContentFrame, config, dependencies, UpdateSectionVisuals)
+				end
+				function Section:AddDropdown(config)
+					return Helper_CreateDropdown(SectionContentFrame, config, dependencies, UpdateSectionVisuals)
+				end
+				function Section:AddDivider(config)
+					return Helper_CreateDivider(SectionContentFrame, config, dependencies, UpdateSectionVisuals)
+				end
+				function Section:AddParagraph(config)
+					return Helper_CreateParagraph(SectionContentFrame, config, dependencies, UpdateSectionVisuals)
+				end
+				-- ... Add other element types in the same way ...
+
+				UpdateSectionVisuals() -- Initial sizing
+				return Section
 			end
-		end
-	}, dependencies)
 
-	-- Re-implement Interface Customization Section
-	local InterfaceSettingsSection_InSettings = SettingsTabObject:AddSection("Interface Customization", dependencies)
-	InterfaceSettingsSection_InSettings:AddToggle({
-		Title = "Undetected Mode", Content = "Attempts to load assets in a way less likely to be detected. May not work with all assets.",
-		Flag = "UndetectedMode", Default = LibraryCfg.Undetected,
-		Callback = function(val) LibraryCfg.Undetected = val end
-	}, dependencies)
-	InterfaceSettingsSection_InSettings:AddSlider({
-		Title = "Tab Width", Content = "Adjust the width of the tab list.",
-		Min = 80, Max = 250, Default = GuiConfig["Tab Width"], Increment = 1,
-		Flag = "TabWidth",
-		Callback = function(val)
-			dependencies.LayersTab.Size = UDim2.new(0, val, dependencies.LayersTab.Size.Y.Scale, dependencies.LayersTab.Size.Y.Offset)
-			Layers.Position = UDim2.new(0, val + 18, Layers.Position.Y.Scale, Layers.Position.Y.Offset)
-			Layers.Size = UDim2.new(1, -(val + 9 + 18), Layers.Size.Y.Scale, Layers.Size.Y.Offset)
-			dependencies.GuiConfig["Tab Width"] = val
-		end
-	}, dependencies)
-	InterfaceSettingsSection_InSettings:AddInput({
-		Title = "Background Asset URL/Path", Content = "Set a custom background image/video. Type 'Reset' to clear.",
-		Flag = "BackgroundAsset", Default = dependencies.Flags["BackgroundAsset"] or "",
-		Callback = function(val)
-			if val:lower() == "reset" then
-				Reset()
-				dependencies.SaveFile("BackgroundAsset", "")
-			else
-				local assetType = "Image"
-				if val:match("%.mp4") or val:match("%.webm") then assetType = "Video" end
-				ChangeAsset(assetType, val, "CustomBackground")
+			CountTab = CountTab + 1
+			-- Default to first tab selected if it's the very first one
+			if CountTab == 1 then
+				TabButton.Activated:Invoke() -- Simulate a click
 			end
-		end
-	}, dependencies)
-	InterfaceSettingsSection_InSettings:AddSlider({
-		Title = "UI Background Transparency", Content = "Adjust the main UI background transparency.",
-		Min = 0, Max = 1, Default = Main.BackgroundTransparency, Increment = 0.01,
-		Flag = "BackgroundTransparency",
-		Callback = function(val) ChangeTransparency(val) end
-	}, dependencies)
+			return Tab
 
+		else -- This is the special permanent Settings Tab
+			-- It doesn't need a unique content page in LayersFolder.
+			-- Its button click will show the 'SettingsContentPage' (which should be a pre-existing frame).
 
-	-- Re-implement Customize Colors Section
-	local CustomizeColorsSettingsSection_InSettings = SettingsTabObject:AddSection("Customize Colors", dependencies)
-	local colorControls_InSettings = {}
+			-- The 'SettingsContentPage' needs to be defined in MakeGui and made visible by this button.
+			-- For now, assume SettingsContentPage is a direct child of 'Layers' frame, sibling to 'LayersReal'.
+			-- It should have its own ScrollingFrame and UIListLayout for its sections.
 
-	local function updateColorFromSliders_InSettings(colorKeyName, component, value)
-		local r, g, b
-		local currentHex = colorControls_InSettings[colorKeyName].hexInput:GetValue()
-		local currentColor = HexToColor(currentHex)
-		r = (component == "R") and value or math.floor(currentColor.R * 255)
-		g = (component == "G") and value or math.floor(currentColor.G * 255)
-		b = (component == "B") and value or math.floor(currentColor.B * 255)
-		local newColor = Color3.fromRGB(r, g, b)
-		Themes[CurrentTheme][colorKeyName] = newColor
-		SetTheme(CurrentTheme)
-		colorControls_InSettings[colorKeyName].hexInput:SetValue(ColorToHex(newColor))
-	end
+			-- Ensure SettingsContentPage exists and is correctly parented (e.g., to Layers)
+			-- This example assumes 'SettingsContentPage' is already created and parented to 'Layers'
+			-- and 'LayersReal' is the container for normal tab content.
+			local settingsContentHost = Layers:FindFirstChild("SettingsContentPage")
+			if not settingsContentHost then
+				-- Create it if it doesn't exist (basic setup)
+				settingsContentHost = Instance.new("Frame")
+				settingsContentHost.Name = "SettingsContentPage"
+				settingsContentHost.Parent = Layers -- Sibling to LayersReal
+				settingsContentHost.Size = UDim2.new(1,0,1,0) -- Take full area of Layers
+				settingsContentHost.Position = UDim2.new(0,0,0,33) -- Below NameTab
+				settingsContentHost.Size = UDim2.new(1,0,1,-33)
+				settingsContentHost.BackgroundTransparency = 1
+				settingsContentHost.Visible = false -- Hidden by default
 
-	local function updateSlidersFromHex_InSettings(colorKeyName, hexValue)
-		if not hexValue or not hexValue:match("^#%x%x%x%x%x%x$") then return end
-		local color = HexToColor(hexValue)
-		Themes[CurrentTheme][colorKeyName] = color
-		SetTheme(CurrentTheme)
-		colorControls_InSettings[colorKeyName].rSlider:SetValue(math.floor(color.R * 255))
-		colorControls_InSettings[colorKeyName].gSlider:SetValue(math.floor(color.G * 255))
-		colorControls_InSettings[colorKeyName].bSlider:SetValue(math.floor(color.B * 255))
-	end
-
-	local baseThemeForKeys_InSettings = Themes[next(Themes)]
-	if baseThemeForKeys_InSettings then
-		local sortedColorKeys_InSettings = {}
-		for key, _ in pairs(baseThemeForKeys_InSettings) do
-			if typeof(baseThemeForKeys_InSettings[key]) == "Color3" then
-				table.insert(sortedColorKeys_InSettings, key)
+				local settingsScroll = Instance.new("ScrollingFrame", settingsContentHost)
+				settingsScroll.Name = "SettingsScroll"
+				settingsScroll.Size = UDim2.new(1,0,1,0)
+				settingsScroll.BackgroundTransparency = 1
+				settingsScroll.ScrollBarThickness = 3
+				local settingsLayout = Instance.new("UIListLayout", settingsScroll)
+				settingsLayout.Padding = UDim.new(0,3)
+				settingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+				-- Store this scroll view for the SettingsTab object
+				-- This is a deviation from the user's block 3 which uses SettingsTab:AddSection.
+				-- The user's block implies SettingsTab IS the tab object for settings.
 			end
-		end
-		table.sort(sortedColorKeys_InSettings)
 
-		for _, colorKeyName in ipairs(sortedColorKeys_InSettings) do
-			local initialColor = Themes[CurrentTheme][colorKeyName] or baseThemeForKeys_InSettings[colorKeyName]
-			local displayName = FormatColorNameForDisplay(colorKeyName)
-			CustomizeColorsSettingsSection_InSettings:AddDivider({ Text = displayName }, dependencies)
-			colorControls_InSettings[colorKeyName] = {}
-			local initialHex = ColorToHex(initialColor)
 
-			local hexInput_InSettings = CustomizeColorsSettingsSection_InSettings:AddInput({
-				Title = displayName .. " Hex", Content = "Hexadecimal color code (e.g., #FF0000)",
-				Default = initialHex, Flag = "CustomColorHex_"..colorKeyName,
-				Callback = function(hexValue)
-					if hexValue:match("^#%x%x%x%x%x%x$") then
-						updateSlidersFromHex_InSettings(colorKeyName, hexValue)
-					else
-						dependencies.UBHubLib:MakeNotify({Title="Invalid Hex", Content="Please use format #RRGGBB."})
-						hexInput_InSettings:SetValue(ColorToHex(Themes[CurrentTheme][colorKeyName]))
+			TabButton.Activated:Connect(function()
+				dependencies.CircleClick(TabButton, dependencies.Mouse.X, dependencies.Mouse.Y)
+
+				-- Clear all other highlights
+				for _, child in ipairs(dependencies.ScrollTab:GetChildren()) do
+					if child:IsA("Frame") and child.Name:match("_TabButton$") then
+						child.BackgroundTransparency = 0.95
+						local cf = child:FindFirstChild("ChooseFrame")
+						if cf then cf.Visible = false end
 					end
 				end
-			}, dependencies)
-			colorControls_InSettings[colorKeyName].hexInput = hexInput_InSettings
 
-			local rSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({
-				Title = "Red", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor.R * 255),
-				Flag = "CustomColorR_"..colorKeyName,  Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "R", value) end
-			}, dependencies)
-			colorControls_InSettings[colorKeyName].rSlider = rSlider_InSettings
+				TabButtonFrame.BackgroundTransparency = 0.85 -- Highlight
+				ChooseFrame.Visible = true
 
-			local gSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({
-				Title = "Green", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor.G * 255),
-				Flag = "CustomColorG_"..colorKeyName, Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "G", value) end
-			}, dependencies)
-			colorControls_InSettings[colorKeyName].gSlider = gSlider_InSettings
+				LayersReal.Visible = false -- Hide normal tab content area
+				local sContentPage = Layers:FindFirstChild("SettingsContentPage")
+				if sContentPage then sContentPage.Visible = true end
 
-			local bSlider_InSettings = CustomizeColorsSettingsSection_InSettings:AddSlider({
-				Title = "Blue", Min = 0, Max = 255, Increment = 1, Default = math.floor(initialColor.B * 255),
-				Flag = "CustomColorB_"..colorKeyName, Callback = function(value) updateColorFromSliders_InSettings(colorKeyName, "B", value) end
-			}, dependencies)
-			colorControls_InSettings[colorKeyName].bSlider = bSlider_InSettings
+				dependencies.NameTab.Text = TabConfig.Name -- "Settings"
+			end)
+
+			-- The Settings Tab itself needs an object to call AddSection on.
+			-- It won't have a ScrolLayers in LayersFolder, but its sections will go into SettingsContentPage's scroller.
+			local SettingsTabAPI = {}
+			local settingsContentScroller = settingsContentHost and settingsContentHost:FindFirstChild("SettingsScroll")
+
+			function SettingsTabAPI:AddSection(SectionTitle)
+				if not settingsContentScroller then
+					warn("SettingsContentPage or its scroller not found for SettingsTab:AddSection")
+					return { AddButton = function() warn("Settings scroller missing") end } -- Return dummy
+				end
+				-- This function now has access to the 'dependencies' table.
+				-- It will create a Section UI and return a Section object.
+				local Section = {}
+				-- Create Section UI (similar to normal tab's AddSection, but parent to settingsContentScroller)
+				local SectionFrame = Instance.new("Frame")
+				SectionFrame.Name = "Section_" .. SectionTitle
+				SectionFrame.Parent = settingsContentScroller -- Parent to the Settings ScrollFrame
+				SectionFrame.BackgroundColor3 = dependencies.GetColor("Secondary")
+				SectionFrame.BackgroundTransparency = 0.97
+				SectionFrame.Size = UDim2.new(1,0,0,30)
+				SectionFrame.ClipsDescendants = true
+				Instance.new("UICorner", SectionFrame).CornerRadius = UDim.new(0,4)
+
+				local SectionHeader = Instance.new("TextButton", SectionFrame)
+				SectionHeader.Name = "SectionHeaderButton"
+				SectionHeader.Text = ""
+				SectionHeader.Size = UDim2.new(1,0,0,30)
+				SectionHeader.BackgroundTransparency = 1
+
+				local SectionTitleLabel = Instance.new("TextLabel", SectionHeader)
+				SectionTitleLabel.Name = "SectionTitle"
+				SectionTitleLabel.Text = SectionTitle
+				SectionTitleLabel.Font = Enum.Font.GothamBold
+				SectionTitleLabel.TextColor3 = dependencies.GetColor("Text")
+				SectionTitleLabel.TextSize = 13
+				SectionTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+				SectionTitleLabel.BackgroundTransparency = 1
+				SectionTitleLabel.Position = UDim2.new(0,10,0.5,-7)
+				SectionTitleLabel.Size = UDim2.new(1,-30,0,14)
+
+				local SectionArrow = Instance.new("ImageLabel", SectionHeader)
+				SectionArrow.Name = "SectionArrow"
+				SectionArrow.Image = dependencies.LoadUIAsset("rbxassetid://16851841101", "DropdownArrowHelper.png")
+				SectionArrow.ImageColor3 = dependencies.GetColor("Text")
+				SectionArrow.AnchorPoint = Vector2.new(1,0.5)
+				SectionArrow.Position = UDim2.new(1,-10,0.5,0)
+				SectionArrow.Size = UDim2.new(0,15,0,15)
+				SectionArrow.Rotation = -90
+				SectionArrow.BackgroundTransparency = 1
+
+				local SectionContentFrame = Instance.new("Frame", SectionFrame)
+				SectionContentFrame.Name = "SectionContent"
+				SectionContentFrame.BackgroundTransparency = 1
+				SectionContentFrame.Size = UDim2.new(1,0,1,-30)
+				SectionContentFrame.Position = UDim2.new(0,0,0,30)
+				SectionContentFrame.ClipsDescendants = true
+				SectionContentFrame.Visible = false
+				local SectionContentLayout = Instance.new("UIListLayout", SectionContentFrame)
+				SectionContentLayout.Padding = UDim.new(0,3)
+				SectionContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+				local isSectionOpen = false
+				local function UpdateSettingsSectionVisuals()
+					SectionContentFrame.Visible = isSectionOpen
+					SectionArrow.Rotation = isSectionOpen and 0 or -90
+					local contentHeight = 0
+					if isSectionOpen then
+						contentHeight = SectionContentLayout.AbsoluteContentSize.Y
+						if #SectionContentFrame:GetChildren() > 1 then
+							contentHeight = contentHeight + (#SectionContentFrame:GetChildren() - 2) * SectionContentLayout.Padding.Offset
+						end
+					end
+					SectionFrame.Size = UDim2.new(1,0,0, 30 + (isSectionOpen and contentHeight + 5 or 0))
+					task.defer(function()
+						if settingsContentScroller and settingsContentScroller:FindFirstChildOfClass("UIListLayout") then
+							local listLayout = settingsContentScroller:FindFirstChildOfClass("UIListLayout")
+							settingsContentScroller.CanvasSize = UDim2.new(0,0,0, listLayout.AbsoluteContentSize.Y)
+						end
+					end)
+				end
+
+				SectionHeader.Activated:Connect(function()
+					dependencies.CircleClick(SectionHeader, dependencies.Mouse.X, dependencies.Mouse.Y)
+					isSectionOpen = not isSectionOpen
+					UpdateSettingsSectionVisuals()
+				end)
+
+				-- Define all element functions for the Section object
+				function Section:AddButton(config)
+					return Helper_CreateButton(SectionContentFrame, config, dependencies, UpdateSettingsSectionVisuals)
+				end
+				function Section:AddSlider(config)
+					return Helper_CreateSlider(SectionContentFrame, config, dependencies, UpdateSettingsSectionVisuals)
+				end
+				function Section:AddToggle(config)
+					return Helper_CreateToggle(SectionContentFrame, config, dependencies, UpdateSettingsSectionVisuals)
+				end
+				function Section:AddInput(config)
+					return Helper_CreateInput(SectionContentFrame, config, dependencies, UpdateSettingsSectionVisuals)
+				end
+				function Section:AddDropdown(config)
+					return Helper_CreateDropdown(SectionContentFrame, config, dependencies, UpdateSettingsSectionVisuals)
+				end
+				function Section:AddDivider(config)
+					return Helper_CreateDivider(SectionContentFrame, config, dependencies, UpdateSettingsSectionVisuals)
+				end
+				function Section:AddParagraph(config)
+					return Helper_CreateParagraph(SectionContentFrame, config, dependencies, UpdateSettingsSectionVisuals)
+				end
+
+				UpdateSettingsSectionVisuals()
+				return Section
+			end
+			return SettingsTabAPI -- Returns the API for the settings tab.
 		end
 	end
+
+	-- The existing settings population code (Preset Management, Interface Customization, Customize Colors)
+	-- was already calling SettingsTabObject:AddSection and its element methods.
+	-- This was part of my previous attempts to fix the settings tab.
+	-- Block 3 from your instructions is to essentially *replace* that with a cleaner, specific example.
+	-- So, I will remove the old population code for SettingsTabObject first, then add Block 3.
+
+	-- REMOVE OLD SettingsTabObject POPULATION START (approx line 2197 to 2396)
+	-- This includes:
+	-- local PresetManagementSettingsSection_InSettings = SettingsTabObject:AddSection(...)
+	-- ... all its elements ...
+	-- local InterfaceSettingsSection_InSettings = SettingsTabObject:AddSection(...)
+	-- ... all its elements ...
+	-- local CustomizeColorsSettingsSection_InSettings = SettingsTabObject:AddSection(...)
+	-- ... all its elements ...
+	-- REMOVE OLD SettingsTabObject POPULATION END
+
+	-- =================================================================
+	-- BLOCK 3: Create and Populate the Settings Tab using the new API
+	-- This goes at the end of MakeGui, before 'return UIInstance'
+	-- =================================================================
+
+	-- Use our new, robust API to create the permanent settings tab
+	-- Note: UIInstance:CreateTab for settings is already called earlier in my refactored code
+	-- and it returns the SettingsTabAPI object.
+	-- The variable 'SettingsTabObject' from my previous code should hold this.
+	-- If 'SettingsTabObject' isn't defined or is incorrect, this needs adjustment.
+	-- Assuming SettingsTabObject is the correct API handle for the settings tab:
+
+	local SettingsTab = SettingsTabObject -- Use the existing handle if valid, otherwise re-create.
+	                                      -- The user's Block 1 CreateTab for IsSettingsTab = true *should* return the correct API.
+	                                      -- Let's verify if SettingsTabObject is indeed the result of UIInstance:CreateTab({IsSettingsTab=true...})
+	                                      -- In my current code (after Block 1 insertion), UIInstance:CreateTab *does* return SettingsTabAPI for settings.
+	                                      -- And it is already called, but its result is not stored in a way Block 3 expects.
+	                                      -- The previous instantiation of SettingsTabObject was for the *old* settings tab system.
+
+	-- Correction: Block 1's `UIInstance:CreateTab` for the settings tab *already creates the button* and returns the API.
+	-- Block 3 *uses* this API. The previous population code needs to be removed, and then Block 3's population code added.
+	-- The line `local SettingsTab = UIInstance:CreateTab({...})` in Block 3 is redundant if CreateTab was already called for settings.
+	-- Let's assume `SettingsTabObject` from the current code is the correct API handle returned by the *new* CreateTab.
+	-- If not, I need to ensure `UIInstance:CreateTab` for settings is called here and its result used.
+
+	-- The current code has:
+	-- local SettingsTabObject = UIInstance:CreateTab({ Name = "Settings", Icon = "...", IsSettingsTab = true }, dependencies)
+	-- This SettingsTabObject *is* the one we need to use.
+
+	-- Populate the settings tab
+	local InterfaceSection = SettingsTabObject:AddSection("Interface")
+	InterfaceSection:AddSlider({
+		Title = "Window Transparency",
+		Min = 0, Max = 1, Default = 0.1, Increment = 0.01,
+		Callback = function(val)
+			if Main then Main.BackgroundTransparency = val end
+			-- Also update image/video transparency if they are active
+			local bgImage = Main and Main:FindFirstChild("MainImage")
+			local bgVideo = Main and Main:FindFirstChild("MainVideo")
+			if bgImage then bgImage.ImageTransparency = val end
+			if bgVideo then bgVideo.BackgroundTransparency = val end
+
+			if dependencies.Flags then dependencies.Flags["WindowTransparency"] = val end
+			if dependencies.SaveFile then dependencies.SaveFile("WindowTransparency", val) end
+		end
+	})
+	InterfaceSection:AddSlider({
+		Title = "Tab List Width",
+		Min = 80, Max = 250, Default = GuiConfig["Tab Width"] or 120, Increment = 1,
+		Flag = "TabWidth", -- Assuming SaveFile uses this flag
+		Callback = function(val)
+			if dependencies.LayersTab then
+				dependencies.LayersTab.Size = UDim2.new(0, val, dependencies.LayersTab.Size.Y.Scale, dependencies.LayersTab.Size.Y.Offset)
+			end
+			if Layers then -- Layers is the main content area next to tabs
+				Layers.Position = UDim2.new(0, val + 18, Layers.Position.Y.Scale, Layers.Position.Y.Offset)
+				Layers.Size = UDim2.new(1, -(val + 9 + 18), Layers.Size.Y.Scale, Layers.Size.Y.Offset)
+			end
+			if dependencies.GuiConfig then dependencies.GuiConfig["Tab Width"] = val end
+			-- SaveFile is implicitly handled by the helper if 'Flag' is provided
+		end
+	})
+	-- ... etc ... Add more elements to InterfaceSection if needed from original settings
+
+	local PresetsSection = SettingsTabObject:AddSection("Presets")
+	-- Add elements to PresetsSection. Example:
+	local defaultThemes = {}
+	if dependencies.GetThemes then defaultThemes = dependencies.GetThemes() end
+	local themeDropdown = PresetsSection:AddDropdown({
+		Title = "Select Theme",
+		Options = defaultThemes,
+		Default = CurrentTheme, -- Assumes CurrentTheme is available
+		Callback = function(selectedTable)
+			if selectedTable and #selectedTable > 0 then
+				local themeName = selectedTable[1]
+				if dependencies.SetTheme then dependencies.SetTheme(themeName) end
+				if dependencies.MakeNotify then dependencies.MakeNotify({Title="Theme Changed", Content="Set to "..themeName}) end
+			end
+		end
+	})
+	PresetsSection:AddButton({
+		Title = "Test Button",
+		Content = "A test button in presets.",
+		Callback = function()
+			if dependencies.MakeNotify then dependencies.MakeNotify({Title="Test", Content="Presets button clicked!"}) end
+		end
+	})
+	-- ... etc ... Add more elements to PresetsSection if needed
 
 	return UIInstance
 end
