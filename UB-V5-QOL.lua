@@ -224,9 +224,8 @@ function SetTheme(themeName)
                     sub.element[sub.property] = themeColor
                 end)
                 if not ok then
-                    warn("Theme application failed for element:", sub.element:GetFullName(), "Property:", sub.property, "Error:", err)
-                    -- Consider removing problematic entries even if element exists but property application fails
-                    -- table.remove(ThemeElements, i)
+                    warn("Theme application failed for element:", sub.element:GetFullName(), "Property:", sub.property, "Error:", err, "- Removing from ThemeElements to prevent spam.")
+                    table.remove(ThemeElements, i)
                 end
             else
                 warn("Theme color not found:", sub.colorName, "for theme:", CurrentTheme)
@@ -725,12 +724,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			local isOriginalDefaultTheme = false
 			if Themes[CurrentTheme] then
 				local originalDefaultThemeNames = GetThemes() -- This now filters out special keys
-				for _, name in ipairs(originalDefaultThemeNames) do
-					if CurrentTheme == name then
-						isOriginalDefaultTheme = true
-						break
-					end
-				end
+				isOriginalDefaultTheme = table.find(originalDefaultThemeNames, CurrentTheme) ~= nil
 			end
 
 			if isOriginalDefaultTheme then
