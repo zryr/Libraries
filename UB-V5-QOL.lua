@@ -338,10 +338,22 @@ function CircleClick(Button, X, Y)
 		end
 
 		local Time = 0.5
+		local initialTransparency = Circle.ImageTransparency -- Store initial transparency
+
 		Circle:TweenSizeAndPosition(UDim2.new(0, Size, 0, Size), UDim2.new(0.5, -Size/2, 0.5, -Size/2), "Out", "Quad", Time, false, nil)
-		for i=1,10 do
-			Circle.ImageTransparency = Circle.ImageTransparency + 0.01
-			wait(Time/10)
+
+		-- Concurrently tween transparency to 1.0 (fully transparent)
+		if TweenService then
+			local transparencyTween = TweenService:Create(Circle, TweenInfo.new(Time), {ImageTransparency = 1.0})
+			transparencyTween:Play()
+			transparencyTween.Completed:Wait() -- Wait for this tween to complete before destroying
+		else
+			-- Fallback if TweenService is somehow nil (should not happen)
+			local steps = 10
+			for i = 1, steps do
+				Circle.ImageTransparency = initialTransparency + ( (1.0 - initialTransparency) * (i / steps) )
+				task.wait(Time / steps)
+			end
 		end
 		Circle:Destroy()
 	end)
@@ -539,7 +551,7 @@ function UBHubLib:MakeNotify(NotifyConfig)
         -- The UIListLayout will handle its X position. Its X Size (Scale 1) will make it try to fill.
         -- The Close button is anchored to the right. Top's PaddingRight helps.
 
-		UIStroke1.Color = NotifyConfig.Color
+		UIStroke1.Color = GetColor("Primary", UIStroke1, "Color") -- Make stroke themeable
 		UIStroke1.Thickness = 0.4000000059604645
 		UIStroke1.Parent = TextLabel1
 
@@ -1912,7 +1924,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	DropdownSelect.BorderSizePixel = 0
 	DropdownSelect.LayoutOrder = 1
 	DropdownSelect.Position = UDim2.new(1, 172, 0.5, 0) -- Start off-screen
-	DropdownSelect.Size = UDim2.new(0, 160, 1, -16)
+	DropdownSelect.Size = UDim2.new(0, 160, 0, 300) -- Fixed width 160, Fixed height 300 (example)
 	DropdownSelect.Name = "DropdownSelect"
 	DropdownSelect.ClipsDescendants = true
 	DropdownSelect.Parent = MoreBlur
@@ -2057,11 +2069,12 @@ function UBHubLib:MakeGui(GuiConfig)
 			selectedTabFrame.BackgroundTransparency = 0.9200000166893005 -- Highlight for user tab
 			local cf = selectedTabFrame:FindFirstChild("ChooseFrame")
 			if cf then
-				cf.Visible = true
+				cf.Visible = true -- Make visible first
+                local targetSize = UDim2.new(0, 3, 1, -8) -- Target: 3px wide, Tab height minus 8px (4px top/bottom padding)
 				if TweenService then
-					TweenService:Create(cf, TweenInfo.new(0.2), {Size = UDim2.new(0,1,0,20)}):Play()
+					TweenService:Create(cf, TweenInfo.new(0.2), {Size = targetSize}):Play()
 				else
-					cf.Size = UDim2.new(0,1,0,20)
+					cf.Size = targetSize
 				end
 			end
 		end
@@ -2211,16 +2224,25 @@ function UBHubLib:MakeGui(GuiConfig)
 		FeatureImg.Parent = Tab
 
 		if not TabConfig.IsSettingsTab then -- Only create ChooseFrame for non-settings tabs
-			local cf = Instance.new("Frame", Tab) -- Parent to Tab (the button container)
+			local cf = Instance.new("Frame", Tab)
 			cf.Name = "ChooseFrame"
 			cf.BackgroundColor3 = GetColor("ThemeHighlight")
-			cf.BorderColor3 = Color3.fromRGB(0,0,0)
-			cf.BorderSizePixel = 0
-			cf.Position = UDim2.new(0,2,0,9) -- Initial position
-			cf.Size = UDim2.new(0,1,0,12)   -- Initial size (small, will be tweened on select)
-			cf.Visible = false -- Initially hidden
-			local stroke = Instance.new("UIStroke", cf); stroke.Color = GetColor("Secondary"); stroke.Thickness = 1.6
-			Instance.new("UICorner", cf)
+			cf.BorderSizePixel = 0 -- No border needed for this style
+
+			cf.AnchorPoint = Vector2.new(0, 0.5)
+			cf.Position = UDim2.new(0, 0, 0.5, 0)    -- Position on left edge, vertically centered
+			cf.Size = UDim2.new(0, 3, 0, 0)          -- Initial: 3px wide, 0 height (will tween to full height)
+			cf.Visible = false                       -- Initially hidden
+
+			-- Remove existing stroke if any, not suitable for a thin bar
+			local existingStroke = cf:FindFirstChildOfClass("UIStroke")
+			if existingStroke then existingStroke:Destroy() end
+
+			-- Add/ensure UICorner for slightly rounded ends if desired (width 3 might be too small for much effect)
+			if not cf:FindFirstChildOfClass("UICorner") then
+				local corner = Instance.new("UICorner", cf)
+				corner.CornerRadius = UDim.new(0, 2) -- Small radius
+			end
 		end
 
 		local TabObject = {}
