@@ -4,7 +4,7 @@ local LocalPlayer = game:GetService("Players").LocalPlayer
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Mouse = LocalPlayer:GetMouse()
-local ProtectGui = protectgui or (syn and syn.protect_gui) or function(f) end
+local ProtectGui = (syn and syn.protect_gui) or (_G.protectgui) or function(f) end -- Prioritize syn, then safe global, then no-op
 local CoreGui = cloneref(gethui()) or game:GetService("CoreGui")
 local SizeUI = UDim2.new(0, 550, 0, 350)
 
@@ -351,6 +351,8 @@ local notifyLayoutOrderCounter = 0 -- Counter for notification LayoutOrder
 local NotifyGuiSingleton = nil -- Singleton for the notification ScreenGui
 local NotifyLayoutSingleton = nil -- Singleton for the notification layout Frame
 
+local Flags = {} -- Script-level Flags table for persistence
+
 local function deepcopy(orig) -- Moved deepcopy to script level
     local orig_type = type(orig)
     local copy
@@ -373,8 +375,18 @@ function UBHubLib:MakeNotify(NotifyConfig)
 	NotifyConfig.Description = NotifyConfig.Description or "Notification"
 	NotifyConfig.Content = NotifyConfig.Content or "Content"
 	NotifyConfig.Color = GetColor("Primary") -- Corrected: Get the Primary color value without trying to register NotifyConfig table
-	NotifyConfig.Time = NotifyConfig.Time or 0.5
-	NotifyConfig.Delay = NotifyConfig.Delay or 5
+	NotifyConfig.Time = tonumber(NotifyConfig.Time or 0.5) -- Ensure numeric type early
+	if not (type(NotifyConfig.Time) == "number" and NotifyConfig.Time > 0) then
+		warn("MakeNotify: Invalid NotifyConfig.Time, defaulting to 0.5. Received:", NotifyConfig.Time)
+		NotifyConfig.Time = 0.5
+	end
+
+	NotifyConfig.Delay = tonumber(NotifyConfig.Delay or 5) -- Ensure numeric type early
+	if not (type(NotifyConfig.Delay) == "number" and NotifyConfig.Delay >= 0) then
+		warn("MakeNotify: Invalid NotifyConfig.Delay, defaulting to 5. Received:", NotifyConfig.Delay)
+		NotifyConfig.Delay = 5
+	end
+
 	local NotifyFunction = {}
 	spawn(function()
 		if not NotifyGuiSingleton or not NotifyGuiSingleton.Parent then
@@ -545,7 +557,7 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		Close.Name = "Close"
 		Close.Parent = Top
 
-		ImageLabel.Image = LoadUIAsset("rbxassetid://9886659671", "ImageLable.png")
+		ImageLabel.Image = LoadUIAsset("rbxassetid://9886659671", "ImageLabel.png") -- Corrected typo
 		ImageLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 		ImageLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 		ImageLabel.BackgroundTransparency = 0.9990000128746033
@@ -592,7 +604,7 @@ function UBHubLib:MakeNotify(NotifyConfig)
 				return false
 			end
 			waitbruh_instance = true
-			local tweenDuration = tonumber(NotifyConfig.Time) * 0.2
+			local tweenDuration = NotifyConfig.Time * 0.2 -- NotifyConfig.Time is already a validated number
 			TweenService:Create(NotifyFrameReal,TweenInfo.new(tweenDuration, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 400, 0, 0)}):Play()
 			task.wait(tweenDuration) -- Wait for the hide animation to complete
 			NotifyFrame:Destroy()
@@ -600,8 +612,8 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		Close.Activated:Connect(function()
 			NotifyFunction:Close()
 		end)
-		TweenService:Create(NotifyFrameReal,TweenInfo.new(tonumber(NotifyConfig.Time) * 0.2, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 0, 0, 0)}):Play()
-		task.wait(tonumber(NotifyConfig.Delay)) -- This is the delay *before* auto-closing
+		TweenService:Create(NotifyFrameReal,TweenInfo.new(NotifyConfig.Time * 0.2, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 0, 0, 0)}):Play() -- NotifyConfig.Time is already a number
+		task.wait(NotifyConfig.Delay) -- NotifyConfig.Delay is already a number; This is the delay *before* auto-closing
 		NotifyFunction:Close() -- This will now wait for its own animation before destroying
 	end)
 	return NotifyFunction
@@ -651,6 +663,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	local draggableElements = {} 
 	-- MakeResizable will add to this: {resizeHandle = {objectToResize = object, saveFlag = flag, api = api}}
 	local resizableElements = {}
+	-- Flags table is now at script scope
 
 	GuiConfig.NameHub = GuiConfig.NameHub or "UB Hub"
 	if LibraryCfg.Undetected then
@@ -663,7 +676,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	GuiConfig["Name Player"] = tostring(game:GetService("Players").LocalPlayer.Name)
 	GuiConfig["Tab Width"] = GuiConfig["Tab Width"] or 120
 	GuiConfig["SaveFolder"] = GuiConfig["SaveFolder"] or false
-	local Flags = {} -- Initialize local Flags table; LoadFile will populate it.
+	-- local Flags = {} -- Moved to script scope
 	local UIInstance = {
 		UserTabObjects = {} -- Initialize list to store user tab objects
 	}
@@ -993,12 +1006,18 @@ function UBHubLib:MakeGui(GuiConfig)
 			ParagraphTitle.TextColor3 = getColorFunc("Text", ParagraphTitle, "TextColor3"); ParagraphTitle.TextSize = 13; ParagraphTitle.TextXAlignment = Enum.TextXAlignment.Left; ParagraphTitle.TextYAlignment = Enum.TextYAlignment.Top;
 			ParagraphTitle.BackgroundTransparency = 1; ParagraphTitle.Position = UDim2.new(0,10,0,10); ParagraphTitle.Size = UDim2.new(1,-16,0,13); ParagraphTitle.TextWrapped = true
 			task.defer(function()
-				ParagraphTitle.Size = UDim2.new(1, -16, 0, ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0, ParagraphTitle.TextBounds.Y + 20); SectionObject._UpdateSizeSection()
+				if ParagraphTitle and ParagraphTitle.Parent then
+					ParagraphTitle.Size = UDim2.new(1, -16, 0, ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0, ParagraphTitle.TextBounds.Y + 20);
+					SectionObject._UpdateSizeSection(); SectionObject._UpdateSizeScroll()
+				end
 			end)
 			function ParagraphFunc:Set(pConfig) 
 				ParagraphTitle.Text = (pConfig.Title or "T") .. " | " .. (pConfig.Content or "C"); 
 				task.defer(function()
-					ParagraphTitle.Size = UDim2.new(1,-16,0,ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0,ParagraphTitle.TextBounds.Y + 20); SectionObject._UpdateSizeSection() 
+					if ParagraphTitle and ParagraphTitle.Parent then
+						ParagraphTitle.Size = UDim2.new(1,-16,0,ParagraphTitle.TextBounds.Y); Paragraph.Size = UDim2.new(1,0,0,ParagraphTitle.TextBounds.Y + 20);
+						SectionObject._UpdateSizeSection(); SectionObject._UpdateSizeScroll()
+					end
 				end) 
 			end
 			CountItem = CountItem + 1; return ParagraphFunc
@@ -1016,7 +1035,12 @@ function UBHubLib:MakeGui(GuiConfig)
 				local FeatureFrame1_Button = Instance.new("Frame", ButtonFrame); FeatureFrame1_Button.Name = "FeatureFrame"; FeatureFrame1_Button.AnchorPoint = Vector2.new(1,0.5); FeatureFrame1_Button.BackgroundTransparency = 1; FeatureFrame1_Button.Position = UDim2.new(1,-15,0.5,0); FeatureFrame1_Button.Size = UDim2.new(0,25,0,25)
 				local FeatureImg3_Button = Instance.new("ImageLabel", FeatureFrame1_Button); FeatureImg3_Button.Name = "FeatureImg"; FeatureImg3_Button.Image = ButtonConfig.Icon; FeatureImg3_Button.AnchorPoint = Vector2.new(0.5,0.5); FeatureImg3_Button.BackgroundTransparency = 1; FeatureImg3_Button.Position = UDim2.new(0.5,0,0.5,0); FeatureImg3_Button.Size = UDim2.new(1,0,1,0)
 			end
-			task.delay(0, function() local contentHeight = ButtonContent.TextBounds.Y; local titleHeight = ButtonTitle.TextBounds.Y; ButtonFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); SectionObject._UpdateSizeSection() end)
+			task.delay(0, function()
+				if ButtonContent and ButtonContent.Parent and ButtonTitle and ButtonTitle.Parent then
+					local contentHeight = ButtonContent.TextBounds.Y; local titleHeight = ButtonTitle.TextBounds.Y; ButtonFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15));
+					SectionObject._UpdateSizeSection(); SectionObject._UpdateSizeScroll()
+				end
+			end)
 			CountItem = CountItem + 1; return {}
 		end
 
@@ -1033,7 +1057,12 @@ function UBHubLib:MakeGui(GuiConfig)
 			local currentValue = ToggleConfig.Default
 			local function setToggleVisual(value) SwitchCircle:TweenPosition(UDim2.new(value and 0.5 or 0, value and -1 or 1, 0.5, -6), "Out", "Quad", 0.15, true) end; setToggleVisual(currentValue)
 			ActualButton.Activated:Connect(function() circleClickFunc(ActualButton, mouseRef.X, mouseRef.Y); currentValue = not currentValue; if ToggleConfig.Flag then saveFileFunc(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue) end)
-			task.delay(0, function() local contentHeight = ToggleContent.TextBounds.Y; local titleHeight = ToggleTitle.TextBounds.Y; ToggleFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); SectionObject._UpdateSizeSection() end)
+			task.delay(0, function()
+				if ToggleContent and ToggleContent.Parent and ToggleTitle and ToggleTitle.Parent then
+					local contentHeight = ToggleContent.TextBounds.Y; local titleHeight = ToggleTitle.TextBounds.Y; ToggleFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15));
+					SectionObject._UpdateSizeSection(); SectionObject._UpdateSizeScroll()
+				end
+			end)
 			CountItem = CountItem + 1; return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; if ToggleConfig.Flag then saveFileFunc(ToggleConfig.Flag, currentValue) end; ToggleConfig.Callback(currentValue); setToggleVisual(currentValue); end }
 		end
 
@@ -1156,7 +1185,12 @@ function UBHubLib:MakeGui(GuiConfig)
 				-- No explicit revert logic here as AddInput usually accepts any text.
 				-- If specific validation and revert were needed, it would be more complex.
 			end)
-			task.delay(0, function() local contentHeight = InputContent.TextBounds.Y; local titleHeight = InputTitle.TextBounds.Y; InputFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15)); SectionObject._UpdateSizeSection() end)
+			task.delay(0, function()
+				if InputContent and InputContent.Parent and InputTitle and InputTitle.Parent then
+					local contentHeight = InputContent.TextBounds.Y; local titleHeight = InputTitle.TextBounds.Y; InputFrame.Size = UDim2.new(1,0,0,math.max(46, titleHeight + contentHeight + 15));
+					SectionObject._UpdateSizeSection(); SectionObject._UpdateSizeScroll()
+				end
+			end)
 			CountItem = CountItem + 1; return { GetValue = function() return currentValue end, SetValue = function(val) currentValue = val; TextBox.Text = val; if InputConfig.Flag then saveFileFunc(InputConfig.Flag, currentValue) end; InputConfig.Callback(currentValue) end }
 		end
 
@@ -1297,7 +1331,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					local optionsFrameHeight = SelectOptionsFrame.AbsoluteSize.Y + 2 * 8 -- Consider some vertical padding for options frame (e.g. 8px top/bottom from center)
 
 					DropdownFrame.Size = UDim2.new(1,0,0, math.max(46, totalTextHeight, optionsFrameHeight))
-					SectionObject._UpdateSizeSection()
+					SectionObject._UpdateSizeSection(); SectionObject._UpdateSizeScroll()
 				end
 			end)
 			CountItem = CountItem + 1; return DropdownFunc;
@@ -1798,7 +1832,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 	NameTab.Font = Enum.Font.GothamBold
 	NameTab.Text = ""
-	NameTab.TextColor3 = Color3.fromRGB(255, 255, 255)
+	NameTab.TextColor3 = GetColor("Text", NameTab, "TextColor3") -- Use theme color
 	NameTab.TextSize = 24
 	NameTab.TextWrapped = true
 	NameTab.TextXAlignment = Enum.TextXAlignment.Left
@@ -1833,10 +1867,9 @@ function UBHubLib:MakeGui(GuiConfig)
 
 	-- Dropdown UI Elements (defined before settings population which uses AddDropdown)
 	local MoreBlur = Instance.new("Frame");
-	local DropShadowHolder_MoreBlur = Instance.new("Frame"); -- Renamed to avoid conflict
-	local DropShadow_MoreBlur = Instance.new("ImageLabel");   -- Renamed to avoid conflict
-	local UICorner_MoreBlur = Instance.new("UICorner");     -- Renamed to avoid conflict
-	local ConnectButton_MoreBlur = Instance.new("TextButton"); -- Renamed to avoid conflict
+	-- DropShadowHolder_MoreBlur and DropShadow_MoreBlur removed as they were unused.
+	local UICorner_MoreBlur = Instance.new("UICorner");     -- This is for MoreBlur frame itself
+	local ConnectButton_MoreBlur = Instance.new("TextButton");
 
 	MoreBlur.AnchorPoint = Vector2.new(1, 1)
 	MoreBlur.BackgroundColor3 = GetColor("Accent",MoreBlur,"BackgroundColor3")
@@ -1850,28 +1883,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	MoreBlur.Name = "MoreBlur"
 	MoreBlur.Parent = UBHubGui -- Parent to the top-level ScreenGui for full-screen coverage
 
-	DropShadowHolder_MoreBlur.BackgroundTransparency = 1
-	DropShadowHolder_MoreBlur.BorderSizePixel = 0
-	DropShadowHolder_MoreBlur.Size = UDim2.new(1, 0, 1, 0)
-	DropShadowHolder_MoreBlur.ZIndex = 0
-	DropShadowHolder_MoreBlur.Name = "DropShadowHolder_MoreBlur" -- Unique Name
-	DropShadowHolder_MoreBlur.Parent = MoreBlur
-	DropShadowHolder_MoreBlur.Visible = false
-
-	DropShadow_MoreBlur.Image = LoadUIAsset("rbxassetid://6015897843", "DropShadow_MoreBlur.png") -- Unique Asset Name
-	DropShadow_MoreBlur.ImageColor3 = Color3.fromRGB(0, 0, 0)
-	DropShadow_MoreBlur.ImageTransparency = 0.5
-	DropShadow_MoreBlur.ScaleType = Enum.ScaleType.Slice
-	DropShadow_MoreBlur.SliceCenter = Rect.new(49, 49, 450, 450)
-	DropShadow_MoreBlur.AnchorPoint = Vector2.new(0.5, 0.5)
-	DropShadow_MoreBlur.BackgroundTransparency = 1
-	DropShadow_MoreBlur.BorderSizePixel = 0
-	DropShadow_MoreBlur.Position = UDim2.new(0.5, 0, 0.5, 0)
-	DropShadow_MoreBlur.Size = UDim2.new(1, 35, 1, 35)
-	DropShadow_MoreBlur.ZIndex = 0
-	DropShadow_MoreBlur.Name = "DropShadow_MoreBlur" -- Unique Name
-	DropShadow_MoreBlur.Parent = DropShadowHolder_MoreBlur
-	DropShadow_MoreBlur.Visible = false
+	-- Removed DropShadowHolder_MoreBlur and DropShadow_MoreBlur definitions and property settings
 
 	UICorner_MoreBlur.Parent = MoreBlur -- Assuming this is for MoreBlur itself
 
@@ -2011,6 +2023,72 @@ function UBHubLib:MakeGui(GuiConfig)
 
 	local ScrolLayersMap = {} 
 	local FrameToTabObjectMap = {}
+
+	-- Define SelectTab before CreateTab because CreateTab's connections use SelectTab
+	function UIInstance:SelectTab(tabObject)
+		if not tabObject or not tabObject.Instance or not tabObject._ScrolLayers or not tabObject._TabConfig then
+			warn("SelectTab: Invalid tabObject received.")
+			return
+		end
+
+		local selectedTabFrame = tabObject.Instance
+		local isSettings = tabObject._IsSettingsTab
+
+		-- Unhighlight all user tabs in ScrollTab
+		if ScrollTab then -- ScrollTab is an upvalue from MakeGui's scope
+			for _, child in ipairs(ScrollTab:GetChildren()) do
+				if child:IsA("Frame") and child.Name:match("^TabInstance_") and child ~= selectedTabFrame then
+					child.BackgroundTransparency = 0.9990000128746033 -- Default unselected for user tabs
+					local cf = child:FindFirstChild("ChooseFrame")
+					if cf then cf.Visible = false end
+				end
+			end
+		end
+
+		-- Unhighlight the Customize tab if it exists and is not the one being selected
+		if customizeButtonInstance and customizeButtonInstance ~= selectedTabFrame then -- customizeButtonInstance is an upvalue
+			customizeButtonInstance.BackgroundTransparency = 0.95 -- Default unselected for settings tab
+		end
+
+		-- Highlight the selected tab
+		if isSettings then
+			selectedTabFrame.BackgroundTransparency = 0.92 -- Highlight for settings tab
+		else -- It's a user tab
+			selectedTabFrame.BackgroundTransparency = 0.9200000166893005 -- Highlight for user tab
+			local cf = selectedTabFrame:FindFirstChild("ChooseFrame")
+			if cf then
+				cf.Visible = true
+				if TweenService then
+					TweenService:Create(cf, TweenInfo.new(0.2), {Size = UDim2.new(0,1,0,20)}):Play()
+				else
+					cf.Size = UDim2.new(0,1,0,20)
+				end
+			end
+		end
+
+		-- View switching
+		if isSettings then
+			if not isSettingsViewActive then  -- isSettingsViewActive is an upvalue
+				lastSelectedTabName = NameTab.Text -- lastSelectedTabName, NameTab are upvalues
+			end
+			SettingsPage.Visible = true -- SettingsPage is an upvalue
+			LayersReal.Visible = false -- LayersReal is an upvalue
+			NameTab.Text = "Customize"
+			isSettingsViewActive = true
+		else -- It's a user tab
+			NameTab.Text = tabObject._TabConfig.Name
+			SettingsPage.Visible = false
+			LayersReal.Visible = true
+			if LayersPageLayout then LayersPageLayout:JumpTo(tabObject._ScrolLayers) end -- LayersPageLayout is an upvalue
+			isSettingsViewActive = false
+		end
+
+		if not isSettings and SaveFile then -- SaveFile is an upvalue
+			SaveFile("LastSelectedUserTab", tabObject._TabConfig.Name)
+		elseif isSettings and SaveFile then
+			SaveFile("LastSelectedUserTab", nil)
+		end
+	end
 
 	function UIInstance:CreateTab(TabConfig)
 		local TabConfig = TabConfig or {}
