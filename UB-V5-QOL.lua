@@ -1542,7 +1542,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	local LayersTab = Instance.new("Frame");
 	local UICorner2 = Instance.new("UICorner");
 	local DecideFrame = Instance.new("Frame");
-	local UIStroke3 = Instance.new("UIStroke");
+	-- local UIStroke3 = Instance.new("UIStroke"); -- Removed orphaned variable
 	local Layers = Instance.new("Frame");
 	local UICorner6 = Instance.new("UICorner");
 	local NameTab = Instance.new("TextLabel");
@@ -1787,6 +1787,30 @@ function UBHubLib:MakeGui(GuiConfig)
 	ImageLabel1.Size = UDim2.new(1, -8, 1, -8)
 	ImageLabel1.Parent = Close
 
+	MaxRestore.Font = Enum.Font.SourceSans -- Added properties for MaxRestore similar to Close and Min
+	MaxRestore.Text = ""
+	MaxRestore.TextColor3 = Color3.fromRGB(0, 0, 0)
+	MaxRestore.TextSize = 14
+	MaxRestore.AnchorPoint = Vector2.new(1, 0.5)
+	MaxRestore.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	MaxRestore.BackgroundTransparency = 0.9990000128746033
+	MaxRestore.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	MaxRestore.BorderSizePixel = 0
+	MaxRestore.Position = UDim2.new(1, -29, 0.5, 0) -- Positioned between Min and Close
+	MaxRestore.Size = UDim2.new(0, 25, 0, 25)
+	MaxRestore.Name = "MaxRestore"
+	MaxRestore.Parent = Top
+
+	ImageLabel.Image = MAXIMIZE_ICON_ASSET -- Set initial icon
+	ImageLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	ImageLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	ImageLabel.BackgroundTransparency = 0.9990000128746033
+	ImageLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	ImageLabel.BorderSizePixel = 0
+	ImageLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+	ImageLabel.Size = UDim2.new(1, -8, 1, -8)
+	-- ImageLabel.Parent = MaxRestore -- Parent is already set when MaxRestore is defined
+
 	Min.Font = Enum.Font.SourceSans
 	Min.Text = ""
 	Min.TextColor3 = Color3.fromRGB(0, 0, 0)
@@ -2025,6 +2049,54 @@ function UBHubLib:MakeGui(GuiConfig)
 	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	UIListLayout.Parent = ScrollTab
 
+	-- Part 2.1 & 2.2: Create and Parent New Customize Button
+	local NewCustomizeButton = Instance.new("TextButton")
+	NewCustomizeButton.Name = "CustomizeButton"
+	NewCustomizeButton.Text = ""
+	NewCustomizeButton.Parent = LayersTab
+	NewCustomizeButton.AnchorPoint = Vector2.new(0, 1)
+	NewCustomizeButton.Position = UDim2.new(0, 0, 1, 0) -- At the bottom of LayersTab
+	NewCustomizeButton.Size = UDim2.new(1, 0, 0, 40)    -- Full width, 40px height
+	NewCustomizeButton.BackgroundColor3 = GetColor("Secondary") -- Example color, can be themed
+	NewCustomizeButton.BackgroundTransparency = 0 -- Make it visible for now, adjust with theme
+	NewCustomizeButton.BorderColor3 = GetColor("Stroke")
+	NewCustomizeButton.BorderSizePixel = 1
+	NewCustomizeButton.LayoutOrder = 1000 -- Ensure it's at the bottom
+
+	local NewCustomizeButtonCorner = Instance.new("UICorner", NewCustomizeButton)
+	NewCustomizeButtonCorner.CornerRadius = UDim.new(0, 4)
+
+	-- Part 2.3: Add Visuals to the New Button
+	local NewCustomizeIcon = Instance.new("ImageLabel", NewCustomizeButton)
+	NewCustomizeIcon.Name = "CustomizeIcon"
+	NewCustomizeIcon.Image = "rbxassetid://126800841735072"
+	NewCustomizeIcon.ImageColor3 = GetColor("Text")
+	NewCustomizeIcon.BackgroundTransparency = 1
+	NewCustomizeIcon.Size = UDim2.new(0, 20, 0, 20) -- Adjust size as needed
+	NewCustomizeIcon.Position = UDim2.new(0, 10, 0.5, -10) -- Position on the left, centered vertically
+
+	local NewCustomizeText = Instance.new("TextLabel", NewCustomizeButton)
+	NewCustomizeText.Name = "CustomizeText"
+	NewCustomizeText.Text = "Customize"
+	NewCustomizeText.Font = Enum.Font.GothamBold
+	NewCustomizeText.TextSize = 14
+	NewCustomizeText.TextColor3 = GetColor("Text")
+	NewCustomizeText.BackgroundTransparency = 1
+	NewCustomizeText.TextXAlignment = Enum.TextXAlignment.Left
+	NewCustomizeText.Size = UDim2.new(0, 100, 1, 0) -- Adjust size as needed
+	NewCustomizeText.Position = UDim2.new(0, 35, 0, 0) -- Position next to icon
+
+	-- Separator Line above the new Customize Button
+	local CustomizeButtonSeparator = Instance.new("Frame")
+	CustomizeButtonSeparator.Name = "CustomizeButtonSeparator"
+	CustomizeButtonSeparator.Parent = LayersTab
+	CustomizeButtonSeparator.BackgroundColor3 = GetColor("Stroke")
+	CustomizeButtonSeparator.BorderSizePixel = 0
+	CustomizeButtonSeparator.Size = UDim2.new(1, 0, 0, 1) -- Full width, 1px high
+	CustomizeButtonSeparator.AnchorPoint = Vector2.new(0, 1)
+	CustomizeButtonSeparator.Position = UDim2.new(0, 0, 1, -NewCustomizeButton.Size.Y.Offset) -- Position it above the NewCustomizeButton
+	CustomizeButtonSeparator.LayoutOrder = NewCustomizeButton.LayoutOrder - 1 -- Ensure it's just above the button
+
 	local function UpdateSize1()
 		-- Use UIListLayout.AbsoluteContentSize.Y to correctly get the total height of content
 		if UIListLayout and UIListLayout.Parent == ScrollTab then
@@ -2049,10 +2121,10 @@ function UBHubLib:MakeGui(GuiConfig)
 	
 	local isSettingsViewActive = false
 	local lastSelectedTabName = ""
-	local customizeButtonInstance = nil
+	local customizeButtonInstance = NewCustomizeButton -- Part 2.4: Assign to customizeButtonInstance
 
 	local ScrolLayersMap = {} 
-	local FrameToTabObjectMap = {}
+	-- local FrameToTabObjectMap = {} -- Defined later, this one is redundant
 
 	-- Define SelectTab before CreateTab because CreateTab's connections use SelectTab
 	function UIInstance:SelectTab(tabObject)
@@ -2075,42 +2147,53 @@ function UBHubLib:MakeGui(GuiConfig)
 			end
 		end
 
-		-- Unhighlight the Customize tab if it exists and is not the one being selected
-		if customizeButtonInstance and customizeButtonInstance ~= selectedTabFrame then -- customizeButtonInstance is an upvalue
-			customizeButtonInstance.BackgroundTransparency = 0.95 -- Default unselected for settings tab
+		-- Unhighlight the Customize button (which is customizeButtonInstance)
+		if customizeButtonInstance then
+			customizeButtonInstance.BackgroundTransparency = 0.95 -- Default unselected transparency
+			-- Potentially reset other visual cues for customizeButtonInstance if they were set when it was active
 		end
 
 		-- Highlight the selected tab
 		if isSettings then
-			selectedTabFrame.BackgroundTransparency = 0.92 -- Highlight for settings tab
+			-- The selectedTabFrame for settings is now effectively customizeButtonInstance
+			if customizeButtonInstance then
+				customizeButtonInstance.BackgroundTransparency = 0.92 -- Highlight for settings tab
+			end
+			if selectedTabFrame and selectedTabFrame ~= customizeButtonInstance then
+				-- This case should ideally not happen if selectedTabFrame is nil for CustomizeTab
+                -- but as a safeguard, ensure the API-returned (but now invisible) settings tab frame is not highlighted
+                selectedTabFrame.BackgroundTransparency = 0.999
+			end
 		else -- It's a user tab
-			selectedTabFrame.BackgroundTransparency = 0.9200000166893005 -- Highlight for user tab
-			local cf = selectedTabFrame:FindFirstChild("ChooseFrame")
-			if cf then
-				cf.Visible = true -- Make visible first
-                local targetSize = UDim2.new(0, 3, 1, -8) -- Target: 3px wide, Tab height minus 8px (4px top/bottom padding)
-				if TweenService then
-					TweenService:Create(cf, TweenInfo.new(0.2), {Size = targetSize}):Play()
-				else
-					cf.Size = targetSize
+			if selectedTabFrame then -- selectedTabFrame is tabObject.Instance for user tabs
+				selectedTabFrame.BackgroundTransparency = 0.9200000166893005 -- Highlight for user tab
+				local cf = selectedTabFrame:FindFirstChild("ChooseFrame")
+				if cf then
+					cf.Visible = true
+					local targetSize = UDim2.new(0, 3, 1, -8)
+					if TweenService then
+						TweenService:Create(cf, TweenInfo.new(0.2), {Size = targetSize}):Play()
+					else
+						cf.Size = targetSize
+					end
 				end
 			end
 		end
 
 		-- View switching
 		if isSettings then
-			if not isSettingsViewActive then  -- isSettingsViewActive is an upvalue
-				lastSelectedTabName = NameTab.Text -- lastSelectedTabName, NameTab are upvalues
+			if not isSettingsViewActive then
+				lastSelectedTabName = NameTab.Text
 			end
-			SettingsPage.Visible = true -- SettingsPage is an upvalue
-			LayersReal.Visible = false -- LayersReal is an upvalue
+			SettingsPage.Visible = true
+			LayersReal.Visible = false
 			NameTab.Text = "Customize"
 			isSettingsViewActive = true
-		else -- It's a user tab
-			NameTab.Text = tabObject._TabConfig.Name
+		else -- It's a user tab (selectedTabFrame is the user tab's instance)
+			if tabObject._TabConfig then NameTab.Text = tabObject._TabConfig.Name end
 			SettingsPage.Visible = false
 			LayersReal.Visible = true
-			if LayersPageLayout then LayersPageLayout:JumpTo(tabObject._ScrolLayers) end -- LayersPageLayout is an upvalue
+			if LayersPageLayout and tabObject._ScrolLayers then LayersPageLayout:JumpTo(tabObject._ScrolLayers) end
 			isSettingsViewActive = false
 		end
 
@@ -2158,39 +2241,26 @@ function UBHubLib:MakeGui(GuiConfig)
 		TabConfigNameValue.Value = TabConfig.Name
 		TabConfigNameValue.Parent = ScrolLayers
 
-		local Tab = Instance.new("Frame")
-		local UICorner3 = Instance.new("UICorner")
-		local TabButton = Instance.new("TextButton");
-		local TabName = Instance.new("TextLabel")
-		local FeatureImg = Instance.new("ImageLabel");
-
-		Tab.Name = "TabInstance_" .. TabConfig.Name
-		Tab.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		Tab.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		Tab.BorderSizePixel = 0
+		local TabObject = {} -- Initialize TabObject earlier
+		local Tab -- Declare Tab variable
 
 		if TabConfig.IsSettingsTab then
-			Tab.Parent = LayersTab
-			Tab.LayoutOrder = 999
-			Tab.Size = UDim2.new(1, 0, 0, 40)
-			Tab.Position = UDim2.new(0, 0, 1, 0)
-			Tab.AnchorPoint = Vector2.new(0, 1)
-			Tab.BackgroundTransparency = 0.95
-
-			TabName.Text = "Customize"
-			FeatureImg.Image = "rbxassetid://126800841735072"
-
-			local SeparatorLineInstance = Instance.new("Frame")
-			SeparatorLineInstance.Name = "SeparatorLineForSettingsTab"
-			SeparatorLineInstance.Parent = LayersTab
-			SeparatorLineInstance.Size = UDim2.new(1, 0, 0, 1)
-			SeparatorLineInstance.BackgroundColor3 = GetColor("Stroke")
-			SeparatorLineInstance.BorderSizePixel = 0
-			SeparatorLineInstance.AnchorPoint = Vector2.new(0, 1)
-			-- Position dynamically based on the settings tab's actual height
-			SeparatorLineInstance.Position = UDim2.new(0, 0, 1, -Tab.Size.Y.Offset)
-			SeparatorLineInstance.LayoutOrder = 998
+			-- For the settings tab, we don't create a visible Tab instance in LayersTab here.
+			-- The 'Info' button will be repurposed to act as the settings tab button.
+			-- However, we still need the TabObject for logic and to hold the ScrolLayers (SettingsPage).
+			TabObject.Instance = nil -- No separate visible instance for settings tab button itself
+			-- The manual SeparatorLineForSettingsTab that was created here is now removed as per instructions.
 		else
+			Tab = Instance.new("Frame")
+			local UICorner3 = Instance.new("UICorner")
+			local TabButton = Instance.new("TextButton");
+			local TabName = Instance.new("TextLabel")
+			local FeatureImg = Instance.new("ImageLabel");
+
+			Tab.Name = "TabInstance_" .. TabConfig.Name
+			Tab.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			Tab.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			Tab.BorderSizePixel = 0
 			Tab.Parent = ScrollTab
 			Tab.LayoutOrder = CountTab
 			Tab.Size = UDim2.new(1, 0, 0, 30)
@@ -2198,85 +2268,80 @@ function UBHubLib:MakeGui(GuiConfig)
 
 			TabName.Text = TabConfig.Name
 			FeatureImg.Image = TabConfig.Icon
-		end
 
-		ScrolLayersMap[Tab] = ScrolLayers
+			ScrolLayersMap[Tab] = ScrolLayers
 
-		UICorner3.CornerRadius = UDim.new(0, 4)
-		UICorner3.Parent = Tab
+			UICorner3.CornerRadius = UDim.new(0, 4)
+			UICorner3.Parent = Tab
 
-		TabButton.Font = Enum.Font.GothamBold
-		TabButton.Text = ""
-		TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-		TabButton.TextSize = 13
-		TabButton.TextXAlignment = Enum.TextXAlignment.Left
-		TabButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		TabButton.BackgroundTransparency = 0.9990000128746033
-		TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		TabButton.BorderSizePixel = 0
-		TabButton.Size = UDim2.new(1, 0, 1, 0)
-		TabButton.Name = "TabButton"
-		TabButton.Parent = Tab
+			TabButton.Font = Enum.Font.GothamBold
+			TabButton.Text = ""
+			TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+			TabButton.TextSize = 13
+			TabButton.TextXAlignment = Enum.TextXAlignment.Left
+			TabButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			TabButton.BackgroundTransparency = 0.9990000128746033
+			TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			TabButton.BorderSizePixel = 0
+			TabButton.Size = UDim2.new(1, 0, 1, 0)
+			TabButton.Name = "TabButton"
+			TabButton.Parent = Tab
 
-		TabName.Font = Enum.Font.GothamBold
-		TabName.TextColor3 = GetColor("Text", TabName, "TextColor3")
-		TabName.TextSize = 13
-		TabName.TextXAlignment = Enum.TextXAlignment.Left
-		TabName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		TabName.BackgroundTransparency = 0.9990000128746033
-		TabName.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		TabName.BorderSizePixel = 0
-		TabName.Size = UDim2.new(1, 0, 1, 0)
-		TabName.Position = UDim2.new(0, 30, 0, 0)
-		TabName.Name = "TabName"
-		TabName.Parent = Tab
+			TabButton.Activated:Connect(function()
+				CircleClick(TabButton, Mouse.X, Mouse.Y)
+				if UIInstance.SelectTab then
+					UIInstance:SelectTab(TabObject)
+				else
+					warn("UIInstance:SelectTab is not yet defined when TabButton was activated for:", TabConfig.Name)
+				end
+			end)
 
-		FeatureImg.ImageColor3 = GetColor("Text", FeatureImg, "ImageColor3")
-		FeatureImg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		FeatureImg.BackgroundTransparency = 0.9990000128746033
-		FeatureImg.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		FeatureImg.BorderSizePixel = 0
-		FeatureImg.Position = UDim2.new(0, 9, 0, 7)
-		FeatureImg.Size = UDim2.new(0, 16, 0, 16)
-		FeatureImg.Name = "FeatureImg"
-		FeatureImg.Parent = Tab
+			TabName.Font = Enum.Font.GothamBold
+			TabName.TextColor3 = GetColor("Text", TabName, "TextColor3")
+			TabName.TextSize = 13
+			TabName.TextXAlignment = Enum.TextXAlignment.Left
+			TabName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			TabName.BackgroundTransparency = 0.9990000128746033
+			TabName.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			TabName.BorderSizePixel = 0
+			TabName.Size = UDim2.new(1, 0, 1, 0)
+			TabName.Position = UDim2.new(0, 30, 0, 0)
+			TabName.Name = "TabName"
+			TabName.Parent = Tab
 
-		if not TabConfig.IsSettingsTab then -- Only create ChooseFrame for non-settings tabs
+			FeatureImg.ImageColor3 = GetColor("Text", FeatureImg, "ImageColor3")
+			FeatureImg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			FeatureImg.BackgroundTransparency = 0.9990000128746033
+			FeatureImg.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			FeatureImg.BorderSizePixel = 0
+			FeatureImg.Position = UDim2.new(0, 9, 0, 7)
+			FeatureImg.Size = UDim2.new(0, 16, 0, 16)
+			FeatureImg.Name = "FeatureImg"
+			FeatureImg.Parent = Tab
+
+			-- Only create ChooseFrame for non-settings tabs (user tabs)
 			local cf = Instance.new("Frame", Tab)
 			cf.Name = "ChooseFrame"
 			cf.BackgroundColor3 = GetColor("ThemeHighlight")
-			cf.BorderSizePixel = 0 -- No border needed for this style
+			cf.BorderSizePixel = 0
 
 			cf.AnchorPoint = Vector2.new(0, 0.5)
-			cf.Position = UDim2.new(0, 0, 0.5, 0)    -- Position on left edge, vertically centered
-			cf.Size = UDim2.new(0, 3, 0, 0)          -- Initial: 3px wide, 0 height (will tween to full height)
-			cf.Visible = false                       -- Initially hidden
+			cf.Position = UDim2.new(0, 0, 0.5, 0)
+			cf.Size = UDim2.new(0, 3, 0, 0)
+			cf.Visible = false
 
-			-- Remove existing stroke if any, not suitable for a thin bar
 			local existingStroke = cf:FindFirstChildOfClass("UIStroke")
 			if existingStroke then existingStroke:Destroy() end
-
-			-- Add/ensure UICorner for slightly rounded ends if desired (width 3 might be too small for much effect)
 			if not cf:FindFirstChildOfClass("UICorner") then
 				local corner = Instance.new("UICorner", cf)
-				corner.CornerRadius = UDim.new(0, 2) -- Small radius
+				corner.CornerRadius = UDim.new(0, 2)
 			end
+			TabObject.Instance = Tab -- Assign the created Tab Frame to TabObject.Instance for user tabs
 		end
-
-		local TabObject = {}
-
-		TabButton.Activated:Connect(function()
-			CircleClick(TabButton, Mouse.X, Mouse.Y)
-			if UIInstance.SelectTab then
-				UIInstance:SelectTab(TabObject)
-			else
-				warn("UIInstance:SelectTab is not yet defined when TabButton was activated for:", TabConfig.Name)
-			end
-		end)
 
 		local currentTabSectionCount = 0
 
-		TabObject.Instance = Tab
+		-- TabObject.Instance is set above based on whether it's a settings tab or not
 		TabObject._ScrolLayers = ScrolLayers
 		TabObject._UIListLayout = UIListLayout1
 		TabObject._IsSettingsTab = TabConfig.IsSettingsTab
@@ -2336,74 +2401,8 @@ function UBHubLib:MakeGui(GuiConfig)
 		return TabObject
 	end
 
-	function UIInstance:SelectTab(tabObject)
-		if not tabObject or not tabObject.Instance or not tabObject._ScrolLayers or not tabObject._TabConfig then
-			warn("SelectTab: Invalid tabObject received.")
-			return
-		end
-
-		local selectedTabFrame = tabObject.Instance
-		local isSettings = tabObject._IsSettingsTab
-
-		-- Unhighlight all user tabs in ScrollTab
-		if ScrollTab then
-			for _, child in ipairs(ScrollTab:GetChildren()) do
-				if child:IsA("Frame") and child.Name:match("^TabInstance_") and child ~= selectedTabFrame then
-					child.BackgroundTransparency = 0.9990000128746033 -- Default unselected for user tabs
-					local cf = child:FindFirstChild("ChooseFrame")
-					if cf then cf.Visible = false end
-				end
-			end
-		end
-
-		-- Unhighlight the Customize tab if it exists and is not the one being selected
-		if customizeButtonInstance and customizeButtonInstance ~= selectedTabFrame then
-			customizeButtonInstance.BackgroundTransparency = 0.95 -- Default unselected for settings tab
-		end
-
-		-- Highlight the selected tab
-		if isSettings then
-			selectedTabFrame.BackgroundTransparency = 0.92 -- Highlight for settings tab
-			-- No ChooseFrame for settings tab, its visibility is handled by its own logic/non-existence
-		else -- It's a user tab
-			selectedTabFrame.BackgroundTransparency = 0.9200000166893005 -- Highlight for user tab
-			local cf = selectedTabFrame:FindFirstChild("ChooseFrame")
-			if cf then -- Should always exist if created in CreateTab
-				cf.Visible = true
-				if TweenService then
-					TweenService:Create(cf, TweenInfo.new(0.2), {Size = UDim2.new(0,1,0,20)}):Play()
-				else
-					cf.Size = UDim2.new(0,1,0,20) -- Fallback if TweenService is nil
-				end
-			end
-		end
-
-		-- View switching
-		if isSettings then
-			if not isSettingsViewActive then
-				lastSelectedTabName = NameTab.Text -- Store the name of the previously active user tab
-			end
-			SettingsPage.Visible = true
-			LayersReal.Visible = false
-			NameTab.Text = "Customize" -- Updated to "Customize" for consistency
-			isSettingsViewActive = true
-		else -- It's a user tab
-			NameTab.Text = tabObject._TabConfig.Name
-			SettingsPage.Visible = false
-			LayersReal.Visible = true
-			if LayersPageLayout then LayersPageLayout:JumpTo(tabObject._ScrolLayers) end
-			isSettingsViewActive = false
-		end
-
-		-- Persist the name of the last selected tab if it's a user tab
-		if not isSettings and SaveFile then
-			SaveFile("LastSelectedUserTab", tabObject._TabConfig.Name)
-		elseif isSettings and SaveFile then
-			SaveFile("LastSelectedUserTab", nil) -- Clear if settings tab is selected
-		end
-	end
-
-	local FrameToTabObjectMap = {} -- New map: Frame Instance -> TabObject
+	-- local FrameToTabObjectMap = {} -- This is the one to keep, the earlier one was removed.
+	-- The redundant UIInstance:SelectTab function that was here has been removed.
 
 	-- Create the Customize Tab using the enhanced API
 	local CustomizeTab = UIInstance:CreateTab({
@@ -2411,8 +2410,16 @@ function UBHubLib:MakeGui(GuiConfig)
 		Icon = "rbxassetid://126800841735072",
 		IsSettingsTab = true
 	})
-	if CustomizeTab and CustomizeTab.Instance then
-		customizeButtonInstance = CustomizeTab.Instance
+	-- if CustomizeTab and CustomizeTab.Instance then -- This line is no longer needed as customizeButtonInstance is now the NewCustomizeButton
+	-- 	customizeButtonInstance = CustomizeTab.Instance
+	-- end
+
+	-- Part 2.4: Connect the new CustomizeButton's Activated event
+	if customizeButtonInstance and CustomizeTab then
+		customizeButtonInstance.Activated:Connect(function()
+			CircleClick(customizeButtonInstance, Mouse.X, Mouse.Y) -- Optional: Add circle click effect
+			UIInstance:SelectTab(CustomizeTab)
+		end)
 	end
 
 	-- Settings Population Code (Pasted and Adapted)
