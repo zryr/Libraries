@@ -1084,7 +1084,23 @@ function UBHubLib:MakeGui(GuiConfig)
 			SliderFrame.Size = UDim2.new(1,0,0,55); SliderFrame.BackgroundTransparency = 0.935; SliderFrame.BackgroundColor3 = getColorFunc("Secondary", SliderFrame, "BackgroundColor3")
 			Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(0,4)
 			local SliderTitle = Instance.new("TextLabel", SliderFrame); SliderTitle.Name = "SliderTitle"; SliderTitle.Font = Enum.Font.GothamBold; SliderTitle.Text = SliderConfig.Title; SliderTitle.TextColor3 = getColorFunc("Text", SliderTitle, "TextColor3"); SliderTitle.TextSize = 13; SliderTitle.TextXAlignment = Enum.TextXAlignment.Left; SliderTitle.TextYAlignment = Enum.TextYAlignment.Top; SliderTitle.BackgroundTransparency=1; SliderTitle.Position = UDim2.new(0,10,0,10); SliderTitle.Size = UDim2.new(1,-60,0,13)
-			local SliderValueText = Instance.new("TextBox", SliderFrame); SliderValueText.Name = "SliderValueText"; SliderValueText.Font = Enum.Font.GothamBold; SliderValueText.Text = tostring(SliderConfig.Default); SliderValueText.TextColor3 = getColorFunc("Text", SliderValueText, "TextColor3"); SliderValueText.TextSize = 12; SliderValueText.BackgroundTransparency = 0.8; SliderValueText.BackgroundColor3 = getColorFunc("Accent", SliderValueText, "BackgroundColor3"); SliderValueText.Position = UDim2.new(1,-45,0,5); SliderValueText.Size = UDim2.new(0,40,0,20); Instance.new("UICorner", SliderValueText).CornerRadius = UDim.new(0,3)
+
+			local savedVal = SliderConfig.Flag and flagsRef[SliderConfig.Flag]
+            local valueToParse = SliderConfig.Min -- Default to Min as the ultimate fallback
+            if savedVal ~= nil then
+                valueToParse = savedVal
+            elseif SliderConfig.Default ~= nil then
+                valueToParse = SliderConfig.Default
+            end
+
+            local currentValue = tonumber(valueToParse)
+            if type(currentValue) ~= "number" then
+                warn("AddSlider: Initial value for slider '" .. SliderConfig.Title .. "' was not a valid number. Got: " .. tostring(valueToParse) .. ". Defaulting to Min value: " .. SliderConfig.Min)
+                currentValue = SliderConfig.Min
+            end
+            -- Initial value is now guaranteed to be a number, UpdateSlider will clamp and step it.
+
+			local SliderValueText = Instance.new("TextBox", SliderFrame); SliderValueText.Name = "SliderValueText"; SliderValueText.Font = Enum.Font.GothamBold; SliderValueText.Text = ""; SliderValueText.TextColor3 = getColorFunc("Text", SliderValueText, "TextColor3"); SliderValueText.TextSize = 12; SliderValueText.BackgroundTransparency = 0.8; SliderValueText.BackgroundColor3 = getColorFunc("Accent", SliderValueText, "BackgroundColor3"); SliderValueText.Position = UDim2.new(1,-45,0,5); SliderValueText.Size = UDim2.new(0,40,0,20); Instance.new("UICorner", SliderValueText).CornerRadius = UDim.new(0,3)
 			local Bar = Instance.new("Frame", SliderFrame); Bar.Name = "Bar"; Bar.BackgroundColor3 = getColorFunc("Accent", Bar, "BackgroundColor3"); Bar.BorderSizePixel = 0; Bar.Position = UDim2.new(0,10,1,-20); Bar.Size = UDim2.new(1,-20,0,5); Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,100)
 			local Progress = Instance.new("Frame", Bar); Progress.Name = "Progress"; Progress.BackgroundColor3 = getColorFunc("ThemeHighlight", Progress, "BackgroundColor3"); Progress.BorderSizePixel = 0; Instance.new("UICorner", Progress).CornerRadius = UDim.new(0,100)
 			local Dragger = Instance.new("TextButton", Bar); Dragger.Name = "Dragger"; Dragger.Text = ""; Dragger.Size = UDim2.new(0,10,0,10); Dragger.AnchorPoint = Vector2.new(0.5,0.5); Dragger.BackgroundColor3 = getColorFunc("ThemeHighlight", Dragger, "BackgroundColor3"); Dragger.BorderSizePixel = 0; Instance.new("UICorner", Dragger).CornerRadius = UDim.new(0,100); Dragger.ZIndex = 2
@@ -1099,8 +1115,10 @@ function UBHubLib:MakeGui(GuiConfig)
 			DraggerHitbox.BorderSizePixel = 0
             -- No UICorner needed for an invisible hitbox
 
-			local currentValue = SliderConfig.Default
 			local function UpdateSlider(value) 
+				value = tonumber(value) -- Ensure value is a number before math ops
+				if type(value) ~= "number" then value = SliderConfig.Min end -- Fallback if somehow not a number
+
 				value = math.clamp(math.floor(value/SliderConfig.Increment + 0.5) * SliderConfig.Increment, SliderConfig.Min, SliderConfig.Max); 
 				currentValue = value; 
 				SliderValueText.Text = tostring(value); 
