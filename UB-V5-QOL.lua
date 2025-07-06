@@ -9,9 +9,9 @@ local FontManager = require(script.Parent:WaitForChild("Core"):WaitForChild("Fon
 FontManager:RegisterFont("GothamBold", Enum.Font.GothamBold)
 FontManager:RegisterFont("SourceSans", Enum.Font.SourceSans)
 
-local IconManager = require(script.Parent:WaitForChild("Core"):WaitForChild("IconManager"))
-local LucideIcons = require(script.Parent:WaitForChild("Lucide-Source"))
-IconManager:LoadIconSet("lucide", LucideIcons)
+local ExternalIconManager = require(script.Parent:WaitForChild("Icons"):WaitForChild("Main"))
+-- Default to "lucide" if not specified, or allow changing via a function later if needed.
+-- ExternalIconManager.SetIconsType("lucide") -- This is already the default in the provided Main.lua
 
 local ConfigManager = require(script.Parent:WaitForChild("Core"):WaitForChild("ConfigManager"))
 
@@ -504,7 +504,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	GuiFunc.ParentGui = UBHubGui
 	GuiFunc.ConfigManager = ConfigManager
 	GuiFunc.FontManager = FontManager
-	GuiFunc.IconManager = IconManager
+	GuiFunc.ExternalIconManager = ExternalIconManager -- Store reference to the new icon manager
 	GuiFunc.CurrentTheme = CurrentTheme
 	GuiFunc.ThemesTable = Themes
 	GuiFunc.MakeDraggable = MakeDraggable
@@ -1175,13 +1175,15 @@ function UBHubLib:MakeGui(GuiConfig)
 	SearchIconButton.Position = UDim2.new(1, -(38 + searchIconSize + iconPadding), 0.5, 0)
 	SearchIconButton.AnchorPoint = Vector2.new(1, 0.5)
 	SearchIconButton.Parent = Top
-	local searchIconData = IconManager:GetIcon("lucide", "search", searchIconSize)
-	if searchIconData then
-		SearchIconButton.Image = searchIconData.Url
-		SearchIconButton.ImageRectOffset = searchIconData.ImageRectOffset
-		SearchIconButton.ImageRectSize = searchIconData.ImageRectSize
+	local searchIconInfo = ExternalIconManager.Icon("search", "lucide")
+	if searchIconInfo then
+		SearchIconButton.Image = searchIconInfo[1] -- Spritesheet URL
+		local iconData = searchIconInfo[2]
+		SearchIconButton.ImageRectOffset = iconData.ImageRectOffset
+		SearchIconButton.ImageRectSize = iconData.ImageRectSize
 	else
 		SearchIconButton.Image = "rbxassetid://13087513584" -- Fallback search icon
+		warn("Search icon 'search' (lucide) not found by ExternalIconManager.")
 	end
 
 	local SearchHighlight = Instance.new("Frame")
@@ -1740,7 +1742,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	function Tabs:CreateTab(TabConfig)
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "Tab"
-		TabConfig.Icon = TabConfig.Icon or ""
+		TabConfig.IconName = TabConfig.IconName or nil -- e.g., "home"
+		TabConfig.IconLibrary = TabConfig.IconLibrary or "lucide" -- Default to lucide
 
 		local ScrolLayers = Instance.new("ScrollingFrame");
 		local UIListLayout1 = Instance.new("UIListLayout");
@@ -1812,7 +1815,20 @@ function UBHubLib:MakeGui(GuiConfig)
 		TabName.Name = "TabName"
 		TabName.Parent = Tab
 
-		FeatureImg.Image = TabConfig.Icon
+		if TabConfig.IconName then
+			local iconInfo = ExternalIconManager.Icon(TabConfig.IconName, TabConfig.IconLibrary)
+			if iconInfo then
+				FeatureImg.Image = iconInfo[1]
+				local iconData = iconInfo[2]
+				FeatureImg.ImageRectOffset = iconData.ImageRectOffset
+				FeatureImg.ImageRectSize = iconData.ImageRectSize
+			else
+				warn("Tab icon '" .. TabConfig.IconName .. "' (" .. TabConfig.IconLibrary .. ") not found.")
+				FeatureImg.Visible = false
+			end
+		else
+			FeatureImg.Visible = false
+		end
 		FeatureImg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 		FeatureImg.BackgroundTransparency = 0.9990000128746033
 		FeatureImg.BorderColor3 = Color3.fromRGB(0, 0, 0)
@@ -2107,8 +2123,9 @@ function UBHubLib:MakeGui(GuiConfig)
 				local ParagraphConfig = ParagraphConfig or {}
 				ParagraphConfig.Title = ParagraphConfig.Title or "Title"
 				ParagraphConfig.Content = ParagraphConfig.Content or "Content"
-				ParagraphConfig.Image = ParagraphConfig.Image or nil
-				ParagraphConfig.ImageSize = ParagraphConfig.ImageSize or UDim2.fromOffset(24, 24)
+				ParagraphConfig.IconName = ParagraphConfig.IconName or nil -- Was ParagraphConfig.Image
+				ParagraphConfig.IconLibrary = ParagraphConfig.IconLibrary or "lucide"
+				ParagraphConfig.ImageSize = ParagraphConfig.ImageSize or UDim2.fromOffset(24, 24) -- Remains for sizing the ImageLabel
 				ParagraphConfig.Buttons = ParagraphConfig.Buttons or {} -- Table of {Text, Callback, Variant}
 				ParagraphConfig.Dependency = ParagraphConfig.Dependency or nil
 				local ParagraphFunc = {} -- No specific value/changed event for simple paragraph
@@ -2144,10 +2161,21 @@ function UBHubLib:MakeGui(GuiConfig)
 				TextImageListLayout.Parent = TextImageFrame
 
 				local ParagraphImageLabel
-				if ParagraphConfig.Image then
+				if ParagraphConfig.IconName then
 					ParagraphImageLabel = Instance.new("ImageLabel")
 					ParagraphImageLabel.Name = "ParagraphImage"
-					ParagraphImageLabel.Image = ParagraphConfig.Image
+
+					local iconInfo = ExternalIconManager.Icon(ParagraphConfig.IconName, ParagraphConfig.IconLibrary)
+					if iconInfo then
+						ParagraphImageLabel.Image = iconInfo[1]
+						local iconData = iconInfo[2]
+						ParagraphImageLabel.ImageRectOffset = iconData.ImageRectOffset
+						ParagraphImageLabel.ImageRectSize = iconData.ImageRectSize
+					else
+						warn("Paragraph icon '" .. ParagraphConfig.IconName .. "' (" .. ParagraphConfig.IconLibrary .. ") not found.")
+						-- ImageLabel will be there but possibly without a visible image
+					end
+
 					ParagraphImageLabel.Size = ParagraphConfig.ImageSize
 					ParagraphImageLabel.BackgroundTransparency = 1
 					ParagraphImageLabel.LayoutOrder = 1
@@ -2255,7 +2283,8 @@ function UBHubLib:MakeGui(GuiConfig)
 				local ButtonConfig = ButtonConfig or {}
 				ButtonConfig.Title = ButtonConfig.Title or "Title"
 				ButtonConfig.Content = ButtonConfig.Content or "Content"
-				ButtonConfig.Icon = ButtonConfig.Icon or "rbxassetid://16932740082"
+				ButtonConfig.IconName = ButtonConfig.IconName or nil -- Was ButtonConfig.Icon
+				ButtonConfig.IconLibrary = ButtonConfig.IconLibrary or "lucide"
 				ButtonConfig.Callback = ButtonConfig.Callback or function() end
 				ButtonConfig.Dependency = ButtonConfig.Dependency or nil
 				local ButtonFunc = {}
@@ -2349,7 +2378,20 @@ function UBHubLib:MakeGui(GuiConfig)
 				FeatureFrame1.Name = "FeatureFrame"
 				FeatureFrame1.Parent = Button
 
-				FeatureImg3.Image = ButtonConfig.Icon
+				if ButtonConfig.IconName then
+					local iconInfo = ExternalIconManager.Icon(ButtonConfig.IconName, ButtonConfig.IconLibrary)
+					if iconInfo then
+						FeatureImg3.Image = iconInfo[1]
+						local iconData = iconInfo[2]
+						FeatureImg3.ImageRectOffset = iconData.ImageRectOffset
+						FeatureImg3.ImageRectSize = iconData.ImageRectSize
+					else
+						warn("Button icon '"..ButtonConfig.IconName.."' ("..ButtonConfig.IconLibrary..") not found.")
+						FeatureImg3.Image = "rbxassetid://16932740082" -- Default/fallback if specified icon not found
+					end
+				else
+					FeatureImg3.Image = "rbxassetid://16932740082" -- Default if no icon name provided
+				end
 				FeatureImg3.AnchorPoint = Vector2.new(0.5, 0.5)
 				FeatureImg3.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 				FeatureImg3.BackgroundTransparency = 0.9990000128746033
@@ -2400,7 +2442,8 @@ function UBHubLib:MakeGui(GuiConfig)
 				local currentSectionInstanceForSearch = Section
 				ToggleConfig.Title = ToggleConfig.Title or "no Title"
 				ToggleConfig.Content = ToggleConfig.Content or ""
-				ToggleConfig.Icon = ToggleConfig.Icon or nil
+				ToggleConfig.IconName = ToggleConfig.IconName or nil -- Was ToggleConfig.Icon
+				ToggleConfig.IconLibrary = ToggleConfig.IconLibrary or "lucide"
 				ToggleConfig.Style = ToggleConfig.Style or "Default" -- "Default" or "Checkbox"
 				ToggleConfig.CanQuickToggle = ToggleConfig.CanQuickToggle or false
 
@@ -2430,21 +2473,34 @@ function UBHubLib:MakeGui(GuiConfig)
 					CreatorButtonInstance.BackgroundTransparency = 1
 					CreatorButtonInstance.Parent = Toggle
 
-					local creatorIconData = IconManager:GetIcon("lucide", isCreatorActive and "settings-2" or "plus-square", 14)
-					if creatorIconData then
-						CreatorButtonInstance.Image = creatorIconData.Url
-						CreatorButtonInstance.ImageRectOffset = creatorIconData.ImageRectOffset
-						CreatorButtonInstance.ImageRectSize = creatorIconData.ImageRectSize
+					local creatorIconName = isCreatorActive and "settings-2" or "plus-square"
+					local creatorIconInfo = ExternalIconManager.Icon(creatorIconName, "lucide")
+					if creatorIconInfo then
+						CreatorButtonInstance.Image = creatorIconInfo[1]
+						local iconData = creatorIconInfo[2]
+						CreatorButtonInstance.ImageRectOffset = iconData.ImageRectOffset
+						CreatorButtonInstance.ImageRectSize = iconData.ImageRectSize
 						CreatorButtonInstance.ImageColor3 = isCreatorActive and CurrentTheme.Colors.ThemeHighlight or CurrentTheme.Colors.TextLight
+					else
+						warn("Creator button icon '"..creatorIconName.."' (lucide) not found.")
 					end
 					currentXOffset = currentXOffset + CreatorButtonInstance.Size.X.Offset + 5 -- 5 is padding
 				end
 
 				local ToggleIconImage
-				if ToggleConfig.Icon then
+				if ToggleConfig.IconName then
 					ToggleIconImage = Instance.new("ImageLabel")
 					ToggleIconImage.Name = "ToggleIcon"
-					ToggleIconImage.Image = ToggleConfig.Icon
+					local iconInfo = ExternalIconManager.Icon(ToggleConfig.IconName, ToggleConfig.IconLibrary)
+					if iconInfo then
+						ToggleIconImage.Image = iconInfo[1]
+						local iconData = iconInfo[2]
+						ToggleIconImage.ImageRectOffset = iconData.ImageRectOffset
+						ToggleIconImage.ImageRectSize = iconData.ImageRectSize
+					else
+						warn("Toggle icon '"..ToggleConfig.IconName.."' ("..ToggleConfig.IconLibrary..") not found.")
+						ToggleIconImage.Visible = false
+					end
 					ToggleIconImage.BackgroundTransparency = 1
 					ToggleIconImage.Size = UDim2.fromOffset(16, 16)
 					ToggleIconImage.Position = UDim2.new(0, currentXOffset, 0.5, 0)
@@ -2548,11 +2604,15 @@ function UBHubLib:MakeGui(GuiConfig)
 
 					CheckboxCheckmark = Instance.new("ImageLabel")
 					CheckboxCheckmark.Name = "CheckboxCheckmark"
-					local checkIconData = IconManager:GetIcon("lucide", "check", 12)
-					CheckboxCheckmark.Image = checkIconData and checkIconData.Url or "rbxassetid://13088829194"
-					if checkIconData then
-						CheckboxCheckmark.ImageRectOffset = checkIconData.ImageRectOffset
-						CheckboxCheckmark.ImageRectSize = checkIconData.ImageRectSize
+					local checkIconInfo = ExternalIconManager.Icon("check", "lucide")
+					if checkIconInfo then
+						CheckboxCheckmark.Image = checkIconInfo[1]
+						local iconData = checkIconInfo[2]
+						CheckboxCheckmark.ImageRectOffset = iconData.ImageRectOffset
+						CheckboxCheckmark.ImageRectSize = iconData.ImageRectSize
+					else
+						warn("Checkbox 'check' (lucide) icon not found.")
+						CheckboxCheckmark.Image = "rbxassetid://13088829194" -- Fallback
 					end
 					CheckboxCheckmark.ImageColor3 = CurrentTheme.Colors.TextVeryLight
 					CheckboxCheckmark.BackgroundTransparency = 1
@@ -2640,18 +2700,18 @@ function UBHubLib:MakeGui(GuiConfig)
 					qtButton.Position = UDim2.fromScale(0.5,0.5)
 					qtButton.AnchorPoint = Vector2.new(0.5,0.5)
 					qtButton.BackgroundTransparency = 1
-					local iconName = TglConfig.Icon and string.match(TglConfig.Icon, "/([^/]+)$") -- Extract from asset id if possible
-					if not iconName and TglConfig.Icon then -- if it's a direct lucide name
-						local _, count = string.gsub(TglConfig.Icon, "lucide:", "")
-						if count > 0 then iconName = TglConfig.Icon end
-					end
-					iconName = iconName or "toggle-left" -- Default if no icon set
+					local iconNameForQuickToggle = TglConfig.IconName or "toggle-left" -- Use provided icon or default
+					local iconLibForQuickToggle = TglConfig.IconLibrary or "lucide"
 
-					local iconData = IconManager:GetIcon("lucide", iconName, math.min(qtFrame.AbsoluteSize.X, qtFrame.AbsoluteSize.Y) * 0.6)
-					if iconData then
-						qtButton.Image = iconData.Url
+					local iconInfo = ExternalIconManager.Icon(iconNameForQuickToggle, iconLibForQuickToggle)
+					if iconInfo then
+						qtButton.Image = iconInfo[1]
+						local iconData = iconInfo[2]
 						qtButton.ImageRectOffset = iconData.ImageRectOffset
 						qtButton.ImageRectSize = iconData.ImageRectSize
+					else
+						warn("Quick toggle icon '"..iconNameForQuickToggle.."' ("..iconLibForQuickToggle..") not found.")
+						-- Button will be blank if icon not found, or could set a fallback text/image
 					end
 					qtButton.Parent = qtFrame
 					MakeDraggable(qtButton, qtFrame)
@@ -2782,12 +2842,15 @@ function UBHubLib:MakeGui(GuiConfig)
 						isCreatorActive = not isCreatorActive
 						ConfigManager:SetFlag(creatorButtonFlag, isCreatorActive)
 						local creatorIconName = isCreatorActive and "settings-2" or "plus-square"
-						local newIconData = IconManager:GetIcon("lucide", creatorIconName, 14)
-						if newIconData then
-							CreatorButtonInstance.Image = newIconData.Url
-							CreatorButtonInstance.ImageRectOffset = newIconData.ImageRectOffset
-							CreatorButtonInstance.ImageRectSize = newIconData.ImageRectSize
+					local newIconInfo = ExternalIconManager.Icon(creatorIconName, "lucide")
+					if newIconInfo then
+						CreatorButtonInstance.Image = newIconInfo[1]
+						local iconData = newIconInfo[2]
+						CreatorButtonInstance.ImageRectOffset = iconData.ImageRectOffset
+						CreatorButtonInstance.ImageRectSize = iconData.ImageRectSize
 							CreatorButtonInstance.ImageColor3 = isCreatorActive and CurrentTheme.Colors.ThemeHighlight or CurrentTheme.Colors.TextLight
+					else
+						warn("Creator button (update) icon '"..creatorIconName.."' (lucide) not found.")
 						end
 
 						if not isCreatorActive then
@@ -4049,7 +4112,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	function Tabs:AddStaticTab(TabConfig)
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "StaticTab"
-		TabConfig.Icon = TabConfig.Icon or "" -- Add icon support if needed
+		TabConfig.IconName = TabConfig.IconName or nil -- Was TabConfig.Icon
+		TabConfig.IconLibrary = TabConfig.IconLibrary or "lucide"
 
 		-- Create the page content frame first (similar to CreateTab)
 		local ScrolLayers = Instance.new("ScrollingFrame")
@@ -4115,6 +4179,20 @@ function UBHubLib:MakeGui(GuiConfig)
 		FeatureImageLabel.AnchorPoint = Vector2.new(0, 0.5)
 		FeatureImageLabel.Size = UDim2.fromOffset(16,16)
 		FeatureImageLabel.Parent = TabButtonFrame
+		if TabConfig.IconName then
+			local iconInfo = ExternalIconManager.Icon(TabConfig.IconName, TabConfig.IconLibrary)
+			if iconInfo then
+				FeatureImageLabel.Image = iconInfo[1]
+				local iconData = iconInfo[2]
+				FeatureImageLabel.ImageRectOffset = iconData.ImageRectOffset
+				FeatureImageLabel.ImageRectSize = iconData.ImageRectSize
+			else
+				warn("Static tab icon '" .. TabConfig.IconName .. "' (" .. TabConfig.IconLibrary .. ") not found.")
+				FeatureImageLabel.Visible = false
+			end
+		else
+			FeatureImageLabel.Visible = false
+		end
 
 		-- Selection Indicator (similar to normal tabs)
 		local ChooseFrame = Instance.new("Frame")
@@ -4460,13 +4538,15 @@ function GuiFunc:ShowDialog(DialogConfig)
 		CloseButton.Size = UDim2.fromOffset(16,16)
 		CloseButton.Position = UDim2.new(1, -10, 0.5, 0)
 		CloseButton.AnchorPoint = Vector2.new(1, 0.5)
-		local closeIconData = IconManager:GetIcon("lucide","x", 16)
-		if closeIconData then
-			CloseButton.Image = closeIconData.Url
-			CloseButton.ImageRectOffset = closeIconData.ImageRectOffset
-			CloseButton.ImageRectSize = closeIconData.ImageRectSize
+		local closeIconInfo = ExternalIconManager.Icon("x", "lucide")
+		if closeIconInfo then
+			CloseButton.Image = closeIconInfo[1]
+			local iconData = closeIconInfo[2]
+			CloseButton.ImageRectOffset = iconData.ImageRectOffset
+			CloseButton.ImageRectSize = iconData.ImageRectSize
 		else
-			CloseButton.Image = "rbxassetid://9886659671"
+			warn("Dialog close icon 'x' (lucide) not found.")
+			CloseButton.Image = "rbxassetid://9886659671" -- Fallback
 		end
 		CloseButton.ImageColor3 = CurrentTheme.Colors.Text
 		CloseButton.BackgroundTransparency = 1

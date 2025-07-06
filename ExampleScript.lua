@@ -25,9 +25,9 @@ local guiConfig = {
 local Window = UBHubLib:MakeGui(guiConfig)
 
 -- For easy access to ConfigManager and other parts if needed
-local ConfigManager = Window.ConfigManager -- Assuming ConfigManager is attached to Window object
-local FontManager = Window.FontManager -- Assuming FontManager is available
-local IconManager = Window.IconManager -- Assuming IconManager is available
+local ConfigManager = Window.ConfigManager
+local FontManager = Window.FontManager
+local ExternalIconManager = Window.ExternalIconManager -- Get the new icon manager
 
 
 --[[
@@ -44,7 +44,7 @@ local IconManager = Window.IconManager -- Assuming IconManager is available
 ]]
 
 -- Tab 1: Main Features & Elements
-local Tab1 = Window:CreateTab({ Name = "Main Elements", Icon = IconManager:GetIcon("lucide", "box", 16)?.Url or "" })
+local Tab1 = Window:CreateTab({ Name = "Main Elements", IconName = "box", IconLibrary = "lucide" })
 
 local Section1_1 = Tab1:AddSection("Basic Elements & Notifications")
 
@@ -53,12 +53,12 @@ local paragraphButtons = {
     {Text = "Notify Me!", Callback = function() UBHubLib:MakeNotify({ Title = "Paragraph Notify", Description = "Button Clicked!", Time = 0.3, Delay = 3}) end},
     {Text = "Hello", Callback = function() print("Hello from paragraph!") end}
 }
-local paragraphIcon = IconManager:GetIcon("lucide", "message-circle", 20)
 Section1_1:AddParagraph({
     Title = "Enhanced Paragraph",
     Content = "This paragraph demonstrates image and button support.",
-    Image = paragraphIcon?.Url, -- Optional image
-    ImageSize = UDim2.fromOffset(paragraphIcon and 20 or 0, paragraphIcon and 20 or 0),
+    IconName = "message-circle", -- Lucide icon name
+    IconLibrary = "lucide",
+    ImageSize = UDim2.fromOffset(20, 20), -- Keep ImageSize for controlling the ImageLabel's dimensions
     Buttons = paragraphButtons
 })
 
@@ -101,13 +101,21 @@ Section1_2:AddToggle({
     Default = false,
     Callback = function(val) print("Checkbox style toggled:", val) end
 })
-local toggleIcon = IconManager:GetIcon("lucide", "settings", 16)
 Section1_2:AddToggle({
-    Title = "Toggle with Icon",
-    Content = "This toggle has an icon property.",
-    Icon = toggleIcon?.Url,
+    Title = "Toggle with Icon (Lucide)",
+    Content = "This toggle has a Lucide icon.",
+    IconName = "settings",
+    IconLibrary = "lucide",
     Default = true,
-    Callback = function(val) print("Icon toggle toggled:", val) end
+    Callback = function(val) print("Icon toggle (lucide) toggled:", val) end
+})
+Section1_2:AddToggle({
+    Title = "Toggle with Icon (Craft)",
+    Content = "This toggle has a Craft icon.",
+    IconName = "Discord", -- Assuming "Discord" is a valid icon name in your craft.lua
+    IconLibrary = "craft",
+    Default = false,
+    Callback = function(val) print("Icon toggle (craft) toggled:", val) end
 })
 
 -- Dialog
@@ -131,7 +139,7 @@ Section1_2:AddButton({
 Window:AddTabDivider()
 
 -- Tab 2: Conditional Logic & Quick Toggles
-local Tab2 = Window:CreateTab({ Name = "Conditional & Quick Toggles", Icon = IconManager:GetIcon("lucide", "git-fork", 16)?.Url or "" })
+local Tab2 = Window:CreateTab({ Name = "Conditional & Quick Toggles", IconName = "git-fork", IconLibrary = "lucide" })
 
 local Section2_1 = Tab2:AddSection("Dependency System")
 local MasterToggle = Section2_1:AddToggle({
@@ -168,7 +176,8 @@ local FeatureB_QuickToggle = Section2_2:AddToggle({
     Default = true,
     CanQuickToggle = true, -- Key feature
     Flag = "FeatureBQuick",
-    Icon = IconManager:GetIcon("lucide", "zap", 16)?.Url,
+    IconName = "zap",
+    IconLibrary = "lucide",
     Callback = function(val)
         print("Feature B (actual feature) toggled:", val)
         UBHubLib:MakeNotify({Title = "Feature B", Content = val and "Activated" or "Deactivated"})
@@ -177,7 +186,7 @@ local FeatureB_QuickToggle = Section2_2:AddToggle({
 
 
 -- Tab 3: Advanced Dropdowns & Search Demo (Populate with many items for search)
-local Tab3 = Window:CreateTab({ Name = "Advanced UI & Search", Icon = IconManager:GetIcon("lucide", "list-checks", 16)?.Url or "" })
+local Tab3 = Window:CreateTab({ Name = "Advanced UI & Search", IconName = "list-checks", IconLibrary = "lucide" })
 local Section3_1 = Tab3:AddSection("Advanced Dropdown")
 local dropdownOptions = {}
 for i = 1, 15 do
@@ -220,7 +229,7 @@ end
         - Advanced Dropdown Behavior (Implemented in AddDropdown)
         - Section Underline Animation (Part of Section open/close)
 ]]
-local CustomizeTab = Window:AddStaticTab({Name = "Customize", Icon = IconManager:GetIcon("lucide", "settings-2", 16)?.Url or "", LayoutOrder = 99})
+local CustomizeTab = Window:AddStaticTab({Name = "Customize", IconName = "settings-2", IconLibrary = "lucide", LayoutOrder = 99})
 
 local ConfigSection = CustomizeTab:AddSection("Configuration Management")
 
