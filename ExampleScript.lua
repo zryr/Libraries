@@ -19,10 +19,46 @@ task.wait(0.5)
 local guiConfig = {
     NameHub = "Refactored Hub Test",
     Description = "Showcasing All New Features!",
-    Color = Color3.fromRGB(0, 180, 255), -- A distinct accent for the example
+    Color = Color3.fromRGB(0, 180, 255), -- A distinct accent for the example title bar
     SaveFolder = "UBHubRefactorDemo" -- Unique folder for this example's configs
 }
 local Window = UBHubLib:MakeGui(guiConfig)
+
+-- Define a custom theme to demonstrate theme switching
+local MyDarkTheme = {
+    Colors = {
+        Primary = Color3.fromRGB(50, 50, 50), -- Darker primary
+        Secondary = Color3.fromRGB(70, 70, 70),
+        Accent = Color3.fromRGB(0, 150, 220), -- Blue accent
+        ThemeHighlight = Color3.fromRGB(0, 180, 255),
+        Text = Color3.fromRGB(220, 220, 220),
+        Background = Color3.fromRGB(30, 30, 30), -- Dark background
+        Stroke = Color3.fromRGB(100, 100, 100),
+        TextLight = Color3.fromRGB(200, 200, 200),
+        TextVeryLight = Color3.fromRGB(240, 240, 240),
+        TextDark = Color3.fromRGB(130, 130, 130),
+        TextLocked = Color3.fromRGB(90,90,90),
+        BackgroundLight = Color3.fromRGB(45, 45, 45),
+        BackgroundTransparent = Color3.fromRGB(30, 30, 30),
+        ItemHover = Color3.fromRGB(60, 60, 60),
+        InputBackground = Color3.fromRGB(40, 40, 40),
+        LockedOverlay = Color3.fromRGB(60,60,60),
+        GradientExample = ColorSequence.new({ -- Example gradient
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 120, 200)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255))
+        })
+    },
+    Fonts = { Primary = "GothamBold", Secondary = "SourceSans" }, -- Keep same fonts or customize
+    Sizes = Window.CurrentTheme.Sizes -- Reuse default sizes or customize
+}
+
+-- Apply the custom theme
+Window.CurrentTheme = MyDarkTheme
+if Window.ApplyThemeStyleHints then -- Check if function exists before calling
+    Window:ApplyThemeStyleHints() -- Apply some immediate visual changes
+end
+UBHubLib:MakeNotify({Title = "Theme Loaded", Content = "MyDarkTheme has been applied!"})
+
 
 -- For easy access to ConfigManager and other parts if needed
 local ConfigManager = Window.ConfigManager
@@ -47,6 +83,14 @@ local ExternalIconManager = Window.ExternalIconManager -- Get the new icon manag
 local Tab1 = Window:CreateTab({ Name = "Main Elements", IconName = "box", IconLibrary = "lucide" })
 
 local Section1_1 = Tab1:AddSection("Basic Elements & Notifications")
+
+Section1_1:AddParagraph({Title = "Theme & Gradient Demo", Content="The UI is now using 'MyDarkTheme'. Below is a frame with a gradient."})
+Section1_1:AddFrame({
+    Size = UDim2.new(1,0,0,40),
+    Color = "GradientExample", -- This key is defined in MyDarkTheme.Colors as a ColorSequence
+    LayoutOrder = 0 -- Place it early in the section
+})
+Section1_1:AddDivider() -- Add a visual separator
 
 -- Enhanced Paragraph
 local paragraphButtons = {

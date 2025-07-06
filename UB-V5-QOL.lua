@@ -5,15 +5,44 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Mouse = LocalPlayer:GetMouse()
 
-local FontManager = require(script.Parent:WaitForChild("Core"):WaitForChild("FontManager"))
+local function FetchAndLoadModule(url)
+    local success, content = pcall(game.HttpGetAsync, game, url)
+    if not success then
+        warn("Failed to fetch module from URL:", url, "\nError:", content)
+        return nil
+    end
+
+    local func, err = loadstring(content)
+    if not func then
+        warn("Failed to loadstring for module from URL:", url, "\nError:", err)
+        return nil
+    end
+
+    local ok, module = pcall(func)
+    if not ok then
+        warn("Failed to execute module from URL:", url, "\nError:", module)
+        return nil
+    end
+    return module
+end
+
+local FONT_MANAGER_URL = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Core/FontManager.lua"
+local CONFIG_MANAGER_URL = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Core/ConfigManager.lua"
+local ICON_MANAGER_URL = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Icons/Main.lua"
+
+local FontManager = FetchAndLoadModule(FONT_MANAGER_URL)
+local ConfigManager = FetchAndLoadModule(CONFIG_MANAGER_URL)
+local ExternalIconManager = FetchAndLoadModule(ICON_MANAGER_URL)
+
+if not FontManager then error("CRITICAL: FontManager module failed to load. UI cannot continue.") end
+if not ConfigManager then error("CRITICAL: ConfigManager module failed to load. UI cannot continue.") end
+if not ExternalIconManager then error("CRITICAL: ExternalIconManager module failed to load. UI cannot continue.") end
+
+
 FontManager:RegisterFont("GothamBold", Enum.Font.GothamBold)
 FontManager:RegisterFont("SourceSans", Enum.Font.SourceSans)
 
-local ExternalIconManager = require(script.Parent:WaitForChild("Icons"):WaitForChild("Main"))
--- Default to "lucide" if not specified, or allow changing via a function later if needed.
--- ExternalIconManager.SetIconsType("lucide") -- This is already the default in the provided Main.lua
-
-local ConfigManager = require(script.Parent:WaitForChild("Core"):WaitForChild("ConfigManager"))
+-- ExternalIconManager.SetIconsType("lucide") -- This is already the default in its own Main.lua
 
 local Themes = {
     Default = {
@@ -1540,6 +1569,25 @@ function UBHubLib:MakeGui(GuiConfig)
 	DropShadowHolder.Size = UDim2.new(0, 150 + TextLabel.TextBounds.X + 1 + (TextLabel1.Text and TextLabel1.TextBounds.X or 0), 0, 450)
 	MakeDraggable(Top, DropShadowHolder)
 
+	GuiFunc.ApplyThemeStyleHints = function()
+		if not CurrentTheme then return end -- Should always exist but good check
+
+		Main.BackgroundColor3 = GetColor("Background")
+		if Top then -- Title bar frame
+			-- Top is mostly transparent, but its children are what matter
+			local titleText = Top:FindFirstChild("TextLabel") -- The main title
+			if titleText then titleText.TextColor3 = GetColor("Accent") end
+
+			local descriptionText = Top:FindFirstChild("TextLabel1") -- The description
+			if descriptionText then descriptionText.TextColor3 = GetColor("Text") end
+		end
+
+		-- Update section underlines as their gradient uses Primary and Accent (GuiConfig.Color)
+		-- This requires iterating through all sections, which is complex here.
+		-- A full theme apply would do this. This is just for global hints.
+		-- For now, section underlines will update when their specific tab is re-rendered or section toggled.
+	end
+
 	GuiFunc.UpdateEditModeVisuals = function()
 		local targetTransparency = GuiFunc.isEditMode and 0.6 or 1
 		TweenService:Create(EditHighlight, TweenInfo.new(0.2), {BackgroundTransparency = targetTransparency}):Play()
@@ -3040,6 +3088,8 @@ function UBHubLib:MakeGui(GuiConfig)
 
 				local Dragging = false
                 local DragInputObject = nil 
+                local UISInputChangedConnection = nil
+                local UISInputEndedConnection = nil
 
 				local function Round(Number, Factor)
 					return math.floor(Number/Factor + 0.5) * Factor
@@ -3100,7 +3150,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					end 
 				end)
                 
-                UserInputService.InputChanged:Connect(function(Input)
+                UISInputChangedConnection = UserInputService.InputChanged:Connect(function(Input)
 					if isLockedByDependency() then Dragging = false; return end
 					if Dragging and Input == DragInputObject then 
 						if Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch then 
@@ -3114,13 +3164,24 @@ function UBHubLib:MakeGui(GuiConfig)
 					end
 				end)
 
-				UserInputService.InputEnded:Connect(function(Input) 
+				UISInputEndedConnection = UserInputService.InputEnded:Connect(function(Input)
 					if Dragging and Input == DragInputObject then 
 						if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
 							Dragging = false 
                             DragInputObject = nil
 						end 
 					end 
+				end)
+
+				Slider.Destroying:Connect(function()
+					if UISInputChangedConnection then
+						UISInputChangedConnection:Disconnect()
+						UISInputChangedConnection = nil
+					end
+					if UISInputEndedConnection then
+						UISInputEndedConnection:Disconnect()
+						UISInputEndedConnection = nil
+					end
 				end)
 
 				TextBox:GetPropertyChangedSignal("Text"):Connect(function()
@@ -4109,6 +4170,54 @@ function UBHubLib:MakeGui(GuiConfig)
 		return Sections
 	end
 
+	function Items:AddFrame(FrameConfig) -- Added to the Items table context
+		local FrameConfig = FrameConfig or {}
+		FrameConfig.Size = FrameConfig.Size or UDim2.new(1, 0, 0, 30)
+		FrameConfig.Color = FrameConfig.Color -- Can be theme color name, Color3, or ColorSequence
+		FrameConfig.LayoutOrder = FrameConfig.LayoutOrder or CountItem -- Use current CountItem
+
+		local DisplayFrame = Instance.new("Frame")
+		DisplayFrame.Name = FrameConfig.Name or "DisplayFrame"
+		DisplayFrame.Size = FrameConfig.Size
+		DisplayFrame.LayoutOrder = FrameConfig.LayoutOrder
+		DisplayFrame.BorderSizePixel = 0
+		DisplayFrame.Parent = SectionAdd -- Assumes SectionAdd is the correct parent from Items context
+
+		if FrameConfig.Color then
+			local colorValue = GetColor(FrameConfig.Color) -- Use GetColor to resolve theme names
+			if typeof(colorValue) == "ColorSequence" then
+				DisplayFrame.BackgroundColor3 = colorValue.Keypoints[1].Value -- Set a base color
+				local gradient = Instance.new("UIGradient")
+				gradient.Color = colorValue
+				gradient.Parent = DisplayFrame
+			elseif typeof(colorValue) == "Color3" then
+				DisplayFrame.BackgroundColor3 = colorValue
+			else -- Direct Color3 or ColorSequence value
+				if typeof(FrameConfig.Color) == "ColorSequence" then
+					DisplayFrame.BackgroundColor3 = FrameConfig.Color.Keypoints[1].Value
+					local gradient = Instance.new("UIGradient")
+					gradient.Color = FrameConfig.Color
+					gradient.Parent = DisplayFrame
+				elseif typeof(FrameConfig.Color) == "Color3" then
+					DisplayFrame.BackgroundColor3 = FrameConfig.Color
+				else
+					DisplayFrame.BackgroundColor3 = Color3.fromRGB(100,100,100) -- Default fallback
+				end
+			end
+		else
+			DisplayFrame.BackgroundTransparency = 1 -- Transparent if no color
+		end
+
+		local UICorner_DisplayFrame = Instance.new("UICorner")
+		UICorner_DisplayFrame.CornerRadius = CurrentTheme.Sizes.DefaultCornerRadius
+		UICorner_DisplayFrame.Parent = DisplayFrame
+
+		CountItem = CountItem + 1
+		UpdateSizeSection() -- Ensure section resizes
+		return DisplayFrame -- Return the frame instance
+	end
+
+
 	function Tabs:AddStaticTab(TabConfig)
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "StaticTab"
@@ -4456,6 +4565,9 @@ function UBHubLib:MakeGui(GuiConfig)
 
 	return Tabs
 end
+
+-- Call ApplyThemeStyleHints after UI is built and default theme is set
+GuiFunc:ApplyThemeStyleHints()
 
 function GuiFunc:ShowDialog(DialogConfig)
 	local DialogConfig = DialogConfig or {}
