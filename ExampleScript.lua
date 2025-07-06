@@ -5,14 +5,48 @@ if not game:IsLoaded() then
     game.Loaded:Wait()
 end
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Assuming the library is placed in ReplicatedStorage and named UB-V5-QOL
-local UBHubLib = require(ReplicatedStorage:WaitForChild("UB-V5-QOL"))
+--[[
+    Loading the UB-V5-QOL Library:
+    The line below fetches the library script from its raw GitHub URL and loads it.
+    IMPORTANT: Replace "YOUR_RAW_GITHUB_URL_TO_UB-V5-QOL.LUA_HERE" with the actual URL.
+]]
+local UBHubLib -- Declare UBHubLib
+local UB_V5_QOL_URL = "YOUR_RAW_GITHUB_URL_TO_UB-V5-QOL.LUA_HERE" -- <<<!!! IMPORTANT: REPLACE THIS URL !!!>>>
 
--- Give the library a moment to fully initialize its own internal components if needed
+local success, result = pcall(function()
+    local httpService = game:GetService("HttpService")
+    local scriptSource, httpError = httpService:HttpGetAsync(UB_V5_QOL_URL)
+    if not scriptSource then -- Check if HttpGetAsync failed
+        error("Failed to fetch UB-V5-QOL.lua from URL: " .. UB_V5_QOL_URL .. "\nError: " .. tostring(httpError))
+    end
+    local loadedFunction, loadError = loadstring(scriptSource)
+    if not loadedFunction then
+        error("Failed to loadstring UB-V5-QOL.lua: " .. tostring(loadError))
+    end
+    local lib = loadedFunction() -- Execute the library code
+    if type(lib) ~= "table" then
+        error("UB-V5-QOL.lua did not return a table.")
+    end
+    UBHubLib = lib -- Assign to the outer local variable
+end)
+
+if not success then
+    warn("Error loading UB-V5-QOL library:", result)
+    if syn and syn.protect_gui then syn.protect_gui() end -- Attempt to prevent error UI from breaking
+    game.CoreGui:FindFirstChild("UBHubGui"):Destroy() -- Cleanup if any part of UI was made
+    error("UB-V5-QOL library loading failed. Cannot continue example script. Error: " .. tostring(result))
+    return -- Stop script if library fails
+end
+
+if not UBHubLib then
+    error("UB-V5-QOL Library failed to load correctly and UBHubLib is nil. This should not happen if pcall was successful.")
+    return
+end
+
+-- Give the library a moment to fully initialize its own internal components (like fetching its own dependencies)
 task.wait(0.5)
 
 -- Main GUI Configuration
@@ -65,21 +99,23 @@ local ConfigManager = Window.ConfigManager
 local FontManager = Window.FontManager
 local ExternalIconManager = Window.ExternalIconManager -- Get the new icon manager
 
-
 --[[
-    Task #1: Core Systems & Architectural Overhaul
-    - Font Manager: Implicitly used by all text. We'll add a font demonstration in Customize.
-    - Icon Support (Lucide & Craft): We'll use Lucide icons.
-    - Gradient Support: Will be shown in Theming via ColorSequences.
-    - Advanced Color Picker Element: Will be added to Customize tab.
-    - Enhanced Theming: Will be demonstrated in Customize tab.
-    - Dual-Mode Config System: UI will be in Customize tab.
-    - Top Bar Icons: Search & Edit are part of the Window.
-    - Overlays & Effects: SearchOverlay, BlurEffect, ResizePanel are part of the Window.
-    - Tab Layout: AddTabDivider, AddStaticTab.
+    Core Library Systems Demonstration:
+    This example script showcases various features of the UB-V5-QOL library.
+    - Font Manager: Handles font registration and usage, applied via themes.
+    - Icon Support: The ExternalIconManager provides icons (Lucide & Craft featured).
+    - Gradient Support: Demonstrated with ColorSequence in themes.
+    - Advanced Color Picker: See the "Customize" tab for theme color adjustments.
+    - Enhanced Theming: Apply and customize themes (see "MyDarkTheme" below and "Customize" tab).
+    - Configuration System: Save/load UI states (see "Customize" tab).
+    - Global UI Features:
+        - Top Bar Icons: Search (magnifying glass) and Edit Mode (pencil) are built into the window.
+        - Overlays & Effects: Search overlay, blur effects, and quick toggle resize panels are integrated.
+    - Tab Layout: Examples include standard tabs, tab dividers, and static tabs (like "Customize").
 ]]
 
 -- Tab 1: Main Features & Elements
+-- This tab demonstrates common UI elements and notification systems.
 local Tab1 = Window:CreateTab({ Name = "Main Elements", IconName = "box", IconLibrary = "lucide" })
 
 local Section1_1 = Tab1:AddSection("Basic Elements & Notifications")
@@ -183,6 +219,8 @@ Section1_2:AddButton({
 Window:AddTabDivider()
 
 -- Tab 2: Conditional Logic & Quick Toggles
+-- This tab demonstrates how to make UI elements dependent on the state of others,
+-- and how to create on-screen quick toggles for features.
 local Tab2 = Window:CreateTab({ Name = "Conditional & Quick Toggles", IconName = "git-fork", IconLibrary = "lucide" })
 
 local Section2_1 = Tab2:AddSection("Dependency System")
@@ -262,16 +300,11 @@ for i = 1, 20 do
     end
 end
 
-
 --[[
-    Task #5: Final 'Customize' Panel & UI Polish
-    - Create SettingsPage Frame & Implement View-Switching (Done by static tab)
-    - Populate SettingsPage using library's own API:
-        - Section: "Configuration"
-        - Section: "Theming"
-    - Final UX Polish:
-        - Advanced Dropdown Behavior (Implemented in AddDropdown)
-        - Section Underline Animation (Part of Section open/close)
+    Customize Panel (Static Tab):
+    This static tab demonstrates configuration management (saving/loading UI settings)
+    and theme customization (adjusting colors). Static tabs are always visible at the
+    bottom of the tab list and are useful for settings or persistent actions.
 ]]
 local CustomizeTab = Window:AddStaticTab({Name = "Customize", IconName = "settings-2", IconLibrary = "lucide", LayoutOrder = 99})
 
@@ -416,6 +449,17 @@ print("Example Script Loaded for UB-V5-QOL Refactored")
 -- To test dialogs: Click "Show Dialog" button.
 -- To test advanced dropdown: Select items, close, reopen dropdown in "Advanced UI & Search" tab.
 -- To test color picker: Go to Customize -> Theming Engine.
+
+--[[
+    Testing Global Window Features:
+    - Search: Click the magnifying glass icon (🔍) in the window's top bar.
+      Try searching for element titles like "Toggle 5" or "Searchable Slider 10".
+    - Edit Mode (for Quick Toggles): Click the pencil icon (✏️) in the window's top bar.
+      This allows you to drag and resize any active on-screen Quick Toggles.
+      Click the pencil icon again to save their positions and sizes.
+    - Minimize/Close: Use the standard window controls on the top bar.
+    - Toggle UI Visibility: Press the RightShift key to hide/show the entire UI.
+]]
 
 -- Cleanup function for when the script is removed (e.g., in an exploit environment)
 script.Destroying:Connect(function()
