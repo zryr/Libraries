@@ -3,57 +3,53 @@ local IconManager = {}
 
 local iconLibraries = {}
 
-local function HttpGetLoadString(url)
+-- HttpGet and load string utility (can be shared if this file is part of a larger system with globals, or keep it local)
+local function GetAndLoadIconData(url, iconLibName)
     local success, response = pcall(game.HttpGet, game, url)
-    if not success then
-        warn("HttpGet failed for URL:", url, "Error:", response)
-        return nil
-    end
-    if not response then
-        warn("HttpGet response was nil for URL:", url)
+    if not success or not response then
+        warn("HttpGet failed for " .. iconLibName .. " data: " .. tostring(response))
         return nil
     end
 
-    local func, err = loadstring(response)
+    local func, loadErr = loadstring(response)
     if not func then
-        warn("loadstring failed for URL:", url, "Error:", err)
+        warn("loadstring failed for " .. iconLibName .. " data: " .. tostring(loadErr))
         return nil
     end
 
-    local funcSuccess, module = pcall(func)
-    if not funcSuccess then
-        warn("Execution of loaded string failed for URL:", url, "Error:", module)
+    local execSuccess, moduleData = pcall(func)
+    if not execSuccess or moduleData == nil then
+        warn("Execution failed or module data is nil for " .. iconLibName .. ": " .. tostring(moduleData))
         return nil
     end
-    return module
+    return moduleData
 end
 
-
-local function loadLibraryFromUrl(name, url)
-    local libraryModule = HttpGetLoadString(url)
-
-    if libraryModule and type(libraryModule) == "table" and libraryModule.Spritesheets and libraryModule.Icons then
-        iconLibraries[name] = libraryModule
-        -- Pre-process icons to include the full spritesheet path
-        for iconKey, iconData in pairs(libraryModule.Icons) do
+local function loadLibraryFromData(name, libraryData)
+    if libraryData and type(libraryData) == "table" and libraryData.Spritesheets and libraryData.Icons then
+        iconLibraries[name] = libraryData
+        for iconKey, iconData in pairs(libraryData.Icons) do
             local spritesheetNum = iconData.Image
-            if libraryModule.Spritesheets[tostring(spritesheetNum)] then
-                iconData.SpritesheetID = libraryModule.Spritesheets[tostring(spritesheetNum)]
+            if libraryData.Spritesheets[tostring(spritesheetNum)] then
+                iconData.SpritesheetID = libraryData.Spritesheets[tostring(spritesheetNum)]
             else
                 warn("IconManager: Spritesheet number " .. tostring(spritesheetNum) .. " not found for icon " .. iconKey .. " in library " .. name)
             end
         end
     else
-        warn("IconManager: Failed to load or parse icon library '" .. name .. "' from URL: " .. url)
-        iconLibraries[name] = {Icons = {}, Spritesheets = {}} -- Provide an empty table to prevent errors
+        warn("IconManager: Failed to process icon library data for '" .. name .. "'.")
+        iconLibraries[name] = {Icons = {}, Spritesheets = {}}
     end
 end
 
 local LucideIconsUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Icons/Lucide.lua"
 local CraftIconsUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Icons/Craft.lua"
 
-loadLibraryFromUrl("Lucide", LucideIconsUrl)
-loadLibraryFromUrl("Craft", CraftIconsUrl)
+local LucideData = GetAndLoadIconData(LucideIconsUrl, "Lucide")
+if LucideData then loadLibraryFromData("Lucide", LucideData) else iconLibraries["Lucide"] = {Icons={}, Spritesheets={}} end
+
+local CraftData = GetAndLoadIconData(CraftIconsUrl, "Craft")
+if CraftData then loadLibraryFromData("Craft", CraftData) else iconLibraries["Craft"] = {Icons={}, Spritesheets={}} end
 
 
 function IconManager.GetIcon(libraryName, iconName)

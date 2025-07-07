@@ -5,43 +5,45 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Mouse = LocalPlayer:GetMouse()
 
+-- HttpGet and load string utility
+local function GetAndLoadModule(url, moduleNameForWarning)
+    local success, response = pcall(game.HttpGet, game, url)
+    if not success or not response then
+        warn("HttpGet failed for " .. moduleNameForWarning .. ": " .. tostring(response))
+        return nil
+    end
+
+    local func, loadErr = loadstring(response)
+    if not func then
+        warn("loadstring failed for " .. moduleNameForWarning .. ": " .. tostring(loadErr))
+        return nil
+    end
+
+    local execSuccess, module = pcall(func)
+    if not execSuccess or module == nil then -- Check if module is nil explicitly
+        warn("Execution failed or module is nil for " .. moduleNameForWarning .. ": " .. tostring(module))
+        return nil
+    end
+    return module
+end
+
 -- Load modules via HttpGet
 local FontManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/FontManager.lua"
 local IconManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/IconManager.lua"
 local ConfigManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/ConfigManager.lua"
 local ThemeManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/ThemeManager.lua"
 
-local function LoadModuleFromUrl(url, moduleName)
-    local success, response = pcall(game.HttpGet, game, url)
-    if success and response then
-        local func, err = loadstring(response)
-        if func then
-            local ok, module = pcall(func)
-            if ok then
-                return module
-            else
-                warn("Error executing module:", moduleName, "-", err)
-            end
-        else
-            warn("Error loading module string:", moduleName, "-", err)
-        end
-    else
-        warn("Error HttpGetting module:", moduleName, "-", response)
-    end
-    return nil
+local FontManager = GetAndLoadModule(FontManagerUrl, "FontManager")
+local IconManager = GetAndLoadModule(IconManagerUrl, "IconManager")
+local ConfigManagerModule = GetAndLoadModule(ConfigManagerUrl, "ConfigManagerModule")
+local ThemeManager = GetAndLoadModule(ThemeManagerUrl, "ThemeManager")
+
+-- Critical Check: If any essential module failed, the library cannot function.
+if not FontManager or not IconManager or not ConfigManagerModule or not ThemeManager then
+    warn("UB-V5-QOL: One or more core modules failed to load via HttpGet. Library may not function correctly.")
+    -- Depending on desired behavior, could return an empty UBHubLib or error out.
+    -- For now, it will proceed, and parts of the UI requiring the missing module will error later.
 end
-
-local FontManager = LoadModuleFromUrl(FontManagerUrl, "FontManager")
-local IconManager = LoadModuleFromUrl(IconManagerUrl, "IconManager") -- This will still have issues with its internal requires for Icons/Lucide.lua etc.
-local ConfigManagerModule = LoadModuleFromUrl(ConfigManagerUrl, "ConfigManagerModule")
-local ThemeManager = LoadModuleFromUrl(ThemeManagerUrl, "ThemeManager")
-
--- Fallbacks if HttpGet fails (useful for local testing if URLs are down or for very first run)
-if not FontManager then warn("FontManager failed to load via HttpGet, attempting local require..."); FontManager = require(script.Parent.src.FontManager) end
-if not IconManager then warn("IconManager failed to load via HttpGet, attempting local require..."); IconManager = require(script.Parent.src.IconManager) end
-if not ConfigManagerModule then warn("ConfigManagerModule failed to load via HttpGet, attempting local require..."); ConfigManagerModule = require(script.Parent.src.ConfigManager) end
-if not ThemeManager then warn("ThemeManager failed to load via HttpGet, attempting local require..."); ThemeManager = require(script.Parent.src.ThemeManager) end
-
 
 -- local Colours -- This will be replaced by ThemeManager (original was here)
 
@@ -3819,4 +3821,13 @@ function UBHubLib:MakeGui(GuiConfig)
 
 	return Tabs
 end
+
+-- Expose managers for external use if needed (e.g., by Example.lua)
+UBHubLib.FontManager = FontManager
+UBHubLib.IconManager = IconManager
+UBHubLib.ConfigManagerModule = ConfigManagerModule -- This is the class/constructor
+UBHubLib.ThemeManager = ThemeManager
+-- Note: UBHubLib.ConfigManager is already the instance for the library's global settings.
+-- window.ConfigManager is the instance for a specific window.
+
 return UBHubLib

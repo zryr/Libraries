@@ -27,20 +27,16 @@ if not success or not libraryModule then
 end
 
 local UBHubLib = libraryModule
--- Assuming ThemeManager, FontManager, IconManager might be exposed by UBHubLib or need separate loading if library structure changes.
--- For now, let's assume they are accessible via UBHubLib if it's designed that way,
--- or this example might need further adjustment if those modules are not part of the single file distribution.
--- For the current structure where they are separate files, HttpGet of the main file won't bring them.
--- This example will likely break unless UB-V5-QOL.lua itself handles requiring its submodules
--- or is bundled into a single file at that URL.
 
--- For the purpose of this example, and given the current multi-file structure,
--- I will revert to local require for ThemeManager etc. IF UBHubLib doesn't provide them.
--- This highlights a potential issue with HttpGet for multi-module local setups.
-local ThemeManager = UBHubLib.ThemeManager or require(script.Parent.src.ThemeManager)
-local FontManager = UBHubLib.FontManager or require(script.Parent.src.FontManager)
-local IconManager = UBHubLib.IconManager or require(script.Parent.src.IconManager)
+-- Access managers exposed by UBHubLib
+local ThemeManager = UBHubLib.ThemeManager
+local FontManager = UBHubLib.FontManager
+local IconManager = UBHubLib.IconManager
+-- ConfigManager is typically used via window.ConfigManager or UBHubLib.ConfigManager (instance)
 
+if not ThemeManager then warn("Example Script: ThemeManager not found on UBHubLib!") end
+if not FontManager then warn("Example Script: FontManager not found on UBHubLib!") end
+if not IconManager then warn("Example Script: IconManager not found on UBHubLib!") end
 
 --[[
     Task #5, Step 4: Final Verification Requirement:
