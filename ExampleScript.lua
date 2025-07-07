@@ -11,10 +11,9 @@ local LocalPlayer = Players.LocalPlayer
 --[[
     Loading the UB-V5-QOL Library:
     The line below fetches the library script from its raw GitHub URL and loads it.
-    IMPORTANT: Replace "YOUR_RAW_GITHUB_URL_TO_UB-V5-QOL.LUA_HERE" with the actual URL.
 ]]
 local UBHubLib -- Declare UBHubLib
-local UB_V5_QOL_URL = "YOUR_RAW_GITHUB_URL_TO_UB-V5-QOL.LUA_HERE" -- <<<!!! IMPORTANT: REPLACE THIS URL !!!>>>
+local UB_V5_QOL_URL = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/UB-V5-QOL.lua"
 
 local success, result = pcall(function()
     local httpService = game:GetService("HttpService")
