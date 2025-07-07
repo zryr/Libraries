@@ -3,9 +3,36 @@ local IconManager = {}
 
 local iconLibraries = {}
 
-local function loadLibrary(name, path)
-    local success, libraryModule = pcall(require, path)
-    if success and type(libraryModule) == "table" and libraryModule.Spritesheets and libraryModule.Icons then
+local function HttpGetLoadString(url)
+    local success, response = pcall(game.HttpGet, game, url)
+    if not success then
+        warn("HttpGet failed for URL:", url, "Error:", response)
+        return nil
+    end
+    if not response then
+        warn("HttpGet response was nil for URL:", url)
+        return nil
+    end
+
+    local func, err = loadstring(response)
+    if not func then
+        warn("loadstring failed for URL:", url, "Error:", err)
+        return nil
+    end
+
+    local funcSuccess, module = pcall(func)
+    if not funcSuccess then
+        warn("Execution of loaded string failed for URL:", url, "Error:", module)
+        return nil
+    end
+    return module
+end
+
+
+local function loadLibraryFromUrl(name, url)
+    local libraryModule = HttpGetLoadString(url)
+
+    if libraryModule and type(libraryModule) == "table" and libraryModule.Spritesheets and libraryModule.Icons then
         iconLibraries[name] = libraryModule
         -- Pre-process icons to include the full spritesheet path
         for iconKey, iconData in pairs(libraryModule.Icons) do
@@ -17,18 +44,16 @@ local function loadLibrary(name, path)
             end
         end
     else
-        warn("IconManager: Failed to load icon library '" .. name .. "' from path: " .. path:GetFullName())
+        warn("IconManager: Failed to load or parse icon library '" .. name .. "' from URL: " .. url)
         iconLibraries[name] = {Icons = {}, Spritesheets = {}} -- Provide an empty table to prevent errors
     end
 end
 
--- Assuming script.Parent.Parent is the root of the UB-V5-QOL library structure
--- Adjust the path if src is not directly under the main library script's parent
-local currentScript = script
-local libraryRoot = currentScript.Parent.Parent
+local LucideIconsUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Icons/Lucide.lua"
+local CraftIconsUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Icons/Craft.lua"
 
-loadLibrary("Lucide", libraryRoot.Icons.Lucide)
-loadLibrary("Craft", libraryRoot.Icons.Craft)
+loadLibraryFromUrl("Lucide", LucideIconsUrl)
+loadLibraryFromUrl("Craft", CraftIconsUrl)
 
 
 function IconManager.GetIcon(libraryName, iconName)

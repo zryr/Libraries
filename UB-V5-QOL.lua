@@ -5,11 +5,43 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Mouse = LocalPlayer:GetMouse()
 
--- Require new modules
-local FontManager = require(script.Parent.src.FontManager)
-local IconManager = require(script.Parent.src.IconManager)
-local ConfigManagerModule = require(script.Parent.src.ConfigManager) -- Renamed to avoid conflict
-local ThemeManager = require(script.Parent.src.ThemeManager)
+-- Load modules via HttpGet
+local FontManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/FontManager.lua"
+local IconManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/IconManager.lua"
+local ConfigManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/ConfigManager.lua"
+local ThemeManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/ThemeManager.lua"
+
+local function LoadModuleFromUrl(url, moduleName)
+    local success, response = pcall(game.HttpGet, game, url)
+    if success and response then
+        local func, err = loadstring(response)
+        if func then
+            local ok, module = pcall(func)
+            if ok then
+                return module
+            else
+                warn("Error executing module:", moduleName, "-", err)
+            end
+        else
+            warn("Error loading module string:", moduleName, "-", err)
+        end
+    else
+        warn("Error HttpGetting module:", moduleName, "-", response)
+    end
+    return nil
+end
+
+local FontManager = LoadModuleFromUrl(FontManagerUrl, "FontManager")
+local IconManager = LoadModuleFromUrl(IconManagerUrl, "IconManager") -- This will still have issues with its internal requires for Icons/Lucide.lua etc.
+local ConfigManagerModule = LoadModuleFromUrl(ConfigManagerUrl, "ConfigManagerModule")
+local ThemeManager = LoadModuleFromUrl(ThemeManagerUrl, "ThemeManager")
+
+-- Fallbacks if HttpGet fails (useful for local testing if URLs are down or for very first run)
+if not FontManager then warn("FontManager failed to load via HttpGet, attempting local require..."); FontManager = require(script.Parent.src.FontManager) end
+if not IconManager then warn("IconManager failed to load via HttpGet, attempting local require..."); IconManager = require(script.Parent.src.IconManager) end
+if not ConfigManagerModule then warn("ConfigManagerModule failed to load via HttpGet, attempting local require..."); ConfigManagerModule = require(script.Parent.src.ConfigManager) end
+if not ThemeManager then warn("ThemeManager failed to load via HttpGet, attempting local require..."); ThemeManager = require(script.Parent.src.ThemeManager) end
+
 
 -- local Colours -- This will be replaced by ThemeManager (original was here)
 
@@ -1778,7 +1810,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				ToggleSwitchFrame.Parent = ToggleFrame
 
 				local ToggleElement -- This will be the actual switch or checkbox button
-				
+
 				if ToggleConfig.Style == "Checkbox" then
 					ToggleElement = Instance.new("ImageButton")
 					ToggleElement.Name = "Checkbox"
@@ -2529,7 +2561,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					OptionLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 					OptionLayout.Padding = ThemeManager.GetSize("SmallPadding")
 					OptionLayout.Parent = OptionFrame
-					
+
 					if optionData.Icon then
 						local OptionIcon = Instance.new("ImageLabel")
 						OptionIcon.Name = "OptionIcon"
@@ -3259,82 +3291,155 @@ function UBHubLib:MakeGui(GuiConfig)
 	Tabs._ItemsCache = {} -- Initialize a cache for item objects if needed by RegisterDependency or other features
 
 	function UBHubLib:CreateInternalSectionItems(parentFrameForItems, tabObjForSearch, sectionObjForSearch)
-		-- This function creates and returns an 'Items' table scoped to a specific parent frame.
-		-- It's a way to reuse the AddItem... API for internal UI construction like the settings page.
 		local scopedItems = {}
 		local scopedItemCount = 0
-		local windowCfg = UBHubLib.CurrentWindowConfigManager -- Assuming this is set correctly by MakeGui
+		local windowCfg = UBHubLib.CurrentWindowConfigManager
+		local currentWindow = UBHubLib.CurrentWindow -- This is the 'Tabs' object
 
-		-- Helper to simplify adding to search registry
 		local function registerSearchable(config, itemFrame, itemType, itemFuncObj)
-			table.insert(UBHubLib.SearchableElements, {
-				Title = config.Title, Keywords = config.Keywords or {}, Type = itemType,
-				Object = itemFrame, TabObject = tabObjForSearch, SectionObject = sectionObjForSearch,
-				OriginalFunctionObject = itemFuncObj
-			})
+			-- For internal settings, search registration might be optional or different
+			-- For now, let's keep it, assuming titles are useful.
+			if config and config.Title then
+				table.insert(UBHubLib.SearchableElements, {
+					Title = config.Title, Keywords = config.Keywords or {}, Type = itemType,
+					Object = itemFrame, TabObject = tabObjForSearch, SectionObject = sectionObjForSearch,
+					OriginalFunctionObject = itemFuncObj
+				})
+			end
 		end
 
-		-- Adapt AddParagraph
+		-- Simplified internal item creators. These directly build UI into `parentFrameForItems`.
+		-- They should return a functional object similar to what the main API returns if its methods are needed.
+
 		scopedItems.AddParagraph = function(cfg)
-			local func, frame = UBHubLib._InternalAddItem_Paragraph(parentFrameForItems, cfg, scopedItemCount, windowCfg)
-			registerSearchable(cfg, frame, "Paragraph", func)
-			scopedItemCount = scopedItemCount + 1; return func
+			local pFrame = Instance.new("TextLabel")
+			pFrame.Name = cfg.Title or "InternalParagraph"
+			pFrame.Text = cfg.Content or cfg.Title -- Show title if no content
+			pFrame.Size = UDim2.new(1,0,0,0); pFrame.AutomaticSize = Enum.AutomaticSize.Y
+			pFrame.TextWrapped = true; pFrame.TextXAlignment = Enum.TextXAlignment.Left
+			ThemeManager.AddThemedObject(pFrame, { TextColor3 = "Text", FontFace = cfg.IsHeader and "Title" or "Default" })
+			pFrame.LayoutOrder = scopedItemCount; pFrame.Parent = parentFrameForItems;
+			scopedItemCount = scopedItemCount + 1
+			registerSearchable(cfg, pFrame, "Paragraph", {})
+			return {Set = function(_,newCfg) pFrame.Text = newCfg.Content or newCfg.Title end}
 		end
-		-- Adapt AddButton
+
 		scopedItems.AddButton = function(cfg)
-			local func, frame = UBHubLib._InternalAddItem_Button(parentFrameForItems, cfg, scopedItemCount, windowCfg)
-			registerSearchable(cfg, frame, "Button", func)
-			scopedItemCount = scopedItemCount + 1; return func
+			local btnFrame = Instance.new("Frame"); btnFrame.Name = cfg.Title or "InternalButton"; btnFrame.Size = UDim2.new(1,0,0,35); btnFrame.BackgroundTransparency=1; btnFrame.LayoutOrder=scopedItemCount; btnFrame.Parent = parentFrameForItems;
+			local actualBtn = Instance.new("TextButton"); actualBtn.Text = cfg.Title; actualBtn.Size=UDim2.new(cfg.FullWidth and 1 or 0, cfg.WidthOffset or (cfg.FullWidth and 0 or 100) ,1,0); actualBtn.Parent=btnFrame;
+			ThemeManager.AddThemedObject(actualBtn, {BackgroundColor3= (cfg.Variant=="Primary" and "Accent" or "ElementBackground"), TextColor3="Text", FontFace="Button", CornerRadius="SmallCornerRadius"});
+			if cfg.Icon then -- Simplified icon
+				local icon = Instance.new("ImageLabel"); icon.Size=UDim2.fromOffset(16,16); IconManager.ApplyIcon(icon, "Lucide", cfg.Icon); icon.Parent=actualBtn; icon.LayoutOrder=1; actualBtn.Text = " "..actualBtn.Text;
+			end
+			if cfg.Callback then actualBtn.Activated:Connect(cfg.Callback) end
+			registerSearchable(cfg, btnFrame, "Button", {})
+			scopedItemCount = scopedItemCount + 1; return {}
 		end
-		-- Adapt AddToggle
+
 		scopedItems.AddToggle = function(cfg)
-			local func, frame = UBHubLib._InternalAddItem_Toggle(parentFrameForItems, cfg, scopedItemCount, windowCfg)
-			registerSearchable(cfg, frame, "Toggle", func)
-			scopedItemCount = scopedItemCount + 1; return func
+			local funcObj = {Value = cfg.Default or false}
+			local toggleFrame = Instance.new("Frame"); toggleFrame.Name=cfg.Title or "InternalToggle"; toggleFrame.Size=UDim2.new(1,0,0,35); toggleFrame.BackgroundTransparency=1; toggleFrame.LayoutOrder=scopedItemCount; toggleFrame.Parent=parentFrameForItems;
+			local layout = Instance.new("UIListLayout"); layout.FillDirection=Enum.FillDirection.Horizontal; layout.VerticalAlignment=Enum.VerticalAlignment.Center; layout.Padding=ThemeManager.GetSize("SmallPadding"); layout.Parent=toggleFrame;
+			if cfg.Icon then local icon = Instance.new("ImageLabel"); icon.Size=UDim2.fromOffset(18,18); IconManager.ApplyIcon(icon, "Lucide", cfg.Icon); icon.Parent=toggleFrame; ThemeManager.AddThemedObject(icon, {ImageColor3="Icon"}); end
+			local lbl = Instance.new("TextLabel"); lbl.Text=cfg.Title; lbl.Size=UDim2.new(1, -50-(cfg.Icon and 22 or 0),1,0);ThemeManager.AddThemedObject(lbl, {TextColor3="Text"}); lbl.Parent=toggleFrame;
+			local switch = Instance.new("TextButton"); switch.Size=UDim2.fromOffset(40,20); switch.Text=""; ThemeManager.AddThemedObject(switch, {BackgroundColor3=funcObj.Value and "ThemeHighlight" or "Stroke", CornerRadius="Full"}); switch.Parent=toggleFrame;
+			local thumb = Instance.new("Frame"); thumb.Size=UDim2.fromOffset(16,16); thumb.Position=UDim2.new(funcObj.Value and 0.75 or 0.25,0,0.5,0); ThemeManager.AddThemedObject(thumb,{BackgroundColor3="Text", CornerRadius="Full"}); thumb.Parent=switch;
+
+			funcObj.Set = function(val, silent)
+				if funcObj.Value == val then return end
+				funcObj.Value = val
+				local targetPos = val and UDim2.new(0.75,0,0.5,0) or UDim2.new(0.25,0,0.5,0)
+				local targetColor = val and ThemeManager.GetColor("ThemeHighlight") or ThemeManager.GetColor("Stroke")
+				TweenService:Create(thumb, TweenInfo.new(0.15), {Position = targetPos}):Play()
+				TweenService:Create(switch, TweenInfo.new(0.15), {BackgroundColor3 = targetColor}):Play()
+				if cfg.Flag and windowCfg then windowCfg:SaveSetting(cfg.Flag, val) end
+				if not silent and cfg.Callback then cfg.Callback(val) end
+			end
+			switch.Activated:Connect(function() funcObj:Set(not funcObj.Value) end)
+			if cfg.Flag and windowCfg then local saved = windowCfg:LoadSetting(cfg.Flag, cfg.Default); funcObj:Set(saved, true); end
+
+			registerSearchable(cfg, toggleFrame, "Toggle", funcObj)
+			scopedItemCount = scopedItemCount + 1; return funcObj
 		end
-		-- Adapt AddSlider
-		scopedItems.AddSlider = function(cfg)
-			local func, frame = UBHubLib._InternalAddItem_Slider(parentFrameForItems, cfg, scopedItemCount, windowCfg)
-			registerSearchable(cfg, frame, "Slider", func)
-			scopedItemCount = scopedItemCount + 1; return func
-		end
-		-- Adapt AddInput
+
 		scopedItems.AddInput = function(cfg)
-			local func, frame = UBHubLib._InternalAddItem_Input(parentFrameForItems, cfg, scopedItemCount, windowCfg)
-			registerSearchable(cfg, frame, "Input", func)
-			scopedItemCount = scopedItemCount + 1; return func
+			local funcObj = {Value = cfg.Default or ""}
+			local inputFrame = Instance.new("Frame"); inputFrame.Name=cfg.Title or "InternalInput"; inputFrame.Size=UDim2.new(1,0,0,35); inputFrame.BackgroundTransparency=1; inputFrame.LayoutOrder=scopedItemCount; inputFrame.Parent=parentFrameForItems;
+			local layout=Instance.new("UIListLayout");layout.FillDirection=Enum.FillDirection.Horizontal;layout.Padding=ThemeManager.GetSize("SmallPadding");layout.VerticalAlignment=Enum.VerticalAlignment.Center; layout.Parent=inputFrame;
+			if cfg.Icon then local icon=Instance.new("ImageLabel");icon.Size=UDim2.fromOffset(18,18);IconManager.ApplyIcon(icon,"Lucide",cfg.Icon);icon.Parent=inputFrame;ThemeManager.AddThemedObject(icon,{ImageColor3="Icon"});end
+			local lbl=Instance.new("TextLabel");lbl.Text=cfg.Title;lbl.Size=UDim2.new(0,100,1,0);ThemeManager.AddThemedObject(lbl,{TextColor3="Text"});lbl.Parent=inputFrame;
+			local tb=Instance.new("TextBox");tb.Text=funcObj.Value;tb.PlaceholderText=cfg.PlaceholderText or "";tb.Size=UDim2.new(1,-(110+(cfg.Icon and 22 or 0)),1,0);ThemeManager.AddThemedObject(tb,{BackgroundColor3="InputBackground",TextColor3="Text",CornerRadius="SmallCornerRadius"});tb.Parent=inputFrame;
+
+			funcObj.Set = function(val, silent)
+				if funcObj.Value == val then return end
+				funcObj.Value = val; tb.Text = val;
+				if cfg.Flag and windowCfg then windowCfg:SaveSetting(cfg.Flag, val) end
+				if not silent and cfg.Callback then cfg.Callback(val) end
+			end
+			tb.FocusLost:Connect(function(ep) if ep then funcObj:Set(tb.Text) end end)
+			if cfg.Flag and windowCfg then local saved = windowCfg:LoadSetting(cfg.Flag, cfg.Default); funcObj:Set(saved, true); end
+
+			registerSearchable(cfg, inputFrame, "Input", funcObj)
+			scopedItemCount = scopedItemCount + 1; return funcObj
 		end
-		-- Adapt AddDropdown
+
 		scopedItems.AddDropdown = function(cfg)
-			local func, frame = UBHubLib._InternalAddItem_Dropdown(parentFrameForItems, cfg, scopedItemCount, windowCfg, UBHubGui, Main) -- Pass UBHubGui and Main for popup
-			registerSearchable(cfg, frame, "Dropdown", func)
-			scopedItemCount = scopedItemCount + 1; return func
+			-- This needs the full dropdown logic to be useful (popup panel, options etc.)
+			-- For now, a placeholder that looks like a dropdown button.
+			local funcObj = {Value = cfg.Default}
+			local ddFrame = Instance.new("Frame"); ddFrame.Name=cfg.Title or "InternalDropdown"; ddFrame.Size=UDim2.new(1,0,0,35); ddFrame.BackgroundTransparency=1; ddFrame.LayoutOrder=scopedItemCount; ddFrame.Parent=parentFrameForItems;
+			local layout=Instance.new("UIListLayout");layout.FillDirection=Enum.FillDirection.Horizontal;layout.Padding=ThemeManager.GetSize("SmallPadding");layout.VerticalAlignment=Enum.VerticalAlignment.Center;layout.Parent=ddFrame;
+			if cfg.Icon then local icon=Instance.new("ImageLabel");icon.Size=UDim2.fromOffset(18,18);IconManager.ApplyIcon(icon,"Lucide",cfg.Icon);icon.Parent=ddFrame;ThemeManager.AddThemedObject(icon,{ImageColor3="Icon"});end
+			local title = Instance.new("TextLabel");title.Text=cfg.Title;title.Size=UDim2.new(0,100,1,0);ThemeManager.AddThemedObject(title,{TextColor3="Text"});title.Parent=ddFrame;
+			local displayBtn = Instance.new("TextButton"); displayBtn.Text=tostring(cfg.Default) or "Select..."; displayBtn.Size=UDim2.new(1,-(110+(cfg.Icon and 22 or 0)+20),1,0);ThemeManager.AddThemedObject(displayBtn,{BackgroundColor3="InputBackground",TextColor3="Text",CornerRadius="SmallCornerRadius"});displayBtn.Parent=ddFrame;
+			local chevron = Instance.new("ImageLabel");chevron.Size=UDim2.fromOffset(16,16);IconManager.ApplyIcon(chevron,"Lucide","chevron-down");ThemeManager.AddThemedObject(chevron,{ImageColor3="Icon"});chevron.Parent=ddFrame;
+
+			funcObj.RefreshOptions = function(opts) print("InternalDropdown: RefreshOptions called (placeholder)") end
+			funcObj.Set = function(val, silent) funcObj.Value = val; displayBtn.Text = tostring(val); if cfg.Callback and not silent then cfg.Callback(val) end end
+			if cfg.Flag and windowCfg then local saved = windowCfg:LoadSetting(cfg.Flag, cfg.Default); funcObj:Set(saved, true); end
+
+			registerSearchable(cfg, ddFrame, "Dropdown", funcObj)
+			scopedItemCount = scopedItemCount + 1; return funcObj
 		end
-		-- Adapt AddColorPicker
+
 		scopedItems.AddColorPicker = function(cfg)
-			local func, frame = UBHubLib._InternalAddItem_ColorPicker(parentFrameForItems, cfg, scopedItemCount, windowCfg, UBHubGui, Main, DropShadowHolder) -- Pass UBHubGui, Main, DropShadowHolder for popup
-			registerSearchable(cfg, frame, "ColorPicker", func)
-			scopedItemCount = scopedItemCount + 1; return func
+			local funcObj = {Value = cfg.Default or Color3.new(1,0,0)}
+			local cpFrame = Instance.new("Frame"); cpFrame.Name=cfg.Title or "InternalColorPicker"; cpFrame.Size=UDim2.new(1,0,0,35); cpFrame.BackgroundTransparency=1; cpFrame.LayoutOrder=scopedItemCount; cpFrame.Parent=parentFrameForItems;
+			local layout=Instance.new("UIListLayout");layout.FillDirection=Enum.FillDirection.Horizontal;layout.Padding=ThemeManager.GetSize("SmallPadding");layout.VerticalAlignment=Enum.VerticalAlignment.Center;layout.Parent=cpFrame;
+			if cfg.Icon then local icon=Instance.new("ImageLabel");icon.Size=UDim2.fromOffset(18,18);IconManager.ApplyIcon(icon,"Lucide",cfg.Icon);icon.Parent=cpFrame;ThemeManager.AddThemedObject(icon,{ImageColor3="Icon"});end
+			local title = Instance.new("TextLabel");title.Text=cfg.Title;title.Size=UDim2.new(1,-(45+(cfg.Icon and 22 or 0)),1,0);ThemeManager.AddThemedObject(title,{TextColor3="Text"});title.Parent=cpFrame;
+			local preview = Instance.new("Frame"); preview.Size=UDim2.fromOffset(30,20); preview.BackgroundColor3=funcObj.Value; ThemeManager.AddThemedObject(preview,{BorderColor3="Stroke",CornerRadius="SmallCornerRadius"});preview.Parent=cpFrame;
+
+			-- Placeholder: Clicking preview would open the real color picker popup.
+			-- The real AddColorPicker is complex to replicate fully here without major refactor.
+			local openBtn = Instance.new("TextButton"); openBtn.Size=UDim2.new(1,0,1,0);openBtn.BackgroundTransparency=1;openBtn.Parent=cpFrame;
+			openBtn.Activated:Connect(function() UBHubLib:MakeNotify({Title="Info", Content="Full color picker UI for theme editing requires using the main AddColorPicker for this item."}) end)
+
+			funcObj.SetColor = function(c, a, silent) funcObj.Value=c; preview.BackgroundColor3=c; if cfg.Callback and not silent then cfg.Callback(c,a) end end
+			if cfg.Flag and windowCfg then
+				local s = windowCfg:LoadSetting(cfg.Flag);
+				if s and s.R then funcObj:SetColor(Color3.new(s.R,s.G,s.B), s.A or 1, true)
+				else funcObj:SetColor(cfg.Default, cfg.DefaultAlpha or 1, true) end
+			end
+
+			registerSearchable(cfg, cpFrame, "ColorPicker", funcObj)
+			scopedItemCount = scopedItemCount + 1; return funcObj
 		end
-		-- Adapt AddDivider
-		scopedItems.AddDivider = function(cfg)
-			UBHubLib._InternalAddItem_Divider(parentFrameForItems, cfg, scopedItemCount) -- Dividers are not typically searchable by title
-			scopedItemCount = scopedItemCount + 1;
-		end
+
 		return scopedItems
 	end
-
 
 	-- Create and store the "Customize" tab and its views
 	local customizeTabObject = Tabs:AddStaticTab({Name = "Customize", Icon = "settings-2"})
 	if customizeTabObject and customizeTabObject.ContentFrame then
-		local settingsViews = UBHubLib:CreateSettingsTabContent(customizeTabObject.ContentFrame, customizeTabObject.ContentFrame, customizeTabObject.ContentFrame) -- Pass content frame as tab and section for search
+		Tabs.CustomizeTabContentFrame = customizeTabObject.ContentFrame -- Store for search context
+		local settingsViews = UBHubLib:CreateSettingsTabContent(customizeTabObject.ContentFrame) -- Removed search context args here, they are for CreateInternalSectionItems
 		Tabs.SettingsViews = settingsViews -- Store for later population
 	else
 		warn("Could not create or get ContentFrame for Customize tab.")
 	end
 
-	function UBHubLib:CreateSettingsTabContent(settingsTabContentFrame, tabObjForSearch, sectionObjForSearch)
+	function UBHubLib:CreateSettingsTabContent(settingsTabContentFrame)
 		local SettingsPage = Instance.new("Frame")
 		SettingsPage.Name = "SettingsPage"
 		SettingsPage.Size = UDim2.new(1,0,1,0)
@@ -3427,17 +3532,18 @@ function UBHubLib:MakeGui(GuiConfig)
 		local configView = windowObject.SettingsViews.Configuration
 		local themingView = windowObject.SettingsViews.Theming
 		local windowCfg = windowObject.ConfigManager
-		local currentTabForSearch = windowObject.SettingsViews.Configuration -- Or the actual tab object for "Customize"
+		local customizeTabActualContentFrame = windowObject.CustomizeTabContentFrame -- Use the correct overall tab content frame
 
-		if not configView or not themingView or not windowCfg then
-			warn("PopulateSettingsViews: ConfigurationView, ThemingView, or windowConfigManager is missing.")
+		if not configView or not themingView or not windowCfg or not customizeTabActualContentFrame then
+			warn("PopulateSettingsViews: ConfigurationView, ThemingView, windowConfigManager, or CustomizeTabContentFrame is missing.")
 			return
 		end
 
 		-- Configuration View Population
 		local configSectionFrame = Instance.new("Frame"); configSectionFrame.Name="ConfigSectionFrame"; configSectionFrame.Size=UDim2.new(1,0,0,0); configSectionFrame.AutomaticSize=Enum.AutomaticSize.Y; configSectionFrame.BackgroundTransparency=1; configSectionFrame.Parent = configView;
 		local cfgLayout = Instance.new("UIListLayout"); cfgLayout.Padding = ThemeManager.GetSize("SmallPadding"); cfgLayout.Parent = configSectionFrame;
-		local configItems = UBHubLib:CreateInternalSectionItems(configSectionFrame, currentTabForSearch, configSectionFrame)
+		-- For items within this section, the 'tab' is the Customize tab's content, and 'section' is this configSectionFrame
+		local configItems = UBHubLib:CreateInternalSectionItems(configSectionFrame, customizeTabActualContentFrame, configSectionFrame)
 
 		configItems.AddToggle({
 			Title = "Config Mode (Legacy ON / Normal OFF)",
@@ -3545,7 +3651,7 @@ function UBHubLib:MakeGui(GuiConfig)
 		-- Theming View Population
 		local themingSectionFrame = Instance.new("Frame"); themingSectionFrame.Name="ThemingSectionFrame"; themingSectionFrame.Size=UDim2.new(1,0,0,0); themingSectionFrame.AutomaticSize=Enum.AutomaticSize.Y; themingSectionFrame.BackgroundTransparency=1; themingSectionFrame.Parent = themingView;
 		local thLayout = Instance.new("UIListLayout"); thLayout.Padding = ThemeManager.GetSize("SmallPadding"); thLayout.Parent = themingSectionFrame;
-		local themingItems = UBHubLib:CreateInternalSectionItems(themingSectionFrame, currentTabForSearch, themingSectionFrame)
+		local themingItems = UBHubLib:CreateInternalSectionItems(themingSectionFrame, customizeTabActualContentFrame, themingSectionFrame)
 
 		local themeNames = ThemeManager.GetThemeNames()
 		local themeDropdown = themingItems.AddDropdown({
