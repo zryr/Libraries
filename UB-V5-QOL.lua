@@ -32,27 +32,25 @@ local function GetAndLoadModule(url, moduleNameForWarning, dependencies)
     -- For now, let's assume the loaded code returns a function,
     -- and that function itself is then called with the dependencies.
 
-    local moduleFactory, factoryError = pcall(func)
-    if not moduleFactory then
-        warn("Execution of loadstring'd code (module factory setup) failed for " .. moduleNameForWarning .. ": " .. tostring(factoryError))
+    -- Execute the loaded chunk. This chunk is expected to RETURN the factory function.
+    local successCallChunk, factoryFunctionOrError = pcall(func)
+    if not successCallChunk then
+        warn("Execution of loaded chunk (to get factory) failed for " .. moduleNameForWarning .. ": " .. tostring(factoryFunctionOrError))
         return nil
     end
 
-    if typeof(moduleFactory) ~= "function" then
-        warn("Loaded code for " .. moduleNameForWarning .. " did not return a function (module factory). Got: " .. typeof(moduleFactory))
-        return nil -- The module needs to be a function that can accept dependencies
+    if typeof(factoryFunctionOrError) ~= "function" then
+        warn("Loaded code for " .. moduleNameForWarning .. " did not return a function (module factory). Got: " .. typeof(factoryFunctionOrError) .. ". Value: " .. tostring(factoryFunctionOrError))
+        return nil
     end
 
+    local factoryFunction = factoryFunctionOrError
+
     -- Call the factory function with the dependencies
-    -- The factory should be `return function(dep1, dep2, ...) end`
-    -- We will pass the values from the dependencies table.
-    -- This requires careful ordering or named arguments if the module expects them.
-    -- A simpler approach for the module: `return function(depsTable) ... end`
-    -- Let's go with passing the dependency table itself.
-    local execSuccess, module = pcall(moduleFactory, dependencies)
+    local execSuccess, module = pcall(factoryFunction, dependencies)
 
     if not execSuccess or module == nil then -- Check if module is nil explicitly
-        warn("Execution of module factory failed or module is nil for " .. moduleNameForWarning .. ": " .. tostring(module))
+        warn("Execution of module factory failed or module is nil for " .. moduleNameForWarning .. ": " .. module) -- Changed tostring(module) to module for better error from pcall
         return nil
     end
     return module
