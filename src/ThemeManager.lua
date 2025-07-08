@@ -122,8 +122,29 @@ end
 
 function ThemeManager.ApplySizeToElement(element, sizeType, propertyName)
     local sizeValue = ThemeManager.CurrentTheme.Sizes[sizeType]
-    if sizeValue and element[propertyName] ~= sizeValue then
-        element[propertyName] = sizeValue
+    if sizeValue == nil then
+        warn("ThemeManager.ApplySizeToElement: SizeType '" .. tostring(sizeType) .. "' not found in theme sizes.")
+        return
+    end
+
+    if propertyName == "CornerRadius" then
+        if typeof(sizeValue) == "UDim" then
+            local uiCorner = element:FindFirstChildWhichIsA("UICorner")
+            if not uiCorner then
+                uiCorner = Instance.new("UICorner")
+                uiCorner.Parent = element
+            end
+            if uiCorner.CornerRadius ~= sizeValue then
+                uiCorner.CornerRadius = sizeValue
+            end
+        else
+            warn("ThemeManager.ApplySizeToElement: CornerRadius value for sizeType '" .. tostring(sizeType) .. "' is not a UDim. Got: " .. typeof(sizeValue))
+        end
+    else
+        -- Original behavior for other properties
+        if element[propertyName] ~= sizeValue then
+            element[propertyName] = sizeValue
+        end
     end
 end
 
