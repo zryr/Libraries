@@ -336,3 +336,4 @@ end
 
 
 return ConfigManager
+end)

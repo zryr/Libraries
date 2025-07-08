@@ -65,3 +65,4 @@ end
 FontManager.RegisterFont("Default", "rbxassetid://12187365364") -- WindUI's default font
 
 return FontManager
+end)

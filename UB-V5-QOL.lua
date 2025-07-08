@@ -1671,7 +1671,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 				local ButtonFrame = Instance.new("Frame")
 				ButtonFrame.Name = "Button_" .. (ButtonConfig.Title:gsub("%s+", "_"))
-				ButtonFrame.Size = UDim2.new(1, 0, 0, ThemeManager.GetSize("ButtonHeight") or 35)
+				ButtonFrame.Size = UDim2.new(1, 0, 0, ThemeManager.GetSize("ButtonHeight"))
 				ButtonFrame.BackgroundTransparency = 0.5
 				ButtonFrame.LayoutOrder = CountItem
 				ButtonFrame.Parent = SectionContent
@@ -1796,7 +1796,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 				local ToggleFrame = Instance.new("Frame")
 				ToggleFrame.Name = "Toggle_" .. (ToggleConfig.Title:gsub("%s+", "_"))
-				ToggleFrame.Size = UDim2.new(1, 0, 0, ThemeManager.GetSize("ButtonHeight") or 35)
+				ToggleFrame.Size = UDim2.new(1, 0, 0, ThemeManager.GetSize("ButtonHeight"))
 				ToggleFrame.BackgroundTransparency = 0.5
 				ToggleFrame.LayoutOrder = CountItem
 				ToggleFrame.Parent = SectionContent
@@ -2129,7 +2129,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 				local SliderFrame = Instance.new("Frame")
 				SliderFrame.Name = "Slider_" .. (SliderConfig.Title:gsub("%s+", "_"))
-				SliderFrame.Size = UDim2.new(1, 0, 0, (ThemeManager.GetSize("ButtonHeight") or 35) * 1.5) -- Sliders typically need more vertical space
+				SliderFrame.Size = UDim2.new(1, 0, 0, ThemeManager.GetSize("ButtonHeight") * 1.5) -- Sliders typically need more vertical space
 				SliderFrame.BackgroundTransparency = 0.5
 				SliderFrame.LayoutOrder = CountItem
 				SliderFrame.Parent = SectionContent
@@ -2330,7 +2330,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 				local InputFrame = Instance.new("Frame")
 				InputFrame.Name = "Input_" .. (InputConfig.Title:gsub("%s+", "_"))
-				InputFrame.Size = UDim2.new(1, 0, 0, (ThemeManager.GetSize("ButtonHeight") or 35) * 1.5) -- Similar to slider for title + input box
+				InputFrame.Size = UDim2.new(1, 0, 0, ThemeManager.GetSize("ButtonHeight") * 1.5) -- Similar to slider for title + input box
 				InputFrame.BackgroundTransparency = 0.5
 				InputFrame.LayoutOrder = CountItem
 				InputFrame.Parent = SectionContent
@@ -2512,7 +2512,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 				local DropdownFrame = Instance.new("Frame")
 				DropdownFrame.Name = "Dropdown_" .. (DropdownConfig.Title:gsub("%s+", "_"))
-				DropdownFrame.Size = UDim2.new(1, 0, 0, ThemeManager.GetSize("ButtonHeight") or 35)
+				DropdownFrame.Size = UDim2.new(1, 0, 0, ThemeManager.GetSize("ButtonHeight"))
 				DropdownFrame.BackgroundTransparency = 0.5
 				DropdownFrame.LayoutOrder = CountItem
 				DropdownFrame.Parent = SectionContent
@@ -2844,7 +2844,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 				local PickerFrame = Instance.new("Frame")
 				PickerFrame.Name = "ColorPicker_" .. (PickerConfig.Title:gsub("%s+", "_"))
-				PickerFrame.Size = UDim2.new(1, 0, 0, ThemeManager.GetSize("ButtonHeight") or 35)
+				PickerFrame.Size = UDim2.new(1, 0, 0, ThemeManager.GetSize("ButtonHeight"))
 				PickerFrame.BackgroundTransparency = 0.5
 				PickerFrame.LayoutOrder = CountItem
 				PickerFrame.Parent = SectionContent
