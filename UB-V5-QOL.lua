@@ -842,11 +842,13 @@ function UBHubLib:MakeGui(GuiConfig)
 	ThemeManager.AddThemedObject(RPWidthTextBox, {BackgroundColor3="InputBackground", TextColor3="Text", FontFace="Default", TextSize="SmallTextSize", CornerRadius="SmallCornerRadius"})
 	RPWidthTextBox.Parent = RPWidthSliderFrame
 
-	UBHubLib.ResizePanel = ResizePanel -- Make accessible
-	UBHubLib.ResizePanel.RPWidthSliderTrack = RPWidthSlider
-	UBHubLib.ResizePanel.RPWidthSliderProgress = RPWidthProgress
-	UBHubLib.ResizePanel.RPWidthSliderThumb = RPWidthThumb
-	UBHubLib.ResizePanel.RPWidthTextBox = RPWidthTextBox
+	UBHubLib.ResizePanel = ResizePanel -- Make accessible for the main panel frame
+	UBHubLib.ResizePanelControls = { -- Store controls in a sub-table
+		Track = RPWidthSlider,
+		Progress = RPWidthProgress,
+		Thumb = RPWidthThumb,
+		TextBox = RPWidthTextBox
+	}
 
 	local minQTWidth, maxQTWidth = 30, 300 -- Define min/max for quick toggle width
 
@@ -856,10 +858,10 @@ function UBHubLib:MakeGui(GuiConfig)
 		local percentage = (currentWidth - minQTWidth) / (maxQTWidth - minQTWidth)
 		percentage = math.clamp(percentage, 0, 1)
 
-		UBHubLib.ResizePanel.RPWidthSliderProgress.Size = UDim2.new(percentage, 0, 1, 0)
-		UBHubLib.ResizePanel.RPWidthSliderThumb.Position = UDim2.new(percentage, 0, 0.5, 0)
-		if not UBHubLib.ResizePanel.RPWidthTextBox:IsFocused() then
-			UBHubLib.ResizePanel.RPWidthTextBox.Text = tostring(math.round(currentWidth))
+		UBHubLib.ResizePanelControls.Progress.Size = UDim2.new(percentage, 0, 1, 0)
+		UBHubLib.ResizePanelControls.Thumb.Position = UDim2.new(percentage, 0, 0.5, 0)
+		if not UBHubLib.ResizePanelControls.TextBox:IsFocused() then
+			UBHubLib.ResizePanelControls.TextBox.Text = tostring(math.round(currentWidth))
 		end
 	end
 	UBHubLib.UpdateResizePanelVisuals = UpdateResizePanelVisuals -- Expose if needed by AddToggle

@@ -66,6 +66,7 @@ return function(dependencies)
             TextSize = 14,
             SmallTextSize = 12,
             TitleTextSize = 16,
+            Full = UDim.new(0.5, 0), -- For pill shape corner radius
         }
     },
     -- Add more themes here later, e.g., Light, VapeV4 inspired
