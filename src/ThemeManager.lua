@@ -137,8 +137,28 @@ function ThemeManager.GetFont(fontType) -- Returns Font object or path
     return FontManager.GetFont(fontNameKey)
 end
 
-function ThemeManager.GetSize(sizeName)
-    return ThemeManager.CurrentTheme.Sizes[sizeName]
+function ThemeManager.GetSize(sizeName, defaultValue)
+    local sizeValue = ThemeManager.CurrentTheme.Sizes[sizeName]
+    if sizeValue == nil then
+        warn("ThemeManager: Size '" .. tostring(sizeName) .. "' not found in current theme. Using default.")
+        -- Provide sensible defaults based on expected type or a generic one
+        if defaultValue ~= nil then
+            return defaultValue
+        elseif type(sizeName) == "string" and (sizeName:lower():match("radius") or sizeName:lower():match("padding")) then
+            return UDim.new(0,0) -- Default for UDim based sizes
+        elseif type(sizeName) == "string" and sizeName:lower():match("height") then
+            return 30 -- Default height
+        elseif type(sizeName) == "string" and sizeName:lower():match("width") then
+            return 100 -- Default width
+        elseif type(sizeName) == "string" and sizeName:lower():match("thickness") then
+            return 1 -- Default thickness
+        elseif type(sizeName) == "string" and sizeName:lower():match("textsize") then
+            return 12 -- Default text size
+        else
+            return 0 -- Generic numerical default
+        end
+    end
+    return sizeValue
 end
 
 function ThemeManager.AddThemedObject(obj, propertiesToTheme)

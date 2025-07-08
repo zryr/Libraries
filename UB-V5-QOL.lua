@@ -526,6 +526,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 	-- Initialize ConfigManager for this window instance
 	-- The Flags table will be managed by ConfigManager
+	local Flags = {} -- Initialize Flags table
 	local windowConfigManager = ConfigManagerModule.new(UBHubLib)
 	windowConfigManager:Init(Flags, GuiConfig["SaveFolder"]) -- Flags is the legacy global one for now
 	UBHubLib.CurrentWindowConfigManager = windowConfigManager -- Make it accessible if needed externally
@@ -2869,7 +2870,8 @@ function UBHubLib:MakeGui(GuiConfig)
 					ColorPickerPopup.Size = UDim2.fromOffset(280, 350) -- Adjusted height for more elements
 					ColorPickerPopup.AnchorPoint = Vector2.new(0.5, 0.5)
 					ColorPickerPopup.Position = UDim2.new(0.5, -Main.AbsolutePosition.X/Main.AbsoluteSize.X * DropShadowHolder.AbsoluteSize.X + Main.AbsoluteSize.X/2 , 0.5, -Main.AbsolutePosition.Y/Main.AbsoluteSize.Y * DropShadowHolder.AbsoluteSize.Y + Main.AbsoluteSize.Y/2 - 20)
-					ColorPickerPopup.BackgroundTransparency = ThemeManager.GetColor("DialogBackground").Transparency or 0.1
+					ColorPickerPopup.BackgroundColor3 = ThemeManager.GetColor("DialogBackground")
+					ColorPickerPopup.BackgroundTransparency = 0.1 -- Defaulting to 0.1 as 'or 0.1' was in the original problematic line for transparency
 					ColorPickerPopup.Visible = false
 					ColorPickerPopup.ZIndex = Main.ZIndex + 200
 					ColorPickerPopup.Parent = UBHubGui
@@ -3086,7 +3088,18 @@ function UBHubLib:MakeGui(GuiConfig)
 					local isUpdatingInternally = false -- Prevents recursive updates from FocusLost
 
 					-- ### INTERNAL COLOR UPDATE LOGIC ###
-					local function UpdateFullColorVisuals()
+					local UpdateFullColorVisuals -- Forward declare so it can be used by UpdateColorFromHSV if needed, though not strictly necessary with current structure
+
+					local function UpdateColorFromHSV()
+						-- This function is called when Hue, Saturation, or Value change from sliders.
+						-- currentHue, currentSaturation, currentValue are already updated by the slider drag logic.
+						-- We just need to refresh all visuals in the popup that depend on these.
+						if UpdateFullColorVisuals then
+							UpdateFullColorVisuals()
+						end
+					end
+
+					UpdateFullColorVisuals = function()
 						isUpdatingInternally = true
 						local baseColor = Color3.fromHSV(currentHue, currentSaturation, currentValue)
 						-- PickerFunc.Value and PickerFunc.Alpha are updated by individual component interactions now,
