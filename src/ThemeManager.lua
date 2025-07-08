@@ -1,5 +1,5 @@
 -- ThemeManager.lua
-local FontManager = require(script.Parent.FontManager) -- Assuming FontManager is in the same directory
+local FontManager = require(script.FontManager) -- Assuming FontManager is in the same directory
 local TweenService = game:GetService("TweenService")
 
 local ThemeManager = {}

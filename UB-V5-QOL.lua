@@ -5,42 +5,15 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Mouse = LocalPlayer:GetMouse()
 
--- HttpGet and load string utility
-local function GetAndLoadModule(url, moduleNameForWarning)
-    local success, response = pcall(game.HttpGet, game, url)
-    if not success or not response then
-        warn("HttpGet failed for " .. moduleNameForWarning .. ": " .. tostring(response))
-        return nil
-    end
-
-    local func, loadErr = loadstring(response)
-    if not func then
-        warn("loadstring failed for " .. moduleNameForWarning .. ": " .. tostring(loadErr))
-        return nil
-    end
-
-    local execSuccess, module = pcall(func)
-    if not execSuccess or module == nil then -- Check if module is nil explicitly
-        warn("Execution failed or module is nil for " .. moduleNameForWarning .. ": " .. tostring(module))
-        return nil
-    end
-    return module
-end
-
--- Load modules via HttpGet
-local FontManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/FontManager.lua"
-local IconManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/IconManager.lua"
-local ConfigManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/ConfigManager.lua"
-local ThemeManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/ThemeManager.lua"
-
-local FontManager = GetAndLoadModule(FontManagerUrl, "FontManager")
-local IconManager = GetAndLoadModule(IconManagerUrl, "IconManager")
-local ConfigManagerModule = GetAndLoadModule(ConfigManagerUrl, "ConfigManagerModule")
-local ThemeManager = GetAndLoadModule(ThemeManagerUrl, "ThemeManager")
+-- Load modules locally
+local FontManager = require(script.Parent.src.FontManager)
+local IconManager = require(script.Parent.src.IconManager)
+local ConfigManagerModule = require(script.Parent.src.ConfigManager)
+local ThemeManager = require(script.Parent.src.ThemeManager)
 
 -- Critical Check: If any essential module failed, the library cannot function.
 if not FontManager or not IconManager or not ConfigManagerModule or not ThemeManager then
-    warn("UB-V5-QOL: One or more core modules failed to load via HttpGet. Library may not function correctly.")
+    warn("UB-V5-QOL: One or more core modules failed to load locally. Library may not function correctly.")
     -- Depending on desired behavior, could return an empty UBHubLib or error out.
     -- For now, it will proceed, and parts of the UI requiring the missing module will error later.
 end

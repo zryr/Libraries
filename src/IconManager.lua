@@ -3,28 +3,6 @@ local IconManager = {}
 
 local iconLibraries = {}
 
--- HttpGet and load string utility (can be shared if this file is part of a larger system with globals, or keep it local)
-local function GetAndLoadIconData(url, iconLibName)
-    local success, response = pcall(game.HttpGet, game, url)
-    if not success or not response then
-        warn("HttpGet failed for " .. iconLibName .. " data: " .. tostring(response))
-        return nil
-    end
-
-    local func, loadErr = loadstring(response)
-    if not func then
-        warn("loadstring failed for " .. iconLibName .. " data: " .. tostring(loadErr))
-        return nil
-    end
-
-    local execSuccess, moduleData = pcall(func)
-    if not execSuccess or moduleData == nil then
-        warn("Execution failed or module data is nil for " .. iconLibName .. ": " .. tostring(moduleData))
-        return nil
-    end
-    return moduleData
-end
-
 local function loadLibraryFromData(name, libraryData)
     if libraryData and type(libraryData) == "table" and libraryData.Spritesheets and libraryData.Icons then
         iconLibraries[name] = libraryData
@@ -42,13 +20,11 @@ local function loadLibraryFromData(name, libraryData)
     end
 end
 
-local LucideIconsUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Icons/Lucide.lua"
-local CraftIconsUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Icons/Craft.lua"
-
-local LucideData = GetAndLoadIconData(LucideIconsUrl, "Lucide")
+-- Load Icon data locally
+local LucideData = require(script.Parent.Parent.Icons.Lucide)
 if LucideData then loadLibraryFromData("Lucide", LucideData) else iconLibraries["Lucide"] = {Icons={}, Spritesheets={}} end
 
-local CraftData = GetAndLoadIconData(CraftIconsUrl, "Craft")
+local CraftData = require(script.Parent.Parent.Icons.Craft)
 if CraftData then loadLibraryFromData("Craft", CraftData) else iconLibraries["Craft"] = {Icons={}, Spritesheets={}} end
 
 
