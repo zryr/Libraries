@@ -249,7 +249,34 @@ end
 local UBHubLib = {}
 
 -- Initialize ConfigManager instance for the library
-UBHubLib.ConfigManager = ConfigManagerModule.new(UBHubLib) -- Pass UBHubLib if ConfigManager needs to call back
+if ConfigManagerModule then
+    UBHubLib.ConfigManager = ConfigManagerModule.new(UBHubLib) -- Pass UBHubLib if ConfigManager needs to call back
+else
+    warn("UB-V5-QOL Critical: ConfigManagerModule failed to load. Configuration system will not be available.")
+    UBHubLib.ConfigManager = { -- Dummy ConfigManager
+        new = function() return UBHubLib.ConfigManager end,
+        Init = function() end,
+        SetMode = function() end,
+        RegisterElement = function() end,
+        SaveSetting = function() end,
+        LoadSetting = function(_, _, default) return default end,
+        _PersistFlags = function() end,
+        _LoadWindowSettings = function() end,
+        _SaveWindowSettings = function() end,
+        CreateConfig = function() return false end,
+        LoadConfig = function() return false end,
+        _ApplyFlagsToElements = function() end,
+        DeleteConfig = function() return false end,
+        OverwriteConfig = function() return false end,
+        ExportConfig = function() return nil end,
+        ListConfigs = function() return {} end,
+        GetMode = function() return "Unavailable" end,
+        GetCurrentConfigName = function() return "N/A" end,
+        GetConfigNames = function() return {} end,
+        GetElementByFlag = function() return nil end,
+        SaveConfig = function() return false end, -- Added missing SaveConfig
+    }
+end
 UBHubLib.isEditMode = false -- Initialize the global edit mode flag
 UBHubLib.SearchableElements = {} -- Initialize registry for searchable elements
 UBHubLib.DraggableObjectsState = {} -- To store state and connections for draggable objects
@@ -1255,7 +1282,7 @@ function UBHubLib:MakeGui(GuiConfig)
 		local UICorner_Divider = Instance.new("UICorner")
 		UICorner_Divider.Parent = DividerFrame
 		ThemeManager.AddThemedObject(UICorner_Divider, {CornerRadius = "SmallCornerRadius"})
-		ThemeManager.AddThemedObject(DividerFrame, { BackgroundColor3FromTheme = color })
+		ThemeManager.AddThemedObject(DividerFrame, { BackgroundColor3 = color })
 	end
 
 	function Tabs:CreateTab(TabConfig, isStatic)
@@ -3275,11 +3302,14 @@ function UBHubLib:MakeGui(GuiConfig)
 					currentHue, currentSaturation, currentValue = Color3.toHSV(newColor)
 					currentAlpha = newAlpha
 					if popupInstance and popupInstance.Parent then
-						-- TODO: Update SaturationBrightnessFrame.BackgroundColor3, SBSelector.Position, HueSlider.Value, AlphaSlider.Value etc.
-						local sbFrame = popupInstance:FindFirstChild("SaturationBrightnessFrame", true)
-						if sbFrame then sbFrame.BackgroundColor3 = Color3.fromHSV(currentHue,1,1) end
-						local sbSelector = popupInstance:FindFirstChild("SBSelector", true)
-						if sbSelector then sbSelector.Position = UDim2.new(currentSaturation, 0, 1 - currentValue, 0) end
+						-- Update the internal state variables that UpdateFullColorVisuals uses
+						local h, s, v = Color3.toHSV(newColor)
+						currentHue = h
+						currentSaturation = s
+						currentValue = v
+						-- currentAlpha is already updated from newAlpha parameter
+
+						UpdateFullColorVisuals() -- This will refresh all internal popup elements
 					end
 
 					if PickerConfig.Flag then
