@@ -1,34 +1,43 @@
 -- IconManager.lua
-local IconManager = {}
+return function(dependencies)
+    local IconManager = {}
+    local iconLibraries = {}
 
-local iconLibraries = {}
+    local LucideData = dependencies.Lucide
+    local CraftData = dependencies.Craft
 
-local function loadLibraryFromData(name, libraryData)
-    if libraryData and type(libraryData) == "table" and libraryData.Spritesheets and libraryData.Icons then
-        iconLibraries[name] = libraryData
-        for iconKey, iconData in pairs(libraryData.Icons) do
-            local spritesheetNum = iconData.Image
-            if libraryData.Spritesheets[tostring(spritesheetNum)] then
-                iconData.SpritesheetID = libraryData.Spritesheets[tostring(spritesheetNum)]
-            else
-                warn("IconManager: Spritesheet number " .. tostring(spritesheetNum) .. " not found for icon " .. iconKey .. " in library " .. name)
+    local function loadLibraryFromData(name, libraryData)
+        if libraryData and type(libraryData) == "table" and libraryData.Spritesheets and libraryData.Icons then
+            iconLibraries[name] = libraryData
+            for iconKey, iconData in pairs(libraryData.Icons) do
+                local spritesheetNum = iconData.Image
+                if libraryData.Spritesheets[tostring(spritesheetNum)] then
+                    iconData.SpritesheetID = libraryData.Spritesheets[tostring(spritesheetNum)]
+                else
+                    warn("IconManager: Spritesheet number " .. tostring(spritesheetNum) .. " not found for icon " .. iconKey .. " in library " .. name)
+                end
             end
+        else
+            warn("IconManager: Failed to process icon library data for '" .. name .. "'.")
+            iconLibraries[name] = {Icons = {}, Spritesheets = {}}
         end
-    else
-        warn("IconManager: Failed to process icon library data for '" .. name .. "'.")
-        iconLibraries[name] = {Icons = {}, Spritesheets = {}}
     end
-end
 
--- Load Icon data locally
-local LucideData = require(script.Parent.Parent.Icons.Lucide)
-if LucideData then loadLibraryFromData("Lucide", LucideData) else iconLibraries["Lucide"] = {Icons={}, Spritesheets={}} end
+    if LucideData then
+        loadLibraryFromData("Lucide", LucideData)
+    else
+        warn("IconManager: Lucide icon data not provided.")
+        iconLibraries["Lucide"] = {Icons={}, Spritesheets={}}
+    end
 
-local CraftData = require(script.Parent.Parent.Icons.Craft)
-if CraftData then loadLibraryFromData("Craft", CraftData) else iconLibraries["Craft"] = {Icons={}, Spritesheets={}} end
+    if CraftData then
+        loadLibraryFromData("Craft", CraftData)
+    else
+        warn("IconManager: Craft icon data not provided.")
+        iconLibraries["Craft"] = {Icons={}, Spritesheets={}}
+    end
 
-
-function IconManager.GetIcon(libraryName, iconName)
+    function IconManager.GetIcon(libraryName, iconName)
     local library = iconLibraries[libraryName]
     if not library then
         warn("IconManager: Library '" .. libraryName .. "' not found.")

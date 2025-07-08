@@ -1,10 +1,29 @@
 -- ThemeManager.lua
-local FontManager = require(script.FontManager) -- Assuming FontManager is in the same directory
-local TweenService = game:GetService("TweenService")
+return function(dependencies)
+    local FontManager = dependencies.FontManager
+    if not FontManager then
+        warn("ThemeManager Critical: FontManager dependency not provided!")
+        -- Return a dummy ThemeManager or error out, as it's essential
+        return {
+            GetColor = function() return Color3.new(1,0,1) end,
+            GetFont = function() return nil end,
+            GetSize = function() return 0 end,
+            ApplyFontToElement = function() end,
+            AddThemedObject = function() end,
+            ApplyThemeToObject = function() end,
+            SetTheme = function() end,
+            ReapplyCurrentTheme = function() end,
+            Themes = {},
+            CurrentTheme = { Fonts = {}, Colors = {}, Sizes = {} },
+            UpdateThemeColorValue = function() end,
+            GetThemeNames = function() return {} end,
+        }
+    end
 
-local ThemeManager = {}
+    local TweenService = game:GetService("TweenService")
+    local ThemeManager = {}
 
-ThemeManager.Themes = {
+    ThemeManager.Themes = {
     Default = {
         Name = "Default",
         Colors = {

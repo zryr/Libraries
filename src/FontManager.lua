@@ -1,9 +1,10 @@
 -- FontManager.lua
-local FontManager = {}
+return function(dependencies)
+    local FontManager = {}
 
-local registeredFonts = {}
+    local registeredFonts = {}
 
-function FontManager.RegisterFont(fontName, fontIdOrPath)
+    function FontManager.RegisterFont(fontName, fontIdOrPath)
     if type(fontIdOrPath) == "string" and not fontIdOrPath:match("^rbxassetid://") then
         -- Assuming it's a path for custom assets if not an rbxassetid
         registeredFonts[fontName] = fontIdOrPath

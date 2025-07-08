@@ -5,15 +5,116 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Mouse = LocalPlayer:GetMouse()
 
--- Load modules locally
-local FontManager = require(script.Parent.src.FontManager)
-local IconManager = require(script.Parent.src.IconManager)
-local ConfigManagerModule = require(script.Parent.src.ConfigManager)
-local ThemeManager = require(script.Parent.src.ThemeManager)
+-- HttpGet and load string utility
+local function GetAndLoadModule(url, moduleNameForWarning, dependencies)
+    dependencies = dependencies or {} -- Default to an empty table if no dependencies are passed
+    local success, response = pcall(game.HttpGet, game, url)
+    if not success or not response then
+        warn("HttpGet failed for " .. moduleNameForWarning .. ": " .. tostring(response))
+        return nil
+    end
+
+    local func, loadErr = loadstring(response)
+    if not func then
+        warn("loadstring failed for " .. moduleNameForWarning .. ": " .. tostring(loadErr))
+        return nil
+    end
+
+    -- Prepare arguments for the module function
+    -- This assumes the module returns a function that accepts dependencies in a specific order
+    -- or as a single table. For simplicity, let's assume it expects them as separate arguments.
+    -- If a module expects a table, the module itself should handle that.
+    -- For now, we'll pass the dependencies table itself, and modules can unpack it.
+    -- Or, more directly, the main script can control what's passed.
+    -- Let's refine this: the module should be a function that accepts these dependencies.
+    -- pcall(func, dep1, dep2, ...)
+    -- A common pattern is to pass a single 'env' table or individual args.
+    -- For now, let's assume the loaded code returns a function,
+    -- and that function itself is then called with the dependencies.
+
+    local moduleFactory, factoryError = pcall(func)
+    if not moduleFactory then
+        warn("Execution of loadstring'd code (module factory setup) failed for " .. moduleNameForWarning .. ": " .. tostring(factoryError))
+        return nil
+    end
+
+    if typeof(moduleFactory) ~= "function" then
+        warn("Loaded code for " .. moduleNameForWarning .. " did not return a function (module factory). Got: " .. typeof(moduleFactory))
+        return nil -- The module needs to be a function that can accept dependencies
+    end
+
+    -- Call the factory function with the dependencies
+    -- The factory should be `return function(dep1, dep2, ...) end`
+    -- We will pass the values from the dependencies table.
+    -- This requires careful ordering or named arguments if the module expects them.
+    -- A simpler approach for the module: `return function(depsTable) ... end`
+    -- Let's go with passing the dependency table itself.
+    local execSuccess, module = pcall(moduleFactory, dependencies)
+
+    if not execSuccess or module == nil then -- Check if module is nil explicitly
+        warn("Execution of module factory failed or module is nil for " .. moduleNameForWarning .. ": " .. tostring(module))
+        return nil
+    end
+    return module
+end
+
+-- URLs for modules and icon data
+local FontManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/FontManager.lua"
+local IconManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/IconManager.lua"
+local ConfigManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/ConfigManager.lua"
+local ThemeManagerUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/src/ThemeManager.lua"
+local LucideIconsDataUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Icons/Lucide.lua"
+local CraftIconsDataUrl = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/Icons/Craft.lua"
+
+-- Load FontManager first as it's a common dependency
+local FontManager = GetAndLoadModule(FontManagerUrl, "FontManager")
+
+-- Load Icon Data Files
+local function LoadIconData(url, dataName)
+    local success, response = pcall(game.HttpGet, game, url)
+    if not success or not response then
+        warn("HttpGet failed for " .. dataName .. " icon data: " .. tostring(response))
+        return nil
+    end
+    local func, loadErr = loadstring(response)
+    if not func then
+        warn("loadstring failed for " .. dataName .. " icon data: " .. tostring(loadErr))
+        return nil
+    end
+    local execSuccess, dataTable = pcall(func)
+    if not execSuccess or dataTable == nil then
+        warn("Execution failed or icon data table is nil for " .. dataName .. ": " .. tostring(dataTable))
+        return nil
+    end
+    return dataTable
+end
+
+local LucideData = LoadIconData(LucideIconsDataUrl, "Lucide")
+local CraftData = LoadIconData(CraftIconsDataUrl, "Craft")
+
+-- Load IconManager, passing icon data
+local IconManager = nil
+if LucideData and CraftData then
+    IconManager = GetAndLoadModule(IconManagerUrl, "IconManager", { Lucide = LucideData, Craft = CraftData })
+else
+    warn("UB-V5-QOL: Failed to load Lucide or Craft icon data. IconManager will not be fully functional.")
+end
+
+-- Load ThemeManager, passing FontManager (and IconManager if it were a direct dependency for ThemeManager's core)
+local ThemeManager = nil
+if FontManager then
+    ThemeManager = GetAndLoadModule(ThemeManagerUrl, "ThemeManager", { FontManager = FontManager })
+else
+    warn("UB-V5-QOL: FontManager failed to load. ThemeManager may not function correctly.")
+end
+
+-- Load ConfigManagerModule (can be passed ThemeManager or other components if needed later)
+local ConfigManagerModule = GetAndLoadModule(ConfigManagerUrl, "ConfigManagerModule")
+
 
 -- Critical Check: If any essential module failed, the library cannot function.
 if not FontManager or not IconManager or not ConfigManagerModule or not ThemeManager then
-    warn("UB-V5-QOL: One or more core modules failed to load locally. Library may not function correctly.")
+    warn("UB-V5-QOL: One or more core modules failed to load. Library may not function correctly.")
     -- Depending on desired behavior, could return an empty UBHubLib or error out.
     -- For now, it will proceed, and parts of the UI requiring the missing module will error later.
 end

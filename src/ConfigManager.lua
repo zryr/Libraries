@@ -1,7 +1,8 @@
 -- ConfigManager.lua
-local HttpService = game:GetService("HttpService")
+return function(dependencies)
+    local HttpService = game:GetService("HttpService")
 
-local ConfigManager = {
+    local ConfigManager = {
     CurrentMode = "Legacy", -- "Legacy" or "Normal"
     CurrentConfigName = "default_config",
     Flags = {}, -- This will hold the actual configuration data
