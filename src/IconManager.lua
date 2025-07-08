@@ -99,4 +99,4 @@ end
 
 
 return IconManager
-end)
+end

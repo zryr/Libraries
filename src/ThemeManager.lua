@@ -250,4 +250,4 @@ end
 ThemeManager.CurrentTheme = ThemeManager.Themes.Default -- Ensure CurrentTheme is set
 
 return ThemeManager
-end)
+end

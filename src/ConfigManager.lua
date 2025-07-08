@@ -336,4 +336,4 @@ end
 
 
 return ConfigManager
-end)
+end
