@@ -1232,7 +1232,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 
 		ScrollTab.Size = UDim2.new(1,0,1, -totalReservedHeight - LayersTabLayout.Padding.Offset*2 )
-		LayersTab.CanvasSize = UDim2.fromOffset(0, LayersTabLayout.AbsoluteContentSize.Y)
+		ScrollTab.CanvasSize = UDim2.fromOffset(0, LayersTabLayout.AbsoluteContentSize.Y) -- Changed LayersTab to ScrollTab
 	end
 	Info:GetPropertyChangedSignal("AbsoluteSize"):Connect(AdjustScrollTabSize)
 	StaticTabsContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(AdjustScrollTabSize)
