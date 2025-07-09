@@ -38,7 +38,7 @@ local function GetAndLoadModule(url, moduleNameForWarning, dependencies)
     local execSuccess, module = pcall(factoryFunction, dependencies)
 
     if not execSuccess or module == nil then -- Check if module is nil explicitly
-        warn("Execution of module factory failed or module is nil for " .. moduleNameForWarning .. ": " .. module) -- Changed tostring(module) to module for better error from pcall
+        warn("Execution of module factory failed or module is nil for " .. moduleNameForWarning .. ": " .. module)
         return nil
     end
     return module
@@ -214,7 +214,6 @@ UBHubLib.isEditMode = false
 UBHubLib.SearchableElements = {}
 UBHubLib.DraggableObjectsState = {}
 
--- Moved function definitions before MakeGui
 function UBHubLib:CreateInternalSectionItems(parentFrameForItems, tabObjForSearch, sectionObjForSearch)
 	local scopedItems = {}
 	local scopedItemCount = 0
@@ -233,23 +232,23 @@ function UBHubLib:CreateInternalSectionItems(parentFrameForItems, tabObjForSearc
 
 	scopedItems.AddParagraph = function(cfg)
 		local pFrame = Instance.new("TextLabel")
-		pFrame.Name = cfg.Title or "InternalParagraph"
-		pFrame.Text = cfg.Content or cfg.Title
+		pFrame.Name = tostring(cfg.Title or "InternalParagraph")
+		pFrame.Text = tostring(cfg.Content or cfg.Title)
 		pFrame.Size = UDim2.new(1,0,0,0); pFrame.AutomaticSize = Enum.AutomaticSize.Y
 		pFrame.TextWrapped = true; pFrame.TextXAlignment = Enum.TextXAlignment.Left
 		ThemeManager.AddThemedObject(pFrame, { TextColor3 = "Text", FontFace = cfg.IsHeader and "Title" or "Default" })
 		pFrame.LayoutOrder = scopedItemCount; pFrame.Parent = parentFrameForItems;
 		scopedItemCount = scopedItemCount + 1
 		registerSearchable(cfg, pFrame, "Paragraph", {})
-		return {Set = function(_,newCfg) pFrame.Text = newCfg.Content or newCfg.Title end}
+		return {Set = function(_,newCfg) pFrame.Text = tostring(newCfg.Content or newCfg.Title) end}
 	end
 
 	scopedItems.AddButton = function(cfg)
-		local btnFrame = Instance.new("Frame"); btnFrame.Name = cfg.Title or "InternalButton"; btnFrame.Size = UDim2.new(1,0,0,35); btnFrame.BackgroundTransparency=1; btnFrame.LayoutOrder=scopedItemCount; btnFrame.Parent = parentFrameForItems;
-		local actualBtn = Instance.new("TextButton"); actualBtn.Text = cfg.Title; actualBtn.Size=UDim2.new(cfg.FullWidth and 1 or 0, cfg.WidthOffset or (cfg.FullWidth and 0 or 100) ,1,0); actualBtn.Parent=btnFrame;
+		local btnFrame = Instance.new("Frame"); btnFrame.Name = tostring(cfg.Title or "InternalButton"); btnFrame.Size = UDim2.new(1,0,0,35); btnFrame.BackgroundTransparency=1; btnFrame.LayoutOrder=scopedItemCount; btnFrame.Parent = parentFrameForItems;
+		local actualBtn = Instance.new("TextButton"); actualBtn.Text = tostring(cfg.Title); actualBtn.Size=UDim2.new(cfg.FullWidth and 1 or 0, cfg.WidthOffset or (cfg.FullWidth and 0 or 100) ,1,0); actualBtn.Parent=btnFrame;
 		ThemeManager.AddThemedObject(actualBtn, {BackgroundColor3= (cfg.Variant=="Primary" and "Accent" or "ElementBackground"), TextColor3="Text", FontFace="Button", CornerRadius="SmallCornerRadius"});
 		if cfg.Icon then
-			local icon = Instance.new("ImageLabel"); icon.Size=UDim2.fromOffset(16,16); IconManager.ApplyIcon(icon, "Lucide", cfg.Icon); icon.Parent=actualBtn; icon.LayoutOrder=1; actualBtn.Text = " "..actualBtn.Text;
+			local icon = Instance.new("ImageLabel"); icon.Size=UDim2.fromOffset(16,16); IconManager.ApplyIcon(icon, "Lucide", cfg.Icon); icon.Parent=actualBtn; icon.LayoutOrder=1; actualBtn.Text = " "..tostring(actualBtn.Text); -- Ensure this is also tostring if cfg.Title was complex
 		end
 		if cfg.Callback then actualBtn.Activated:Connect(cfg.Callback) end
 		registerSearchable(cfg, btnFrame, "Button", {})
@@ -258,10 +257,10 @@ function UBHubLib:CreateInternalSectionItems(parentFrameForItems, tabObjForSearc
 
 	scopedItems.AddToggle = function(cfg)
 		local funcObj = {Value = cfg.Default or false}
-		local toggleFrame = Instance.new("Frame"); toggleFrame.Name=cfg.Title or "InternalToggle"; toggleFrame.Size=UDim2.new(1,0,0,35); toggleFrame.BackgroundTransparency=1; toggleFrame.LayoutOrder=scopedItemCount; toggleFrame.Parent=parentFrameForItems;
+		local toggleFrame = Instance.new("Frame"); toggleFrame.Name = tostring(cfg.Title or "InternalToggle"); toggleFrame.Size=UDim2.new(1,0,0,35); toggleFrame.BackgroundTransparency=1; toggleFrame.LayoutOrder=scopedItemCount; toggleFrame.Parent=parentFrameForItems;
 		local layout = Instance.new("UIListLayout"); layout.FillDirection=Enum.FillDirection.Horizontal; layout.VerticalAlignment=Enum.VerticalAlignment.Center; layout.Padding=ThemeManager.GetSize("SmallPadding"); layout.Parent=toggleFrame;
 		if cfg.Icon then local icon = Instance.new("ImageLabel"); icon.Size=UDim2.fromOffset(18,18); IconManager.ApplyIcon(icon, "Lucide", cfg.Icon); icon.Parent=toggleFrame; ThemeManager.AddThemedObject(icon, {ImageColor3="Icon"}); end
-		local lbl = Instance.new("TextLabel"); lbl.Text=cfg.Title; lbl.Size=UDim2.new(1, -50-(cfg.Icon and 22 or 0),1,0);ThemeManager.AddThemedObject(lbl, {TextColor3="Text"}); lbl.Parent=toggleFrame;
+		local lbl = Instance.new("TextLabel"); lbl.Text=tostring(cfg.Title); lbl.Size=UDim2.new(1, -50-(cfg.Icon and 22 or 0),1,0);ThemeManager.AddThemedObject(lbl, {TextColor3="Text"}); lbl.Parent=toggleFrame;
 		local switch = Instance.new("TextButton"); switch.Size=UDim2.fromOffset(40,20); switch.Text=""; ThemeManager.AddThemedObject(switch, {BackgroundColor3=funcObj.Value and "ThemeHighlight" or "Stroke", CornerRadius="Full"}); switch.Parent=toggleFrame;
 		local thumb = Instance.new("Frame"); thumb.Size=UDim2.fromOffset(16,16); thumb.Position=UDim2.new(funcObj.Value and 0.75 or 0.25,0,0.5,0); ThemeManager.AddThemedObject(thumb,{BackgroundColor3="Text", CornerRadius="Full"}); thumb.Parent=switch;
 
@@ -284,11 +283,11 @@ function UBHubLib:CreateInternalSectionItems(parentFrameForItems, tabObjForSearc
 
 	scopedItems.AddInput = function(cfg)
 		local funcObj = {Value = cfg.Default or ""}
-		local inputFrame = Instance.new("Frame"); inputFrame.Name=cfg.Title or "InternalInput"; inputFrame.Size=UDim2.new(1,0,0,35); inputFrame.BackgroundTransparency=1; inputFrame.LayoutOrder=scopedItemCount; inputFrame.Parent=parentFrameForItems;
+			local inputFrame = Instance.new("Frame"); inputFrame.Name=tostring(cfg.Title or "InternalInput"); inputFrame.Size=UDim2.new(1,0,0,35); inputFrame.BackgroundTransparency=1; inputFrame.LayoutOrder=scopedItemCount; inputFrame.Parent=parentFrameForItems;
 		local layout=Instance.new("UIListLayout");layout.FillDirection=Enum.FillDirection.Horizontal;layout.Padding=ThemeManager.GetSize("SmallPadding");layout.VerticalAlignment=Enum.VerticalAlignment.Center; layout.Parent=inputFrame;
 		if cfg.Icon then local icon=Instance.new("ImageLabel");icon.Size=UDim2.fromOffset(18,18);IconManager.ApplyIcon(icon,"Lucide",cfg.Icon);icon.Parent=inputFrame;ThemeManager.AddThemedObject(icon,{ImageColor3="Icon"});end
-		local lbl=Instance.new("TextLabel");lbl.Text=cfg.Title;lbl.Size=UDim2.new(0,100,1,0);ThemeManager.AddThemedObject(lbl,{TextColor3="Text"});lbl.Parent=inputFrame;
-		local tb=Instance.new("TextBox");tb.Text=funcObj.Value;tb.PlaceholderText=cfg.PlaceholderText or "";tb.Size=UDim2.new(1,-(110+(cfg.Icon and 22 or 0)),1,0);ThemeManager.AddThemedObject(tb,{BackgroundColor3="InputBackground",TextColor3="Text",CornerRadius="SmallCornerRadius"});tb.Parent=inputFrame;
+			local lbl=Instance.new("TextLabel");lbl.Text=tostring(cfg.Title);lbl.Size=UDim2.new(0,100,1,0);ThemeManager.AddThemedObject(lbl,{TextColor3="Text"});lbl.Parent=inputFrame;
+			local tb=Instance.new("TextBox");tb.Text=tostring(funcObj.Value);tb.PlaceholderText=tostring(cfg.PlaceholderText or "");tb.Size=UDim2.new(1,-(110+(cfg.Icon and 22 or 0)),1,0);ThemeManager.AddThemedObject(tb,{BackgroundColor3="InputBackground",TextColor3="Text",CornerRadius="SmallCornerRadius"});tb.Parent=inputFrame;
 
 		funcObj.Set = function(val, silent)
 			if funcObj.Value == val then return end
@@ -305,10 +304,10 @@ function UBHubLib:CreateInternalSectionItems(parentFrameForItems, tabObjForSearc
 
 	scopedItems.AddDropdown = function(cfg)
 		local funcObj = {Value = cfg.Default}
-		local ddFrame = Instance.new("Frame"); ddFrame.Name=cfg.Title or "InternalDropdown"; ddFrame.Size=UDim2.new(1,0,0,35); ddFrame.BackgroundTransparency=1; ddFrame.LayoutOrder=scopedItemCount; ddFrame.Parent=parentFrameForItems;
+		local ddFrame = Instance.new("Frame"); ddFrame.Name=tostring(cfg.Title or "InternalDropdown"); ddFrame.Size=UDim2.new(1,0,0,35); ddFrame.BackgroundTransparency=1; ddFrame.LayoutOrder=scopedItemCount; ddFrame.Parent=parentFrameForItems;
 		local layout=Instance.new("UIListLayout");layout.FillDirection=Enum.FillDirection.Horizontal;layout.Padding=ThemeManager.GetSize("SmallPadding");layout.VerticalAlignment=Enum.VerticalAlignment.Center;layout.Parent=ddFrame;
 		if cfg.Icon then local icon=Instance.new("ImageLabel");icon.Size=UDim2.fromOffset(18,18);IconManager.ApplyIcon(icon,"Lucide",cfg.Icon);icon.Parent=ddFrame;ThemeManager.AddThemedObject(icon,{ImageColor3="Icon"});end
-		local title = Instance.new("TextLabel");title.Text=cfg.Title;title.Size=UDim2.new(0,100,1,0);ThemeManager.AddThemedObject(title,{TextColor3="Text"});title.Parent=ddFrame;
+		local title = Instance.new("TextLabel");title.Text=tostring(cfg.Title);title.Size=UDim2.new(0,100,1,0);ThemeManager.AddThemedObject(title,{TextColor3="Text"});title.Parent=ddFrame;
 		local displayBtn = Instance.new("TextButton"); displayBtn.Text=tostring(cfg.Default) or "Select..."; displayBtn.Size=UDim2.new(1,-(110+(cfg.Icon and 22 or 0)+20),1,0);ThemeManager.AddThemedObject(displayBtn,{BackgroundColor3="InputBackground",TextColor3="Text",CornerRadius="SmallCornerRadius"});displayBtn.Parent=ddFrame;
 		local chevron = Instance.new("ImageLabel");chevron.Size=UDim2.fromOffset(16,16);IconManager.ApplyIcon(chevron,"Lucide","chevron-down");ThemeManager.AddThemedObject(chevron,{ImageColor3="Icon"});chevron.Parent=ddFrame;
 
@@ -322,10 +321,10 @@ function UBHubLib:CreateInternalSectionItems(parentFrameForItems, tabObjForSearc
 
 	scopedItems.AddColorPicker = function(cfg)
 		local funcObj = {Value = cfg.Default or Color3.new(1,0,0)}
-		local cpFrame = Instance.new("Frame"); cpFrame.Name=cfg.Title or "InternalColorPicker"; cpFrame.Size=UDim2.new(1,0,0,35); cpFrame.BackgroundTransparency=1; cpFrame.LayoutOrder=scopedItemCount; cpFrame.Parent=parentFrameForItems;
+		local cpFrame = Instance.new("Frame"); cpFrame.Name=tostring(cfg.Title or "InternalColorPicker"); cpFrame.Size=UDim2.new(1,0,0,35); cpFrame.BackgroundTransparency=1; cpFrame.LayoutOrder=scopedItemCount; cpFrame.Parent=parentFrameForItems;
 		local layout=Instance.new("UIListLayout");layout.FillDirection=Enum.FillDirection.Horizontal;layout.Padding=ThemeManager.GetSize("SmallPadding");layout.VerticalAlignment=Enum.VerticalAlignment.Center;layout.Parent=cpFrame;
 		if cfg.Icon then local icon=Instance.new("ImageLabel");icon.Size=UDim2.fromOffset(18,18);IconManager.ApplyIcon(icon,"Lucide",cfg.Icon);icon.Parent=cpFrame;ThemeManager.AddThemedObject(icon,{ImageColor3="Icon"});end
-		local title = Instance.new("TextLabel");title.Text=cfg.Title;title.Size=UDim2.new(1,-(45+(cfg.Icon and 22 or 0)),1,0);ThemeManager.AddThemedObject(title,{TextColor3="Text"});title.Parent=cpFrame;
+		local title = Instance.new("TextLabel");title.Text=tostring(cfg.Title);title.Size=UDim2.new(1,-(45+(cfg.Icon and 22 or 0)),1,0);ThemeManager.AddThemedObject(title,{TextColor3="Text"});title.Parent=cpFrame;
 		local preview = Instance.new("Frame"); preview.Size=UDim2.fromOffset(30,20); preview.BackgroundColor3=funcObj.Value; ThemeManager.AddThemedObject(preview,{BorderColor3="Stroke",CornerRadius="SmallCornerRadius"});preview.Parent=cpFrame;
 		local openBtn = Instance.new("TextButton"); openBtn.Size=UDim2.new(1,0,1,0);openBtn.BackgroundTransparency=1;openBtn.Parent=cpFrame;
 		openBtn.Activated:Connect(function() UBHubLib:MakeNotify({Title="Info", Content="Full color picker UI for theme editing requires using the main AddColorPicker for this item."}) end)
@@ -622,132 +621,6 @@ function UBHubLib:RegisterDependency(options)
 	else
 		warn("RegisterDependency: SourceElement is not a valid UBHubLib element or does not support dependents. SourceElement:", options.SourceElement)
 	end
-end
-
-function UBHubLib:MakeNotify(NotifyConfig)
-	NotifyConfig = NotifyConfig or {}
-	NotifyConfig.Title = NotifyConfig.Title or (ThemeManager.CurrentTheme and ThemeManager.CurrentTheme.Name or "Notification")
-	NotifyConfig.Description = NotifyConfig.Description or "System Message"
-	NotifyConfig.Content = NotifyConfig.Content or "This is a notification."
-	NotifyConfig.Color = NotifyConfig.Color or ThemeManager.GetColor("Primary")
-	NotifyConfig.Time = NotifyConfig.Time or 0.5
-	NotifyConfig.Delay = NotifyConfig.Delay or 5
-	NotifyConfig.BackgroundImage = NotifyConfig.BackgroundImage
-	NotifyConfig.OneTime = NotifyConfig.OneTime or false
-	NotifyConfig.OneTimeId = NotifyConfig.OneTimeId or NotifyConfig.Title .. "_" .. NotifyConfig.Content
-	local NotifyFunction = {}
-	local shownOneTimeNotifications = UBHubLib._shownOneTimeNotifications or {}
-	UBHubLib._shownOneTimeNotifications = shownOneTimeNotifications
-	if NotifyConfig.OneTime and shownOneTimeNotifications[NotifyConfig.OneTimeId] then
-		return NotifyFunction
-	end
-	task.spawn(function()
-		local NotifyGui = CoreGui:FindFirstChild("UBV5_NotifyGui")
-		if not NotifyGui then
-			NotifyGui = Instance.new("ScreenGui");
-			NotifyGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-			NotifyGui.Name = "UBV5_NotifyGui"
-			NotifyGui.Parent = CoreGui
-			ThemeManager.AddThemedObject(NotifyGui, {})
-		end
-		local NotifyLayout = NotifyGui:FindFirstChild("NotifyLayout")
-		if not NotifyLayout then
-			NotifyLayout = Instance.new("Frame");
-			NotifyLayout.AnchorPoint = Vector2.new(1, 1)
-			NotifyLayout.BackgroundTransparency = 1
-			NotifyLayout.BorderSizePixel = 0
-			NotifyLayout.Position = UDim2.new(1, -20, 1, -20)
-			NotifyLayout.Size = UDim2.new(0, 320, 1, -40)
-			NotifyLayout.Name = "NotifyLayout"
-			NotifyLayout.Parent = NotifyGui
-			local listLayout = Instance.new("UIListLayout")
-			listLayout.Padding = UDim.new(0, 5)
-			listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-			listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-			listLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-			listLayout.Parent = NotifyLayout
-			ThemeManager.AddThemedObject(NotifyLayout, {})
-		end
-		local NotifyFrame = Instance.new("Frame")
-		NotifyFrame.Name = NotifyConfig.Title .. "_Notification"
-		NotifyFrame.Size = UDim2.new(1,0,0,65)
-		NotifyFrame.AutomaticSize = Enum.AutomaticSize.Y
-		NotifyFrame.BackgroundTransparency = 0.1
-		NotifyFrame.LayoutOrder = #NotifyLayout:GetChildren() + 1
-		NotifyFrame.Parent = NotifyLayout
-		ThemeManager.AddThemedObject(NotifyFrame, {BackgroundColor3 = "DialogBackground"})
-		if NotifyConfig.BackgroundImage then
-			local BgImage = Instance.new("ImageLabel")
-			BgImage.Name = "NotificationBackgroundImage"
-			BgImage.Image = NotifyConfig.BackgroundImage
-			BgImage.ScaleType = Enum.ScaleType.Slice
-			BgImage.SliceCenter = Rect.new(10,10,118,118)
-			BgImage.Size = UDim2.new(1,0,1,0)
-			BgImage.BackgroundTransparency = 1
-			BgImage.ZIndex = NotifyFrame.ZIndex
-			BgImage.Parent = NotifyFrame
-			NotifyFrame.BackgroundTransparency = 1
-			ThemeManager.AddThemedObject(BgImage, {})
-		end
-		local UICorner = Instance.new("UICorner")
-		ThemeManager.AddThemedObject(UICorner, {CornerRadius = "CornerRadius"})
-		UICorner.Parent = NotifyFrame
-		local TitleLabel = Instance.new("TextLabel")
-		TitleLabel.Name = "TitleLabel"
-		TitleLabel.Size = UDim2.new(1, -20, 0, 20)
-		TitleLabel.Position = UDim2.new(0,10,0,5)
-		TitleLabel.Text = NotifyConfig.Title
-		TitleLabel.TextSize = 16
-		TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-		TitleLabel.BackgroundTransparency = 1
-		TitleLabel.Parent = NotifyFrame
-		ThemeManager.AddThemedObject(TitleLabel, {TextColor3 = "Text", FontFace = "Title"})
-		ThemeManager.ApplyFontToElement(TitleLabel, "Title")
-		local ContentLabel = Instance.new("TextLabel")
-		ContentLabel.Name = "ContentLabel"
-		ContentLabel.Size = UDim2.new(1, -20, 0, 0)
-		ContentLabel.AutomaticSize = Enum.AutomaticSize.Y
-		ContentLabel.Position = UDim2.new(0,10,0,25)
-		ContentLabel.Text = NotifyConfig.Content
-		ContentLabel.TextColor3 = ThemeManager.GetColor("Text")
-		ContentLabel.TextSize = 14
-		ContentLabel.TextWrapped = true
-		ContentLabel.TextXAlignment = Enum.TextXAlignment.Left
-		ContentLabel.BackgroundTransparency = 1
-		ContentLabel.Parent = NotifyFrame
-		ThemeManager.AddThemedObject(ContentLabel, {TextColor3 = "Text", FontFace = "Default"})
-		ThemeManager.ApplyFontToElement(ContentLabel, "Default")
-		NotifyFrame.Size = UDim2.new(1,0,0, ContentLabel.Position.Y.Offset + ContentLabel.TextBounds.Y + 5)
-		local CloseButton = Instance.new("TextButton")
-		CloseButton.Name = "CloseNotify"
-		CloseButton.Size = UDim2.new(0,15,0,15)
-		CloseButton.AnchorPoint = Vector2.new(1,0)
-		CloseButton.Position = UDim2.new(1,-5,0,5)
-		CloseButton.Text = ""
-		CloseButton.BackgroundTransparency = 1
-		IconManager.ApplyIcon(CloseButton, "Lucide", "x")
-		ThemeManager.AddThemedObject(CloseButton, {ImageColor3 = "Text"})
-		CloseButton.Parent = NotifyFrame
-		local isClosing = false
-		function NotifyFunction:Close()
-			if isClosing or not NotifyFrame.Parent then return end
-			isClosing = true
-			if NotifyConfig.OneTime then
-				shownOneTimeNotifications[NotifyConfig.OneTimeId] = true
-			end
-			TweenService:Create(NotifyFrame, TweenInfo.new(NotifyConfig.Time * 0.3), {GroupTransparency = 1}):Play()
-			task.delay(NotifyConfig.Time * 0.3, function()
-				if NotifyFrame and NotifyFrame.Parent then NotifyFrame:Destroy() end
-			end)
-		end
-		CloseButton.Activated:Connect(NotifyFunction.Close)
-		NotifyFrame.GroupTransparency = 1
-		TweenService:Create(NotifyFrame, TweenInfo.new(NotifyConfig.Time * 0.3), {GroupTransparency = 0}):Play()
-		task.delay(NotifyConfig.Delay, function()
-			NotifyFunction:Close()
-		end)
-	end)
-	return NotifyFunction
 end
 
 function UBHubLib:MakeGui(GuiConfig)
@@ -1136,6 +1009,14 @@ function UBHubLib:MakeGui(GuiConfig)
 	IconManager.ApplyIcon(CloseButton, "Lucide", "x")
 	ThemeManager.AddThemedObject(CloseButton, {ImageColor3 = "Text"})
 	CloseButton.Parent = Top
+	CloseButton.Activated:Connect(function()
+		CircleClick(CloseButton, Mouse.X, Mouse.Y)
+		UBHubGui.Enabled = false -- Disable the ScreenGui to hide it
+		if BlurEffect and BlurEffect.Parent and not UBHubLib.isEditMode and not SearchOverlay.Visible then
+			TweenService:Create(BlurEffect, TweenInfo.new(0.3), {Size = 0}):Play()
+			task.delay(0.3, function() if BlurEffect and BlurEffect.Parent then BlurEffect.Enabled = false end end)
+		end
+	end)
 
 	local MinButton = Instance.new("ImageButton")
 	MinButton.Name = "MinButton"
@@ -1368,7 +1249,7 @@ function UBHubLib:MakeGui(GuiConfig)
 		if infoHeight > 0 and staticTabsHeight > 0 then totalReservedHeight = totalReservedHeight + LayersTabLayout.Padding.Offset end
 		if infoHeight > 0 and StaticTabsContainer:GetChildren()[2] then totalReservedHeight = totalReservedHeight + LayersTabLayout.Padding.Offset end
 		ScrollTab.Size = UDim2.new(1,0,1, -totalReservedHeight - LayersTabLayout.Padding.Offset*2 )
-		ScrollTab.CanvasSize = UDim2.fromOffset(0, LayersTabLayout.AbsoluteContentSize.Y) -- Changed LayersTab to ScrollTab
+		ScrollTab.CanvasSize = UDim2.fromOffset(0, LayersTabLayout.AbsoluteContentSize.Y)
 	end
 	Info:GetPropertyChangedSignal("AbsoluteSize"):Connect(AdjustScrollTabSize)
 	StaticTabsContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(AdjustScrollTabSize)
@@ -2976,3 +2857,5 @@ UBHubLib.ConfigManagerModule = ConfigManagerModule
 UBHubLib.ThemeManager = ThemeManager
 
 return UBHubLib
+
+[end of UB-V5-QOL.lua]
