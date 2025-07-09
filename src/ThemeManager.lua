@@ -66,7 +66,6 @@ return function(dependencies)
             TextSize = 14,
             SmallTextSize = 12,
             TitleTextSize = 16,
-            Full = UDim.new(0.5, 0), -- For pill shape corner radius
         }
     },
     -- Add more themes here later, e.g., Light, VapeV4 inspired
@@ -123,29 +122,8 @@ end
 
 function ThemeManager.ApplySizeToElement(element, sizeType, propertyName)
     local sizeValue = ThemeManager.CurrentTheme.Sizes[sizeType]
-    if sizeValue == nil then
-        warn("ThemeManager.ApplySizeToElement: SizeType '" .. tostring(sizeType) .. "' not found in theme sizes.")
-        return
-    end
-
-    if propertyName == "CornerRadius" then
-        if typeof(sizeValue) == "UDim" then
-            local uiCorner = element:FindFirstChildWhichIsA("UICorner")
-            if not uiCorner then
-                uiCorner = Instance.new("UICorner")
-                uiCorner.Parent = element
-            end
-            if uiCorner.CornerRadius ~= sizeValue then
-                uiCorner.CornerRadius = sizeValue
-            end
-        else
-            warn("ThemeManager.ApplySizeToElement: CornerRadius value for sizeType '" .. tostring(sizeType) .. "' is not a UDim. Got: " .. typeof(sizeValue))
-        end
-    else
-        -- Original behavior for other properties
-        if element[propertyName] ~= sizeValue then
-            element[propertyName] = sizeValue
-        end
+    if sizeValue and element[propertyName] ~= sizeValue then
+        element[propertyName] = sizeValue
     end
 end
 
@@ -196,43 +174,18 @@ function ThemeManager.AddThemedObject(obj, propertiesToTheme)
 end
 
 function ThemeManager.ApplyThemeToObject(obj, properties)
-    for property, themeKeyOrValue in pairs(properties) do
-        local pLower = property:lower()
-        if pLower:match("color") then
-            -- Assumes themeKeyOrValue is a string (theme key) for colors
-            ThemeManager.ApplyColorToElement(obj, themeKeyOrValue, property)
-        elseif pLower:match("font") then
-            -- Assumes themeKeyOrValue is a string (font type like "Title", "Default")
-            ThemeManager.ApplyFontToElement(obj, themeKeyOrValue)
-        elseif pLower:match("size") or pLower:match("radius") or pLower:match("padding") or pLower:match("thickness") then
-            if type(themeKeyOrValue) == "string" then
-                -- It's a theme key string, use ApplySizeToElement which looks up in Theme.Sizes
-                ThemeManager.ApplySizeToElement(obj, themeKeyOrValue, property)
-            else
-                -- It's a direct value (number or UDim)
-                if property == "CornerRadius" then
-                    if typeof(themeKeyOrValue) == "UDim" then
-                        local uiCorner = obj:FindFirstChildWhichIsA("UICorner")
-                        if not uiCorner then
-                            uiCorner = Instance.new("UICorner")
-                            uiCorner.Parent = obj
-                        end
-                        if uiCorner.CornerRadius ~= themeKeyOrValue then
-                           uiCorner.CornerRadius = themeKeyOrValue
-                        end
-                    else
-                        warn("ThemeManager: Direct CornerRadius value for " .. obj.Name .. " is not UDim. Got: " .. typeof(themeKeyOrValue))
-                    end
-                elseif obj[property] ~= themeKeyOrValue then -- For other direct size values like Thickness = 1
-                    obj[property] = themeKeyOrValue
-                end
-            end
+    for property, themeKey in pairs(properties) do
+        if property:lower():match("color") then
+            ThemeManager.ApplyColorToElement(obj, themeKey, property)
+        elseif property:lower():match("font") then -- e.g. FontFace, Font
+            ThemeManager.ApplyFontToElement(obj, themeKey) -- themeKey here is the font type like "Title"
+        elseif property:lower():match("size") or property:lower():match("radius") or property:lower():match("padding") or property:lower():match("thickness") then
+            ThemeManager.ApplySizeToElement(obj, themeKey, property)
         else
-            -- Fallback for other properties not explicitly handled above.
-            -- This assumes themeKeyOrValue is the actual value to be set.
-            -- This might need more specific handlers if complex types or lookups are needed.
-            if obj[property] ~= themeKeyOrValue then
-                 obj[property] = themeKeyOrValue
+            -- For other properties, assume direct value from theme (e.g. Sizes table)
+            local value = ThemeManager.CurrentTheme.Sizes[themeKey] or ThemeManager.CurrentTheme.Colors[themeKey] -- or other theme tables
+            if value ~= nil and obj[property] ~= value then
+                 obj[property] = value
             end
         end
     end
@@ -297,4 +250,3 @@ end
 ThemeManager.CurrentTheme = ThemeManager.Themes.Default -- Ensure CurrentTheme is set
 
 return ThemeManager
-end

@@ -1,394 +1,283 @@
--- Comprehensive Example Script for UB-V5-QOL Library Refactor
+-- UB-V5-QOL_Example.lua
+-- This script demonstrates the features of the refactored UB-V5-QOL.lua library.
 
 print("UB-V5-QOL Example Script Loaded")
 
--- Wait for the game to be fully loaded (especially for services)
-if not game:IsLoaded() then
-    game.Loaded:Wait()
+-- Wait for services to load, especially in studio
+if game:GetService("RunService"):IsStudio() then
+    task.wait(2)
 end
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local localPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage") -- Or wherever your library is
+local UBHubLib = require(script.Parent["UB-V5-QOL"]) -- Assuming the example is a child of the library's parent folder
 
--- Assuming the library is a child of this script or in a known location
--- Load the library from the specified GitHub URL
-local LibraryURL = "https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jully/UB-V5-QOL.lua"
-local success, libraryModule = pcall(function()
-    return loadstring(game:HttpGet(LibraryURL))()
-end)
-
-if not success or not libraryModule then
-    warn("Failed to load UB-V5-QOL library from URL. Error:", libraryModule)
-    -- Fallback or error handling if needed, for now, script might not function fully.
-    -- For testing, you might want a local require as a fallback:
-    -- UBHubLib = require(script.Parent["UB-V5-QOL"])
+if not UBHubLib then
+    warn("Failed to load UB-V5-QOL library!")
     return
 end
 
-local UBHubLib = libraryModule
-
--- Access managers exposed by UBHubLib
-local ThemeManager = UBHubLib.ThemeManager
-local FontManager = UBHubLib.FontManager
-local IconManager = UBHubLib.IconManager
--- ConfigManager is typically used via window.ConfigManager or UBHubLib.ConfigManager (instance)
-
-if not ThemeManager then warn("Example Script: ThemeManager not found on UBHubLib!") end
-if not FontManager then warn("Example Script: FontManager not found on UBHubLib!") end
-if not IconManager then warn("Example Script: IconManager not found on UBHubLib!") end
-
 --[[
-    Task #5, Step 4: Final Verification Requirement:
-    Produce a single, comprehensive example script. This script must serve as a
-    complete test bed for the library. It must create a window and demonstrate
-    the functionality of every major feature implemented in this project plan.
+    Task #5: Final Verification Requirement:
+    *   Jules, upon completing all tasks, you are required to produce a single, comprehensive example script.
+    *   This script must serve as a complete test bed for the library. It must create a window and demonstrate
+    *   the functionality of every major feature implemented in this project plan, including:
+        *   The dual-mode config system (Legacy and Normal).
+        *   The on-demand, animated Search feature.
+        *   The Edit Mode with draggable and resizable quick-toggles.
+        *   Advanced dropdowns, showing the selection prioritization.
+        *   Conditional/locked elements using the Dependency system.
+        *   The "Customize" panel with theme and color-picking options.
+        *   All new and enhanced element types.
 ]]
 
--- Register a custom font (optional, for demonstration)
--- FontManager.RegisterFont("ComicSans", "rbxassetid://FONT_ID_HERE") -- Replace with an actual font ID if desired
-
 -- Create the main window
-local window = UBHubLib:MakeGui({
-    NameHub = "UBV5 Refactor Showcase",
-    Description = "Demonstrating new features",
-    Size = UDim2.fromOffset(600, 450),
-    -- SaveFolder will use the default "UBV5_Settings"
+local Window = UBHubLib:MakeGui({
+    NameHub = "UB-V5 Refactor Showcase",
+    Description = "Testing all new features!",
+    Color = Color3.fromRGB(255, 0, 127), -- Example color for the window title stroke
+    ["Tab Width"] = 150,
+    ["SaveFolder"] = "UBV5_Refactor_Settings" -- Crucial for ConfigManager
 })
 
--- Access the window's specific ConfigManager
-local windowConfig = window.ConfigManager
-if not windowConfig then
-    warn("Example: Could not get window.ConfigManager. Some features might not save/load correctly.")
-    -- Create a dummy if needed for the script to run without erroring further
-    windowConfig = {
-        SaveSetting = function(k,v) print("Dummy SaveSetting:",k,v) end,
-        LoadSetting = function(k,d) print("Dummy LoadSetting:",k); return d end,
-        RegisterElement = function() end,
-        SetMode = function() end,
-        CreateConfig = function() end,
-        LoadConfig = function() end,
-        DeleteConfig = function() end,
-        ExportConfig = function() end,
-		_PersistFlags = function() end,
-    }
+if not Window then
+    warn("Failed to create UB-V5-QOL Window!")
+    return
+end
+
+-- Access ConfigManager (assuming it's attached to the window object or accessible via UBHubLib)
+local ConfigManagerInstance = Window.ConfigManager
+if not ConfigManagerInstance then
+    -- Fallback if it's not directly on the window, try to get it from the library module itself
+    -- This part depends on how ConfigManager is exposed by UB-V5-QOL's MakeGui
+    -- For now, we assume it's part of the returned Window object or UBHubLib.GlobalConfigManager
+    warn("ConfigManager not found on Window object. Attempting to access globally if available.")
+    -- ConfigManagerInstance = UBHubLib.GlobalConfigManager (example)
+    -- If still not found, many config tests will fail.
 end
 
 
--- == Section: Main Features & Elements ==
-local mainTab = window:CreateTab({Name = "Main Demo", Icon = "home"})
-local sectionFeatures = mainTab:AddSection("Core Features & Elements")
+-- == Task #1: Core Systems & Architectural Overhaul Demonstrations ==
+local CoreSystemTab = Window:CreateTab({ Name = "Core Systems", Icon = "Lucide/box" })
+local ThemeSection = CoreSystemTab:AddSection("Theming & Icons")
 
--- Paragraph with Image and Buttons
-sectionFeatures:AddParagraph({
-    Title = "Enhanced Paragraph",
-    Content = "This paragraph demonstrates support for an optional icon and buttons below the content. Great for important messages or calls to action.",
-    Image = "info", -- Lucide icon name
-    ImageLib = "Lucide",
-    Buttons = {
-        {Text = "More Info", Callback = function() print("More Info button clicked!") end},
-        {Text = "Dismiss", Callback = function() print("Dismiss button clicked!") end}
-    }
-})
+ThemeSection:AddParagraph({Title = "Icon Test", Content = "Lucide 'activity' and Craft 'cog-settings-01-stroke'"})
+-- We'll add actual icons to elements later to test IconManager fully.
 
-sectionFeatures:AddDivider()
-
--- Advanced Toggles (Switch and Checkbox)
-local mainToggle = sectionFeatures:AddToggle({
-    Title = "Main Feature Toggle (Switch)",
-    Default = false,
-    Flag = "MainFeatureToggle",
-    Icon = "power",
-    CanQuickToggle = true, -- Enable quick toggle creation
-    Callback = function(value)
-        print("Main Feature Toggle changed to:", value)
-        UBHubLib:MakeNotify({Title = "Main Toggle", Content = "State: " .. tostring(value)})
+ThemeSection:AddColorPicker({
+    Title = "Primary Color Picker",
+    DefaultColor = UBHubLib.ThemeManager.GetColor("Primary"), -- Assuming ThemeManager is exposed
+    EnableTransparency = false,
+    Callback = function(newColor, newTrans)
+        print("Primary Color Picker Changed:", newColor)
+        UBHubLib.ThemeManager.UpdateThemeColorValue("Primary", newColor)
+        -- Note: Full live update of all elements depends on ThemeManager.ReapplyCurrentTheme()
+        -- and how elements are registered with ThemeManager.
     end
 })
 
-local checkboxToggle = sectionFeatures:AddToggle({
-    Title = "Checkbox Style Toggle",
+
+-- == Task #2: Advanced Element & Component Implementation Demonstrations ==
+local AdvancedElementsTab = Window:CreateTab({ Name = "Adv. Elements", Icon = "Lucide/toy-brick" })
+
+-- 1. Enhanced Paragraphs & Notifications
+local ParagraphsSection = AdvancedElementsTab:AddSection("Paragraphs & Notifications")
+local dynamicParagraph = ParagraphsSection:AddParagraph({
+    Title = "Dynamic Paragraph",
+    Content = "This paragraph will change.",
+})
+ParagraphsSection:AddButton({Title="Update Paragraph", Callback = function()
+    dynamicParagraph:Set({Title = "Updated Title!", Content = "Content has been updated dynamically."})
+end})
+
+ParagraphsSection:AddParagraph({
+    Title = "Paragraph w/ Image",
+    Content = "This one has a Lucide 'bell' icon.",
+    Image = "Lucide/bell"
+})
+
+ParagraphsSection:AddParagraph({
+    Title = "Paragraph w/ Buttons",
+    Content = "Click these!",
+    Buttons = {
+        {Text = "Btn1", Icon = "Lucide/star", Callback = function() UBHubLib:MakeNotify({Title="Button 1 Clicked"}) end},
+        {Text = "Btn2", Callback = function() UBHubLib:MakeNotify({Title="Button 2 Clicked"}) end}
+    }
+})
+
+ParagraphsSection:AddButton({Title = "One-Time Notify", Callback = function()
+    UBHubLib:MakeNotify({
+        Title = "One-Time Special",
+        Content = "You should only see this once per session/save.",
+        OneTime = true,
+        BackgroundImage = "rbxassetid://6015897843" -- Example dropshadow image as background
+    })
+end})
+ParagraphsSection:AddButton({Title = "Normal Notify", Callback = function()
+    UBHubLib:MakeNotify({Title = "Standard Notification", Content = "This can appear multiple times."})
+end})
+
+
+-- 2. Advanced Toggles & Dialogs
+local TogglesDialogsSection = AdvancedElementsTab:AddSection("Toggles & Dialogs")
+TogglesDialogsSection:AddToggle({ Title = "Standard Toggle", Default = false, Content = "A normal switch."})
+local checkboxToggle = TogglesDialogsSection:AddToggle({
+    Title = "Checkbox Style",
+    Default = true,
+    Content = "This is a checkbox.",
+    Style = "Checkbox"
+})
+TogglesDialogsSection:AddToggle({
+    Title = "Toggle w/ Icon",
+    Default = false,
+    Icon = "Lucide/settings-2",
+    Content = "Switch with an icon."
+})
+TogglesDialogsSection:AddToggle({
+    Title = "Checkbox w/ Icon",
     Default = true,
     Style = "Checkbox",
-    Flag = "CheckboxFeature",
-    Icon = "check-square",
-    Callback = function(value)
-        print("Checkbox Feature changed to:", value)
-    end
-})
-sectionFeatures:AddDivider()
-
--- Slider
-local exampleSlider = sectionFeatures:AddSlider({
-    Title = "Example Slider",
-    Min = 0,
-    Max = 100,
-    Default = 50,
-    Round = true,
-    Suffix = "%",
-    Icon = "sliders-horizontal",
-    Flag = "ExampleSliderValue",
-    Callback = function(value)
-        print("Slider value changed to:", value)
-    end
+    Icon = "Lucide/star",
+    Content = "Checkbox with an icon."
 })
 
--- Input
-local exampleInput = sectionFeatures:AddInput({
-    Title = "Text Input",
-    Default = "Hello World",
-    Placeholder = "Enter some text...",
-    Icon = "edit-3",
-    Flag = "ExampleInputValue",
-    Callback = function(value)
-        print("Input value changed to:", value)
-    end
-})
-sectionFeatures:AddDivider()
-
--- Dropdown (Advanced behavior will be tested by opening/closing)
-local exampleDropdown = sectionFeatures:AddDropdown({
-    Title = "Select Option(s)",
-    MultiSelect = true,
-    Icon = "chevron-down",
-    Flag = "ExampleDropdownValue",
-    Options = {
-        {Name = "Option Alpha", Value = "alpha", Icon = "a-large-small"},
-        {Name = "Option Beta", Value = "beta", Icon = "b-large-small"},
-        {Name = "Option Gamma", Value = "gamma", Icon = "greek-cross"},
-        {Name = "Option Delta", Value = "delta", Icon = "delta"},
-        {Name = "Option Epsilon", Value = "epsilon", Icon = "pilcrow"},
-        {Name = "Another Option", Value = "another"},
-        {Name = "Yet Another", Value = "yetanother", Icon = "star"},
-    },
-    Default = {"beta", "delta"}, -- Default selected for multi-select
-    Callback = function(value)
-        print("Dropdown value changed to:")
-        for _, v in pairs(value) do print("- ", v) end
-    end
-})
-
--- Color Picker Button
-local exampleColorPicker = sectionFeatures:AddColorPicker({
-    Title = "Choose Accent Color",
-    Default = ThemeManager.GetColor("Accent") or Color3.fromRGB(255,80,0),
-    Flag = "ExampleAccentColor", -- Will be saved as {R,G,B,A} table
-    Callback = function(color, alpha)
-        print("Color Picker changed to:", color, "Alpha:", alpha)
-        -- Example of using it to change a theme color live
-        ThemeManager.UpdateThemeColorValue("Accent", color)
-        -- Note: Alpha from color picker isn't directly used by UpdateThemeColorValue which expects Color3
-        -- If elements need transparency, it should be handled by their specific properties.
-    end
-})
-
-
--- == Section: Conditional Logic & Dependencies ==
-local dependencySection = mainTab:AddSection("Dependencies & Conditional UI")
-
-local conditionToggle = dependencySection:AddToggle({
-    Title = "Enable Dependent Elements",
-    Default = false,
-    Flag = "ConditionToggle",
-    Icon = "toggle-left"
-})
-
-dependencySection:AddParagraph({ Content = "The elements below depend on the toggle above."})
-
-local dependentButton = dependencySection:AddButton({
-    Title = "Visible if Toggle is ON",
-    Icon = "eye",
-    Callback = function() print("Dependent Button Clicked!") end,
-    Dependency = {
-        Element = conditionToggle, -- The toggle object itself
-        Value = true,              -- Condition: Toggle must be true
-        Property = "Visible"       -- Property to affect: Visibility
-    }
-})
-
-local dependentInput = dependencySection:AddInput({
-    Title = "Locked if Toggle is ON",
-    Placeholder = "Cannot edit when locked",
-    Icon = "lock",
-    Dependency = {
-        Element = conditionToggle,
-        Value = true,
-        Property = "Locked"
-    }
-})
-
-local dependentSlider = dependencySection:AddSlider({
-    Title = "Visible & Unlocked if Toggle is OFF",
-    Icon = "activity",
-    Dependency = { -- This will be visible when conditionToggle is false
-        Element = conditionToggle,
-        Value = false,
-        Property = "Visible"
-    }
-    -- To make it also unlocked when toggle is OFF, you'd add another dependency or chain it.
-    -- For simplicity, only showing visibility dependency here.
-    -- A more complex scenario might involve a second invisible toggle that this one depends on for lock state,
-    -- and that second toggle depends on the first one with an inverted value.
-})
-
-
--- == Section: Dialogs & Notifications ==
-local dialogsSection = mainTab:AddSection("Dialogs & Notifications")
-
-dialogsSection:AddButton({
-    Title = "Show Standard Dialog",
-    Icon = "message-square",
-    Callback = function()
-        window:ShowDialog({
-            Title = "Standard Dialog",
-            Content = "This is a standard dialog with multiple button variants.",
-            Buttons = {
-                {Text = "Cancel", Variant = "Tertiary", Callback = function() print("Dialog: Cancelled") end},
-                {Text = "Secondary Action", Variant = "Secondary", Callback = function() print("Dialog: Secondary action") end},
-                {Text = "Confirm OK", Variant = "Primary", Callback = function() print("Dialog: Confirmed OK") end}
-            },
-            OnClose = function() print("Dialog was closed.") end
-        })
-    end
-})
-
-dialogsSection:AddButton({
-    Title = "Show One-Time Notify",
-    Icon = "bell",
-    Callback = function()
-        UBHubLib:MakeNotify({
-            Title = "One-Time Offer!",
-            Content = "This notification will only appear once per session thanks to OneTime = true.",
-            Delay = 7,
-            OneTime = true,
-            OneTimeId = "SpecialOfferNotify_v1" -- Unique ID for this specific one-time message
-        })
-    end
-})
-
-dialogsSection:AddButton({
-    Title = "Show Notify with BG Image",
-    Icon = "image",
-    Callback = function()
-        UBHubLib:MakeNotify({
-            Title = "Image Background",
-            Content = "This notification has a custom background image (placeholder asset).",
-            BackgroundImage = "rbxassetid://266543268" -- Placeholder image, use a real one
-        })
-    end
-})
-
-
--- == Section: Edit Mode & Quick Toggles ==
--- This section is primarily to show that toggles with "CanQuickToggle" exist.
--- The actual Edit Mode is controlled by the top-bar Edit icon.
-local quickToggleSection = mainTab:AddSection("Quick Toggles (Test with Edit Mode)")
-
-quickToggleSection:AddParagraph({Content = "Enable 'CanQuickToggle' on toggles. Then, click the 'creator' icon next to the toggle (a small plus/check). After that, the main toggle switch will create/destroy an on-screen button. Activate Edit Mode (pencil icon in top bar) to drag these on-screen buttons."})
-
-quickToggleSection:AddToggle({Title = "Draggable Feature A", CanQuickToggle = true, Flag = "QTA", Icon="mouse-pointer-2"})
-quickToggleSection:AddToggle({Title = "Draggable Feature B", Style="Checkbox", CanQuickToggle = true, Flag = "QTB", Icon="move"})
-
-
--- == Section: Configuration Management (Demonstration) ==
--- The "Customize" tab will eventually house the UI for this.
--- This section demonstrates programmatic interaction.
-local configDemoSection = mainTab:AddSection("Config Management (Programmatic)")
-
-configDemoSection:AddParagraph({Content = "Use the 'Customize' tab (once implemented) for UI-based config management. Below are programmatic tests."})
-
-configDemoSection:AddButton({Title = "Set ConfigMode: Normal", Callback = function() windowConfig:SetMode("Normal"); UBHubLib:MakeNotify({Title="Config", Content="Mode set to Normal. Save manually."}) end})
-configDemoSection:AddButton({Title = "Set ConfigMode: Legacy", Callback = function() windowConfig:SetMode("Legacy"); UBHubLib:MakeNotify({Title="Config", Content="Mode set to Legacy. Auto-saves."}) end})
-
-configDemoSection:AddButton({Title = "Save Config 'MySettings'", Callback = function()
-    if windowConfig.CurrentMode == "Normal" then
-        windowConfig:SaveConfig("MySettings")
-        UBHubLib:MakeNotify({Title="Config", Content="'MySettings' saved."})
-    else
-        UBHubLib:MakeNotify({Title="Config Error", Content="Switch to Normal mode to use SaveConfig."})
-    end
+TogglesDialogsSection:AddButton({Title = "Show Dialog", Callback = function()
+    Window:ShowDialog({
+        Title = "Example Dialog",
+        Content = "This dialog demonstrates multiple button variants and icons.",
+        Icon = "Lucide/message-circle-question",
+        Buttons = {
+            {Text = "Cancel", Variant = "Tertiary", Callback = function() print("Dialog: Cancel") end},
+            {Text = "Secondary Action", Icon = "Lucide/minus-circle", Variant = "Secondary", Callback = function() print("Dialog: Secondary") end},
+            {Text = "Primary Action", Icon = "Lucide/check-circle", Variant = "Primary", Callback = function() print("Dialog: Primary OK") end}
+        }
+    })
 end})
 
-configDemoSection:AddButton({Title = "Load Config 'MySettings'", Callback = function()
-    windowConfig:LoadConfig("MySettings")
-    UBHubLib:MakeNotify({Title="Config", Content="'MySettings' loaded."})
-    -- UI elements should update automatically if registered with ConfigManager
-end})
+-- 3. Conditional & Locked Elements
+local ConditionalSection = AdvancedElementsTab:AddSection("Conditional & Locked")
+local masterToggleVisible = ConditionalSection:AddToggle({Title = "Master Visibility", Default = true, Content="Controls visibility of next element"})
+local dependentParagraphVisible = ConditionalSection:AddParagraph({
+    Title = "Dependent Paragraph (Visible)",
+    Content = "I appear and disappear!",
+    Dependency = {Element = masterToggleVisible, Value = true, Property = "Visible"}
+})
 
-configDemoSection:AddButton({Title = "Export Current Config", Callback = function()
-    local success = windowConfig:ExportConfig()
-    if success then
-        UBHubLib:MakeNotify({Title="Config", Content="Current config copied to clipboard!"})
-    else
-        UBHubLib:MakeNotify({Title="Config Error", Content="Failed to copy config."})
+local masterToggleLocked = ConditionalSection:AddToggle({Title = "Master Lock", Default = false, Content="Controls locked state of next button"})
+local dependentButtonLocked = ConditionalSection:AddButton({
+    Title = "Dependent Button (Locked)",
+    Content = "I can be locked/unlocked.",
+    Callback = function() UBHubLib:MakeNotify({Title="Dependent Button Clicked!"}) end,
+    Dependency = {Element = masterToggleLocked, Value = true, Property = "Locked"}
+})
+local dependentSliderLocked = ConditionalSection:AddSlider({
+    Title = "Dependent Slider (Locked)",
+    Min = 0, Max = 100, Default = 50,
+    Dependency = {Element = masterToggleLocked, Value = true, Property = "Locked"}
+})
+
+
+-- == Task #3: On-Screen Quick Toggles & UI Edit Mode Demonstrations ==
+local QuickTogglesTab = Window:CreateTab({ Name = "Quick Toggles", Icon = "Lucide/layout-dashboard" })
+local QuickToggleSetupSection = QuickTogglesTab:AddSection("Quick Toggle Setup")
+
+QuickToggleSetupSection:AddParagraph({Title="Quick Toggle Info", Content="Enable 'CanQuickToggle'. Then, activate the creator button (left of toggle) to make the main toggle create/destroy an on-screen quick toggle."})
+
+local featureA_value = false
+local quickToggle1 = QuickToggleSetupSection:AddToggle({
+    Title = "Feature A (Quick Toggle)",
+    Content = "This can be a quick toggle.",
+    Default = featureA_value,
+    CanQuickToggle = true,
+    Icon = "Lucide/zap", -- Icon for the on-screen button
+    Callback = function(val)
+        featureA_value = val
+        print("Feature A toggled to: " .. tostring(val))
+        UBHubLib:MakeNotify({Title = "Feature A", Content = "State: " .. (val and "ON" or "OFF")})
     end
-end})
-
-
--- == Section: Search & Customize Placeholders ==
--- These tasks are pending full implementation, but their UI entry points can be shown.
-local pendingSection = mainTab:AddSection("Pending Features (UI Shells)")
-pendingSection:AddParagraph({Content = "Search button is in the top bar. The 'Customize' tab is below."})
-
-
--- == Static Tab: Customize (Placeholder Content) ==
-local customizeTab = window:AddStaticTab({Name = "Customize", Icon = "settings-2"})
-local customizeSection = customizeTab:AddSection("UI Customization")
-
-customizeSection:AddParagraph({
-    Title = "Configuration & Theming",
-    Content = "This area will allow you to manage saved configurations (Create, Load, Delete, Overwrite, Export) and switch between 'Normal' and 'Legacy' save modes. You will also be able to select themes and customize theme colors here using the advanced color picker."
-})
-customizeSection:AddParagraph({
-    Title = "NOTE:",
-    Content = "The UI for these settings is part of Task #5 and is not yet implemented in this example version. The 'Config Management (Programmatic)' section demonstrates some of the underlying ConfigManager API."
 })
 
+local featureB_value = true
+local quickToggle2_checkbox = QuickToggleSetupSection:AddToggle({
+    Title = "Feature B (Checkbox QT)",
+    Content = "Checkbox style quick toggle.",
+    Default = featureB_value,
+    CanQuickToggle = true,
+    Style = "Checkbox",
+    Icon = "Lucide/anchor",
+    Callback = function(val)
+        featureB_value = val
+        print("Feature B (checkbox) toggled to: " .. tostring(val))
+         UBHubLib:MakeNotify({Title = "Feature B", Content = "State: " .. (val and "ON" or "OFF")})
+    end
+})
+QuickToggleSetupSection:AddParagraph({Title="Edit Mode Info", Content="Click the 'Edit' icon (pencil) in the window's top bar to enter/exit Edit Mode. In Edit Mode, quick toggles are draggable. Click a quick toggle in Edit Mode to show the Resize Panel."})
 
--- Make the first tab active by default
--- This logic might be internal to MakeGui, but explicit activation can be useful.
--- (Assuming MakeGui already makes the first created non-static tab active)
 
-print("UB-V5-QOL Example Script Finished Setup")
+-- == Task #4: Implement Full Search Functionality Demonstrations ==
+-- Elements for search are created across various tabs. The search functionality itself is part of the window.
+-- To test: Use the search icon in the window's top bar.
+local SearchTestTab = Window:CreateTab({Name = "Search Content", Icon = "Lucide/text-search"})
+local SearchContentSect = SearchTestTab:AddSection("Content for Searching")
+SearchContentSect:AddParagraph({Title="Player Speed", Content="Adjust player walkspeed."})
+SearchContentSect:AddToggle({Title="ESP Toggle", Content="Enable or disable ESP."})
+SearchContentSect:AddSlider({Title="FOV Changer", Min=70, Max=120, Default=90, Content="Modify field of view."})
+SearchContentSect:AddInput({Title="Custom Chat Message", Content="Enter a message to broadcast."})
+SearchContentSect:AddDropdown({Title="Aim Part Selection", Options={"Head", "Torso", "Legs"}, Default="Head"})
+SearchContentSect:AddColorPicker({Title="ESP Box Color", DefaultColor=Color3.new(1,0,0)})
+SearchContentSect:AddButton({Title="Kill All", Content="Dangerous button!", Keywords={"terminate", "eliminate"}})
 
--- Example of how to make the window draggable by its top bar
--- MakeDraggable is an internal function, but if exposed or if Main.TopBar is accessible:
--- if UBHubLib.WindowObject and UBHubLib.WindowObject:FindFirstChild("TopBar") then
---    MakeDraggable(UBHubLib.WindowObject.TopBar, UBHubLib.WindowObject.Parent.Parent) -- Drags DropShadowHolder
--- end
 
--- Test notification
-task.wait(1)
-UBHubLib:MakeNotify({
-    Title = "Library Ready!",
-    Content = "UB-V5 QOL Refactor example is up and running.",
-    Delay = 7
+-- == Task #5: Final 'Customize' Panel & UI Polish Demonstrations ==
+-- The "Customize" tab is created by the library itself if `AddStaticTab` is working.
+-- We will interact with it directly.
+
+-- Advanced Dropdown Behavior (Demonstrated in a new section)
+local PolishTab = Window:CreateTab({Name = "UI Polish", Icon = "Lucide/wand-2"})
+local DropdownPolishSection = PolishTab:AddSection("Advanced Dropdowns")
+
+local advancedDropdown = DropdownPolishSection:AddDropdown({
+    Title = "Advanced Sort Dropdown",
+    Content = "Selected items should appear at the top after closing and reopening.",
+    Multi = true,
+    Options = {"Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape"},
+    Default = {"Banana", "Fig"},
+    Callback = function(selected)
+        print("Advanced Dropdown selected:", selected)
+    end
 })
 
--- Demonstrate Gradient Support
-local gradientSection = mainTab:AddSection("Gradient Demonstration")
-local gradientFrame = Instance.new("Frame")
-gradientFrame.Size = UDim2.new(1, -10, 0, 50)
-gradientFrame.Position = UDim2.new(0,5,0,0)
-gradientFrame.Parent = gradientSection -- This is not how AddSection works. Items are added via itemsTable:Add...
--- Let's add it properly using a dummy paragraph to get the section's content frame,
--- or ideally, AddSection would return the content frame or an Items table directly.
--- For now, creating a dummy item to get parent.
-local tempParentForGradient = gradientSection:AddParagraph({Title="", Content=""}).Object.Parent -- Get SectionContent frame
+-- Section Underline Animation is tested by interacting with any section.
 
-gradientFrame.Parent = tempParentForGradient
-ThemeManager.AddThemedObject(gradientFrame, {
-    BackgroundColor3 = "PrimaryGradient", -- This should be a ColorSequence in the theme
-    CornerRadius = "SmallCornerRadius"
-})
-gradientSection:AddParagraph({Title="Gradient Frame", Content="The frame above should have a gradient if 'PrimaryGradient' is a ColorSequence in the theme."})
+print("UB-V5-QOL Example Script: Setup Complete. Window should be visible.")
 
--- Ensure PrimaryGradient exists in the default theme for testing
-if not ThemeManager.Themes.Default.Colors.PrimaryGradient then
-	ThemeManager.Themes.Default.Colors.PrimaryGradient = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(160, 40, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200, 50, 0)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 80, 0))
-	})
-	ThemeManager.ReapplyCurrentTheme() -- Re-apply if added dynamically
+-- ConfigManager Demonstration Setup (Part of Task 5, but setting up elements here)
+if ConfigManagerInstance then
+    print("ConfigManager found, registering elements for config testing.")
+    -- Register some elements from different tabs to test saving/loading
+    ConfigManagerInstance:RegisterElement("Core_PrimaryColor", ThemeSection:AddColorPicker({
+        Title = "Configurable Primary Color", -- This is a new element for testing config
+        DefaultColor = Color3.fromRGB(0,0,255),
+        Callback = function(c) print("Configurable Primary Color set to", c) end
+    }), function(el, val) if el and el.SetColor then el:SetColor(val) end end) -- Assuming SetColor exists
+
+    ConfigManagerInstance:RegisterElement("Adv_CheckboxToggle", checkboxToggle,
+        function(el, val) if el and el.Set then el:Set(val) end end) -- Assuming toggle objects have :Set()
+
+    ConfigManagerInstance:RegisterElement("QuickToggle_FeatureA", quickToggle1,
+        function(el, val) if el and el.Set then el:Set(val) end end)
+
+    ConfigManagerInstance:RegisterElement("Polish_AdvancedDropdown", advancedDropdown,
+        function(el, val) if el and el.Set then el:Set(val) end end) -- Assuming dropdowns have :Set()
+else
+    warn("ConfigManagerInstance not available. Config saving/loading tests in Customize tab might not work fully.")
 end
+
+
+-- Example of how to use the ThemeManager to get a color for a non-library element
+local testFrame = Instance.new("Frame")
+testFrame.Size = UDim2.new(0,100,0,100)
+testFrame.Position = UDim2.new(0,10,0.8,0)
+testFrame.BackgroundColor3 = UBHubLib.ThemeManager.GetColor("Accent") or Color3.new(1,1,0) -- Use ThemeManager
+testFrame.Parent = UBHubGui -- Assuming UBHubGui is the ScreenGui
+
+UBHubLib:MakeNotify({Title="Example Loaded!", Content="All test elements created."})
