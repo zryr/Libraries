@@ -52,6 +52,10 @@ function ConfigManager:SetMode(mode)
     end
 end
 
+function ConfigManager:GetMode()
+    return self.CurrentMode
+end
+
 function ConfigManager:RegisterElement(elementName, elementObject, updateCallback)
     -- elementName: A unique string identifying the setting (e.g., "PlayerSpeedToggle")
     -- elementObject: The actual UI element object (e.g., the toggle returned by AddToggle)
@@ -336,3 +340,4 @@ end
 
 
 return ConfigManager
+end

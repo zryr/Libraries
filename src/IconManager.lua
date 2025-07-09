@@ -99,3 +99,4 @@ end
 
 
 return IconManager
+end
