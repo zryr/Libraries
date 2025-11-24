@@ -1,4 +1,4 @@
-local Library = loadfile("UB-V5-Refactor.lua")()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/zryr/Libraries/refs/heads/ules/UB-V5-Refactor.lua"))()
 
 local Window = Library:CreateWindow({
     Title = "UB V5 Refactor Showcase",
