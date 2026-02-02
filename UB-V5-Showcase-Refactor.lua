@@ -1,4 +1,5 @@
-local UBHubLib = loadstring(https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jules/UB-V5-Refactor.lua)()
+local UBHubLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jules/UB-V5-Refactor.lua"))()
+
 
 local Window = UBHubLib:CreateWindow({
     Name = "UB Hub Refactor Showcase",
