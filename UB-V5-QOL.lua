@@ -4,17 +4,30 @@ local LocalPlayer = game:GetService("Players").LocalPlayer
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Mouse = LocalPlayer:GetMouse()
-local Colours
 
-Colours = {
-	Primary = Color3.fromRGB(160, 40, 0),
-	Secondary = Color3.fromRGB(160, 30, 0),      
-	Accent = Color3.fromRGB(200, 50, 0),         
-	ThemeHighlight = Color3.fromRGB(255, 80, 0), -- Bright orange accent
-	Text = Color3.fromRGB(255, 240, 230),        
-	Background = Color3.fromRGB(20, 8, 0),      
-	Stroke = Color3.fromRGB(80, 20, 0),          
-}
+
+
+local success, CoreSystems = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/zryr/Libraries/refs/heads/Jules/UBHubLib_Icons_Fonts_Themes_Config.lua"))()
+end)
+
+if not success or not CoreSystems then
+    warn("Failed to load CoreSystems. Library cannot function properly.")
+    return {}
+end
+
+local Themes = CoreSystems.Themes
+local CurrentTheme = CoreSystems.CurrentTheme
+
+local GetColor = CoreSystems.GetColor
+local ApplyGradient = CoreSystems.ApplyGradient
+local ApplyColor = CoreSystems.ApplyColor
+
+local FontManager = CoreSystems.FontManager
+local Icons = CoreSystems.Icons
+local GetIcon = CoreSystems.GetIcon
+
+local ConfigManager = CoreSystems.ConfigManager
 
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or function(f) end
@@ -74,7 +87,7 @@ function CircleClick(Button, X, Y)
 		Button.ClipsDescendants = true
 		local Circle = Instance.new("ImageLabel")
 		Circle.Image = "rbxassetid://266543268"
-		Circle.ImageColor3 = Colours.ThemeHighlight
+		ApplyColor(Circle, "ImageColor3", GetColor("ThemeHighlight"))
 		Circle.ImageTransparency = 0.8999999761581421
 		Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 		Circle.BackgroundTransparency = 1
@@ -110,9 +123,16 @@ function UBHubLib:MakeNotify(NotifyConfig)
 	NotifyConfig.Title = NotifyConfig.Title or "UB Hub"
 	NotifyConfig.Description = NotifyConfig.Description or "Notification"
 	NotifyConfig.Content = NotifyConfig.Content or "Content"
-	NotifyConfig.Color = NotifyConfig.Color or Colours.Primary
+	NotifyConfig.Color = NotifyConfig.Color or GetColor("Primary")
 	NotifyConfig.Time = NotifyConfig.Time or 0.5
 	NotifyConfig.Delay = NotifyConfig.Delay or 5
+	NotifyConfig.BackgroundImage = NotifyConfig.BackgroundImage or ""
+	NotifyConfig.OneTime = NotifyConfig.OneTime or false
+
+	if NotifyConfig.OneTime and ConfigManager.Flags["Notify_" .. NotifyConfig.Title] then
+		return -- Already shown
+	end
+
 	local NotifyFunction = {}
 	task.spawn(function()
 		if not CoreGui:FindFirstChild("NotifyGui") then
@@ -124,7 +144,7 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		if not CoreGui.NotifyGui:FindFirstChild("NotifyLayout") then
 			local NotifyLayout = Instance.new("Frame");
 			NotifyLayout.AnchorPoint = Vector2.new(1, 1)
-			NotifyLayout.BackgroundColor3 = Colours.Primary
+			ApplyColor(NotifyLayout, "BackgroundColor3", GetColor("Primary"))
 			NotifyLayout.BackgroundTransparency = 0.9990000128746033
 			NotifyLayout.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			NotifyLayout.BorderSizePixel = 0
@@ -178,7 +198,7 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		NotifyFrame.AnchorPoint = Vector2.new(0, 1)
 		NotifyFrame.Position = UDim2.new(0, 0, 1, -(NotifyPosHeigh))
 
-		NotifyFrameReal.BackgroundColor3 = Colours.Primary
+		ApplyColor(NotifyFrameReal, "BackgroundColor3", GetColor("Primary"))
 		NotifyFrameReal.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		NotifyFrameReal.BorderSizePixel = 0
 		NotifyFrameReal.Position = UDim2.new(0, 400, 0, 0)
@@ -196,6 +216,26 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		DropShadowHolder.Size = UDim2.new(1, 0, 1, 0)
 		DropShadowHolder.Parent = NotifyFrameReal
 
+		if NotifyConfig.BackgroundImage ~= "" then
+			local bgImg = Instance.new("ImageLabel")
+			bgImg.Size = UDim2.new(1,0,1,0)
+			bgImg.BackgroundTransparency = 1
+			local isAsset = NotifyConfig.BackgroundImage:match("^rbxassetid")
+			local isHttp = NotifyConfig.BackgroundImage:match("^http")
+			if isAsset or isHttp then
+				bgImg.Image = NotifyConfig.BackgroundImage
+			else
+				local iconId = GetIcon("lucide", NotifyConfig.BackgroundImage)
+				if type(iconId) == "table" then bgImg.Image = iconId[1] else bgImg.Image = iconId end
+			end
+			bgImg.ScaleType = Enum.ScaleType.Crop
+			bgImg.ImageTransparency = 0.5
+			local bgCorner = Instance.new("UICorner")
+			bgCorner.CornerRadius = UDim.new(0, 8)
+			bgCorner.Parent = bgImg
+			bgImg.Parent = NotifyFrameReal
+		end
+
 		DropShado.Image = "rbxassetid://6015897843"
 		DropShado.ImageColor3 = Color3.fromRGB(0, 0, 0)
 		DropShado.ImageTransparency = 0.5
@@ -210,7 +250,7 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		DropShado.Name = "DropShado"
 		DropShado.Parent = DropShadowHolder
 
-		Top.BackgroundColor3 = Colours.Primary
+		ApplyColor(Top, "BackgroundColor3", GetColor("Primary"))
 		Top.BackgroundTransparency = 0.9990000128746033
 		Top.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Top.BorderSizePixel = 0
@@ -218,9 +258,9 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		Top.Name = "Top"
 		Top.Parent = NotifyFrameReal
 
-		TextLabel.Font = Enum.Font.GothamBold
+		FontManager:Set(TextLabel, "Default")
 		TextLabel.Text = NotifyConfig.Title
-		TextLabel.TextColor3 = Colours.Text
+		ApplyColor(TextLabel, "TextColor3", GetColor("Text"))
 		TextLabel.TextSize = 14
 		TextLabel.TextXAlignment = Enum.TextXAlignment.Left
 		TextLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -238,12 +278,12 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		UICorner1_Notify.Parent = Top
 		UICorner1_Notify.CornerRadius = UDim.new(0, 5)
 
-		TextLabel1.Font = Enum.Font.GothamBold
+		FontManager:Set(TextLabel1, "Default")
 		TextLabel1.Text = NotifyConfig.Description
-		TextLabel1.TextColor3 = Colours.Text
+		ApplyColor(TextLabel1, "TextColor3", GetColor("Text"))
 		TextLabel1.TextSize = 14
 		TextLabel1.TextXAlignment = Enum.TextXAlignment.Left
-		TextLabel1.BackgroundColor3 = Colours.ThemeHighlight
+		ApplyColor(TextLabel1, "BackgroundColor3", GetColor("ThemeHighlight"))
 		TextLabel1.BackgroundTransparency = 0.9990000128746033
 		TextLabel1.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		TextLabel1.BorderSizePixel = 0
@@ -279,7 +319,7 @@ function UBHubLib:MakeNotify(NotifyConfig)
 		ImageLabel.Size = UDim2.new(1, -8, 1, -8)
 		ImageLabel.Parent = Close
 
-		TextLabel2.Font = Enum.Font.GothamBold
+		FontManager:Set(TextLabel2, "Default")
 		TextLabel2.TextColor3 = Color3.fromRGB(255, 255, 255)
 		TextLabel2.TextSize = 13
 		TextLabel2.Text = NotifyConfig.Content
@@ -310,6 +350,11 @@ function UBHubLib:MakeNotify(NotifyConfig)
 				return false
 			end
 			waitbruh = true
+
+			if NotifyConfig.OneTime then
+				ConfigManager:UpdateFlag("Notify_" .. NotifyConfig.Title, true)
+			end
+
 			TweenService:Create(
 				NotifyFrameReal,
 				TweenInfo.new(tonumber(NotifyConfig.Time) * 0.2, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 400, 0, 0)}):Play()
@@ -342,42 +387,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	GuiConfig["Tab Width"] = GuiConfig["Tab Width"] or 120
 	GuiConfig["SaveFolder"] = GuiConfig["SaveFolder"] or false
 	local Flags = UBHubLib and UBHubLib.Flags or {}
-	local function SaveFile(Name, Value)
-		if not (writefile and GuiConfig and GuiConfig.SaveFolder) then
-			return false
-		end
-		local valueToSave = Value
-		if type(Value) == "table" and not (Value[1] and not next(Value)) then 
-			valueToSave = nil 
-		elseif type(Value) == "table" and #Value == 1 and not GuiConfig.Multi then 
-			valueToSave = Value[1]
-		end
-
-		Flags[Name] = valueToSave
-		local success, err = pcall(function()
-			local path = GuiConfig.SaveFolder
-			local encoded = HttpService:JSONEncode(Flags)
-			writefile(path, encoded)
-		end)
-		if not success then
-			warn("Save failed:", err)
-			return false
-		end
-		return true
-	end
-	local function LoadFile()
-		if not (GuiConfig and GuiConfig["SaveFolder"]) then return false end
-		local savePath = GuiConfig["SaveFolder"]
-		if not (readfile and isfile and isfile(savePath)) then return false end
-		local success, config = pcall(function()
-			return HttpService:JSONDecode(readfile(savePath))
-		end)
-		if success and type(config) == "table" then
-			Flags = config
-			return true
-		end
-		return false
-	end; LoadFile()
+	ConfigManager:Init(GuiConfig.SaveFolder)
+	Flags = ConfigManager.Flags
 	local UBHubGui = Instance.new("ScreenGui");
 	local DropShadowHolder = Instance.new("Frame");
 	local DropShadow = Instance.new("ImageLabel");
@@ -393,6 +404,19 @@ function UBHubLib:MakeGui(GuiConfig)
 	-- local ImageLabel = Instance.new("ImageLabel"); -- For MaxRestore, also unused
 	local Close = Instance.new("TextButton");
 	local ImageLabel1 = Instance.new("ImageLabel");
+	local SearchBtn = Instance.new("TextButton");
+	local SearchIcon = Instance.new("ImageLabel");
+	local SearchHighlight = Instance.new("Frame");
+
+	local EditBtn = Instance.new("TextButton");
+	local EditIcon = Instance.new("ImageLabel");
+	local EditHighlight = Instance.new("Frame");
+
+	local SearchContainer = Instance.new("Frame")
+	local SearchInput = Instance.new("TextBox")
+	local SearchResultsContainer = Instance.new("ScrollingFrame")
+
+
 	local Min = Instance.new("TextButton");
 	local ImageLabel2 = Instance.new("ImageLabel");
 	local LayersTab = Instance.new("Frame");
@@ -433,7 +457,7 @@ function UBHubLib:MakeGui(GuiConfig)
     DropShadow.Parent = DropShadowHolder
 
 	Main.AnchorPoint = Vector2.new(0.5, 0.5)
-	Main.BackgroundColor3 = Colours.Background
+	ApplyColor(Main, "BackgroundColor3", GetColor("WindowBackground"))
 	Main.BackgroundTransparency = 0.1
 	Main.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	Main.BorderSizePixel = 0
@@ -523,12 +547,12 @@ function UBHubLib:MakeGui(GuiConfig)
 	Top.Name = "Top"
 	Top.Parent = Main
 
-	TextLabel.Font = Enum.Font.GothamBold
+	FontManager:Set(TextLabel, "Default")
 	TextLabel.Text = GuiConfig.NameHub
-	TextLabel.TextColor3 = Colours.Accent
+	ApplyColor(TextLabel, "TextColor3", GetColor("Accent"))
 	TextLabel.TextSize = 14
 	TextLabel.TextXAlignment = Enum.TextXAlignment.Left
-	TextLabel.BackgroundColor3 = Colours.Accent 
+	ApplyColor(TextLabel, "BackgroundColor3", GetColor("Accent"))
 	TextLabel.BackgroundTransparency = 1 
 	TextLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	TextLabel.BorderSizePixel = 0
@@ -539,12 +563,12 @@ function UBHubLib:MakeGui(GuiConfig)
 	UICorner1.Parent = Top
     UICorner1.CornerRadius = UDim.new(0,5) 
 
-	TextLabel1.Font = Enum.Font.GothamBold
+	FontManager:Set(TextLabel1, "Default")
 	TextLabel1.Text = GuiConfig.Description
-	TextLabel1.TextColor3 = Colours.Text
+	ApplyColor(TextLabel1, "TextColor3", GetColor("Text"))
 	TextLabel1.TextSize = 14
 	TextLabel1.TextXAlignment = Enum.TextXAlignment.Left
-	TextLabel1.BackgroundColor3 = Colours.Accent 
+	ApplyColor(TextLabel1, "BackgroundColor3", GetColor("Accent"))
 	TextLabel1.BackgroundTransparency = 1 
 	TextLabel1.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	TextLabel1.BorderSizePixel = 0
@@ -567,6 +591,8 @@ function UBHubLib:MakeGui(GuiConfig)
 	Close.BorderSizePixel = 0
 	Close.Position = UDim2.new(1, -8, 0.5, 0)
 	Close.Size = UDim2.new(0, 25, 0, 25)
+
+	-- Min Button setup
 	Close.Name = "Close"
 	Close.Parent = Top
 
@@ -589,7 +615,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	Min.BackgroundTransparency = 0.9990000128746033
 	Min.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	Min.BorderSizePixel = 0
-	Min.Position = UDim2.new(1, -38, 0.5, 0) -- Adjusted position because MaxRestore is gone
+	Min.Position = UDim2.new(1, -38, 0.5, 0)
 	Min.Size = UDim2.new(0, 25, 0, 25)
 	Min.Name = "Min"
 	Min.Parent = Top
@@ -597,13 +623,245 @@ function UBHubLib:MakeGui(GuiConfig)
 	ImageLabel2.Image = "rbxassetid://9886659276"
 	ImageLabel2.AnchorPoint = Vector2.new(0.5, 0.5)
 	ImageLabel2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	ImageLabel2.BackgroundTransparency = 0.9990000128746033
+	ImageLabel2.BackgroundTransparency = 1
 	ImageLabel2.ImageTransparency = 0.2
 	ImageLabel2.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	ImageLabel2.BorderSizePixel = 0
 	ImageLabel2.Position = UDim2.new(0.5, 0, 0.5, 0)
 	ImageLabel2.Size = UDim2.new(1, -9, 1, -9)
 	ImageLabel2.Parent = Min
+
+	-- Search Button Setup
+	SearchBtn.Font = Enum.Font.SourceSans
+	SearchBtn.Text = ""
+	SearchBtn.BackgroundTransparency = 1
+	SearchBtn.AnchorPoint = Vector2.new(1, 0.5)
+	SearchBtn.Position = UDim2.new(1, -68, 0.5, 0)
+	SearchBtn.Size = UDim2.new(0, 25, 0, 25)
+	SearchBtn.Name = "SearchBtn"
+	SearchBtn.Parent = Top
+
+	SearchHighlight.Size = UDim2.new(1,0,1,0)
+	SearchHighlight.BackgroundTransparency = 1
+	ApplyColor(SearchHighlight, "BackgroundColor3", GetColor("ThemeHighlight"))
+	local schCorner = Instance.new("UICorner")
+	schCorner.CornerRadius = UDim.new(0,4)
+	schCorner.Parent = SearchHighlight
+	SearchHighlight.Parent = SearchBtn
+
+	local searchIconId = GetIcon("lucide", "search")
+	if type(searchIconId) == "table" then SearchIcon.Image = searchIconId[1] else SearchIcon.Image = searchIconId end
+	SearchIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+	SearchIcon.BackgroundTransparency = 1
+	SearchIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+	SearchIcon.Size = UDim2.new(0, 16, 0, 16)
+	SearchIcon.Parent = SearchBtn
+
+	-- Edit Button Setup
+	EditBtn.Font = Enum.Font.SourceSans
+	EditBtn.Text = ""
+	EditBtn.BackgroundTransparency = 1
+	EditBtn.AnchorPoint = Vector2.new(1, 0.5)
+	EditBtn.Position = UDim2.new(1, -98, 0.5, 0)
+	EditBtn.Size = UDim2.new(0, 25, 0, 25)
+	EditBtn.Name = "EditBtn"
+	EditBtn.Parent = Top
+
+	EditHighlight.Size = UDim2.new(1,0,1,0)
+	EditHighlight.BackgroundTransparency = 1
+	ApplyColor(EditHighlight, "BackgroundColor3", GetColor("ThemeHighlight"))
+	local edCorner = Instance.new("UICorner")
+	edCorner.CornerRadius = UDim.new(0,4)
+	edCorner.Parent = EditHighlight
+	EditHighlight.Parent = EditBtn
+
+	local editIconId = GetIcon("lucide", "edit")
+	if type(editIconId) == "table" then EditIcon.Image = editIconId[1] else EditIcon.Image = editIconId end
+	EditIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+	EditIcon.BackgroundTransparency = 1
+	EditIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+	EditIcon.Size = UDim2.new(0, 16, 0, 16)
+	EditIcon.Parent = EditBtn
+
+	-- Search UI Logic
+	SearchContainer.Name = "SearchUI"
+	SearchContainer.Size = UDim2.new(0, 300, 0, 200)
+	SearchContainer.AnchorPoint = Vector2.new(0.5, 0)
+	SearchContainer.Position = UDim2.new(0.5, 0, 0.2, 0)
+	ApplyColor(SearchContainer, "BackgroundColor3", GetColor("WindowBackground"))
+	SearchContainer.ZIndex = 51
+	SearchContainer.Visible = false
+	SearchContainer.Parent = Main
+	local scCorner = Instance.new("UICorner")
+	scCorner.CornerRadius = UDim.new(0, 6)
+	scCorner.Parent = SearchContainer
+
+	SearchInput.Name = "SearchInput"
+	SearchInput.Size = UDim2.new(1, -20, 0, 30)
+	SearchInput.Position = UDim2.new(0, 10, 0, 10)
+	FontManager:Set(SearchInput, "Default")
+	SearchInput.PlaceholderText = "Search elements..."
+	SearchInput.Text = ""
+	ApplyColor(SearchInput, "TextColor3", GetColor("Text"))
+	ApplyColor(SearchInput, "BackgroundColor3", GetColor("Secondary"))
+	SearchInput.ZIndex = 52
+	SearchInput.Parent = SearchContainer
+
+	SearchResultsContainer.Name = "SearchResults"
+	SearchResultsContainer.Size = UDim2.new(1, -20, 1, -50)
+	SearchResultsContainer.Position = UDim2.new(0, 10, 0, 45)
+	SearchResultsContainer.BackgroundTransparency = 1
+	SearchResultsContainer.ScrollBarThickness = 2
+	SearchResultsContainer.ZIndex = 52
+	SearchResultsContainer.Parent = SearchContainer
+	local srLayout = Instance.new("UIListLayout")
+	srLayout.Padding = UDim.new(0, 5)
+	srLayout.Parent = SearchResultsContainer
+
+	local function NavigateToElement(registryItem)
+		-- Fade out search
+		TweenService:Create(SearchOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+		SearchContainer.Visible = false
+		task.wait(0.2)
+		SearchOverlay.Visible = false
+
+		-- Jump to tab
+		if LayersPageLayout.CurrentPage.LayoutOrder ~= registryItem.TabOrder then
+			LayersPageLayout:JumpToIndex(registryItem.TabOrder)
+
+			for _, tabObj in ipairs(ScrollTab:GetChildren()) do
+				if tabObj.Name == "Tab" then
+					if tabObj.LayoutOrder == registryItem.TabOrder then
+						TweenService:Create(tabObj, TweenInfo.new(0.1), {BackgroundTransparency = 0.8}):Play()
+						local choose = tabObj:FindFirstChild("ChooseFrame")
+						if choose then
+							local tabOffsetY = tabObj.AbsolutePosition.Y - ScrollTab.AbsolutePosition.Y + ScrollTab.CanvasPosition.Y
+							TweenService:Create(choose, TweenInfo.new(0.1), {Position = UDim2.new(0, 2, 0, tabOffsetY + 9)}):Play()
+						end
+					else
+						TweenService:Create(tabObj, TweenInfo.new(0.1), {BackgroundTransparency = 1}):Play()
+					end
+				end
+			end
+		end
+
+		-- Scroll to element
+		task.wait(0.1)
+		local scrollFrame = registryItem.Frame.Parent
+		if scrollFrame and scrollFrame:IsA("Frame") and scrollFrame.Name == "SectionAdd" then
+			-- It's in a section, ensure section is open
+			local sectionBtn = scrollFrame.Parent:FindFirstChild("SectionReal") and scrollFrame.Parent.SectionReal:FindFirstChild("SectionButton")
+			if sectionBtn and scrollFrame.Size.Y.Offset == 0 then
+				CircleClick(sectionBtn, 0, 0)
+				sectionBtn.Activated:Fire()
+				task.wait(0.35)
+			end
+			scrollFrame = scrollFrame.Parent.Parent -- ScrolLayers
+		end
+
+		if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
+			local targetY = registryItem.Frame.AbsolutePosition.Y - scrollFrame.AbsolutePosition.Y + scrollFrame.CanvasPosition.Y
+			-- Center it somewhat
+			targetY = targetY - (scrollFrame.AbsoluteSize.Y / 2) + (registryItem.Frame.AbsoluteSize.Y / 2)
+			if targetY < 0 then targetY = 0 end
+
+			TweenService:Create(scrollFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CanvasPosition = Vector2.new(0, targetY)}):Play()
+		end
+
+		-- Highlight
+		local origBg = registryItem.Frame.BackgroundColor3
+		local origTrans = registryItem.Frame.BackgroundTransparency
+
+		registryItem.Frame.BackgroundTransparency = 0
+		ApplyColor(registryItem.Frame, "BackgroundColor3", GetColor("ThemeHighlight"))
+
+		local hlTween = TweenService:Create(registryItem.Frame, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundColor3 = origBg, BackgroundTransparency = origTrans})
+		hlTween:Play()
+	end
+
+	local function DoSearch(query)
+		for _, child in ipairs(SearchResultsContainer:GetChildren()) do
+			if child:IsA("TextButton") then child:Destroy() end
+		end
+
+		if query == "" then return end
+
+		local results = {}
+		local lQuery = query:lower()
+
+		for _, item in ipairs(ElementRegistry) do
+			local score = 0
+			local lTitle = item.Title:lower()
+			local lDesc = item.Description:lower()
+
+			if lTitle == lQuery then score = score + 100
+			elseif lTitle:find(lQuery) then score = score + 50 end
+
+			if lDesc == lQuery then score = score + 20
+			elseif lDesc:find(lQuery) then score = score + 10 end
+
+			if score > 0 then
+				table.insert(results, {Item = item, Score = score})
+			end
+		end
+
+		table.sort(results, function(a, b) return a.Score > b.Score end)
+
+		-- Display results with staggered animation
+		local contentHeight = 0
+		for i, res in ipairs(results) do
+			local btn = Instance.new("TextButton")
+			btn.Name = "Result_" .. i
+			btn.Size = UDim2.new(1, 0, 0, 30)
+			btn.BackgroundTransparency = 1
+			ApplyColor(btn, "BackgroundColor3", GetColor("Secondary"))
+			FontManager:Set(btn, "Default")
+			btn.Text = "  " .. res.Item.Title
+			btn.TextXAlignment = Enum.TextXAlignment.Left
+			ApplyColor(btn, "TextColor3", GetColor("Text"))
+			btn.ZIndex = 53
+			btn.Parent = SearchResultsContainer
+
+			local crn = Instance.new("UICorner")
+			crn.CornerRadius = UDim.new(0, 4)
+			crn.Parent = btn
+
+			btn.Activated:Connect(function()
+				NavigateToElement(res.Item)
+			end)
+
+			contentHeight = contentHeight + 35
+
+			task.spawn(function()
+				task.wait(i * 0.05)
+				TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
+			end)
+		end
+
+		SearchResultsContainer.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
+	end
+
+	SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
+		DoSearch(SearchInput.Text)
+	end)
+
+	local searchOpen = false
+	SearchBtn.Activated:Connect(function()
+		searchOpen = not searchOpen
+		if searchOpen then
+			SearchOverlay.Visible = true
+			SearchContainer.Visible = true
+			SearchInput.Text = ""
+			TweenService:Create(SearchOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 0.3}):Play()
+			SearchInput:CaptureFocus()
+		else
+			TweenService:Create(SearchOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+			SearchContainer.Visible = false
+			task.wait(0.2)
+			SearchOverlay.Visible = false
+		end
+	end)
+
 
 	LayersTab.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	LayersTab.BackgroundTransparency = 0.9990000128746033
@@ -618,7 +876,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	UICorner2.Parent = LayersTab
 
 	DecideFrame.AnchorPoint = Vector2.new(0.5, 0)
-	DecideFrame.BackgroundColor3 = Colours.Stroke 
+	ApplyColor(DecideFrame, "BackgroundColor3", GetColor("Stroke"))
 	DecideFrame.BackgroundTransparency = 0.5 
 	DecideFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	DecideFrame.BorderSizePixel = 0
@@ -639,7 +897,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	UICorner6.CornerRadius = UDim.new(0, 2)
 	UICorner6.Parent = Layers
 
-	NameTab.Font = Enum.Font.GothamBold
+	FontManager:Set(NameTab, "Default")
 	NameTab.Text = ""
 	NameTab.TextColor3 = Color3.fromRGB(255, 255, 255)
 	NameTab.TextSize = 24
@@ -753,7 +1011,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	LogoPlayerUICorner.CornerRadius = UDim.new(0, 1000)
 	LogoPlayerUICorner.Parent = LogoPlayer
 
-	NamePlayer.Font = Enum.Font.GothamBold
+	FontManager:Set(NamePlayer, "Default")
 	NamePlayer.Text = GuiConfig["Name Player"]
 	NamePlayer.TextColor3 = Color3.fromRGB(230.00000149011612, 230.00000149011612, 230.00000149011612)
 	NamePlayer.TextSize = 12
@@ -781,21 +1039,226 @@ function UBHubLib:MakeGui(GuiConfig)
 	local OldSize = DropShadowHolder.Size
 	local MinimizedIcon = Instance.new("ImageButton")
 	local ScreenGui = Instance.new("ScreenGui")
+	local HUDGui = Instance.new("ScreenGui")
 	do
 		ProtectGui(ScreenGui)
+		ProtectGui(HUDGui)
 	end
 	ScreenGui.Name = "OpenClose"
 	ScreenGui.Parent = RunService:IsStudio() and LocalPlayer.PlayerGui or (gethui and gethui()) or CoreGui 
 	ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+	HUDGui.Name = "UBHub_QuickToggles"
+	HUDGui.Parent = ScreenGui.Parent
+	HUDGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+	-- Full screen overlays
+	local SearchOverlay = Instance.new("Frame")
+	SearchOverlay.Name = "SearchOverlay"
+	SearchOverlay.Size = UDim2.new(1,0,1,0)
+	ApplyColor(SearchOverlay, "BackgroundColor3", GetColor("Background"))
+	SearchOverlay.BackgroundTransparency = 1
+	SearchOverlay.Visible = false
+	SearchOverlay.ZIndex = 50 -- Below drop shadow but above layers
+	SearchOverlay.Parent = Main
+
+	local LightingBlur = Instance.new("BlurEffect")
+	LightingBlur.Size = 0
+	LightingBlur.Enabled = false
+	LightingBlur.Parent = game:GetService("Lighting")
+
+	local isEditMode = false
+	local selectedHUDButton = nil
+
+	local ResizePanel = Instance.new("Frame")
+	ResizePanel.Name = "ResizePanel"
+	ResizePanel.Size = UDim2.new(0, 200, 0, 100)
+	ResizePanel.AnchorPoint = Vector2.new(0.5, 0.5)
+	ResizePanel.Position = UDim2.new(0.5, 0, 0.5, 0)
+	ApplyColor(ResizePanel, "BackgroundColor3", GetColor("WindowBackground"))
+	ResizePanel.Visible = false
+	ResizePanel.ZIndex = 100
+	ResizePanel.Parent = UBHubGui
+	local rpCorner = Instance.new("UICorner")
+	rpCorner.CornerRadius = UDim.new(0, 8)
+	rpCorner.Parent = ResizePanel
+
+	local ResizeTitle = Instance.new("TextLabel")
+	FontManager:Set(ResizeTitle, "Default")
+	ResizeTitle.Text = "Resize Element"
+	ApplyColor(ResizeTitle, "TextColor3", GetColor("Text"))
+	ResizeTitle.Size = UDim2.new(1, 0, 0, 30)
+	ResizeTitle.BackgroundTransparency = 1
+	ResizeTitle.Parent = ResizePanel
+
+	local ResizeInputX = Instance.new("TextBox")
+	ResizeInputX.Size = UDim2.new(0.4, 0, 0, 30)
+	ResizeInputX.Position = UDim2.new(0.05, 0, 0.5, 0)
+	ApplyColor(ResizeInputX, "BackgroundColor3", GetColor("Secondary"))
+	ApplyColor(ResizeInputX, "TextColor3", GetColor("Text"))
+	FontManager:Set(ResizeInputX, "Default")
+	ResizeInputX.Parent = ResizePanel
+
+	local ResizeInputY = Instance.new("TextBox")
+	ResizeInputY.Size = UDim2.new(0.4, 0, 0, 30)
+	ResizeInputY.Position = UDim2.new(0.55, 0, 0.5, 0)
+	ApplyColor(ResizeInputY, "BackgroundColor3", GetColor("Secondary"))
+	ApplyColor(ResizeInputY, "TextColor3", GetColor("Text"))
+	FontManager:Set(ResizeInputY, "Default")
+	ResizeInputY.Parent = ResizePanel
+
+	local ResizeSliderFrame = Instance.new("Frame")
+	ResizeSliderFrame.Size = UDim2.new(0.8, 0, 0, 5)
+	ResizeSliderFrame.Position = UDim2.new(0.1, 0, 0.8, 0)
+	ApplyColor(ResizeSliderFrame, "BackgroundColor3", GetColor("Secondary"))
+	ResizeSliderFrame.Parent = ResizePanel
+
+	local ResizeSliderThumb = Instance.new("Frame")
+	ResizeSliderThumb.Size = UDim2.new(0, 10, 0, 15)
+	ResizeSliderThumb.AnchorPoint = Vector2.new(0.5, 0.5)
+	ResizeSliderThumb.Position = UDim2.new(0.5, 0, 0.5, 0)
+	ApplyColor(ResizeSliderThumb, "BackgroundColor3", GetColor("ThemeHighlight"))
+	ResizeSliderThumb.Parent = ResizeSliderFrame
+
+	local isSliderDragging = false
+
+	local function ApplyResize(newSizeRatio)
+		if not selectedHUDButton then return end
+		local baseSize = 30 -- min size
+		local maxSize = 150 -- max size
+		local newSize = baseSize + ((maxSize - baseSize) * newSizeRatio)
+
+		selectedHUDButton.Size = UDim2.new(0, newSize * 4, 0, newSize)
+		ResizeInputX.Text = tostring(math.floor(newSize * 4))
+		ResizeInputY.Text = tostring(math.floor(newSize))
+
+		-- Save the new size and position
+		local flagName = selectedHUDButton.Name:gsub("^HUD_", "")
+		if not ConfigManager.Flags.QuickToggleLayouts then ConfigManager.Flags.QuickToggleLayouts = {} end
+		ConfigManager.Flags.QuickToggleLayouts[flagName] = {
+			Position = {X = {Scale = selectedHUDButton.Position.X.Scale, Offset = selectedHUDButton.Position.X.Offset}, Y = {Scale = selectedHUDButton.Position.Y.Scale, Offset = selectedHUDButton.Position.Y.Offset}},
+			Size = {X = {Scale = selectedHUDButton.Size.X.Scale, Offset = selectedHUDButton.Size.X.Offset}, Y = {Scale = selectedHUDButton.Size.Y.Scale, Offset = selectedHUDButton.Size.Y.Offset}}
+		}
+		ConfigManager:UpdateFlag("QuickToggleLayouts", ConfigManager.Flags.QuickToggleLayouts)
+	end
+
+	ResizeSliderFrame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			isSliderDragging = true
+			local ratio = math.clamp((input.Position.X - ResizeSliderFrame.AbsolutePosition.X) / ResizeSliderFrame.AbsoluteSize.X, 0, 1)
+			ResizeSliderThumb.Position = UDim2.new(ratio, 0, 0.5, 0)
+			ApplyResize(ratio)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if isSliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local ratio = math.clamp((input.Position.X - ResizeSliderFrame.AbsolutePosition.X) / ResizeSliderFrame.AbsoluteSize.X, 0, 1)
+			ResizeSliderThumb.Position = UDim2.new(ratio, 0, 0.5, 0)
+			ApplyResize(ratio)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			isSliderDragging = false
+		end
+	end)
+
+	local function ApplyInputResize()
+		if not selectedHUDButton then return end
+		local nx = tonumber(ResizeInputX.Text) or selectedHUDButton.Size.X.Offset
+		local ny = tonumber(ResizeInputY.Text) or selectedHUDButton.Size.Y.Offset
+		selectedHUDButton.Size = UDim2.new(0, nx, 0, ny)
+
+		-- Try to sync slider if possible
+		local baseSize = 30
+		local maxSize = 150
+		local ratio = math.clamp((ny - baseSize) / (maxSize - baseSize), 0, 1)
+		ResizeSliderThumb.Position = UDim2.new(ratio, 0, 0.5, 0)
+
+		local flagName = selectedHUDButton.Name:gsub("^HUD_", "")
+		if not ConfigManager.Flags.QuickToggleLayouts then ConfigManager.Flags.QuickToggleLayouts = {} end
+		ConfigManager.Flags.QuickToggleLayouts[flagName] = {
+			Position = {X = {Scale = selectedHUDButton.Position.X.Scale, Offset = selectedHUDButton.Position.X.Offset}, Y = {Scale = selectedHUDButton.Position.Y.Scale, Offset = selectedHUDButton.Position.Y.Offset}},
+			Size = {X = {Scale = selectedHUDButton.Size.X.Scale, Offset = selectedHUDButton.Size.X.Offset}, Y = {Scale = selectedHUDButton.Size.Y.Scale, Offset = selectedHUDButton.Size.Y.Offset}}
+		}
+		ConfigManager:UpdateFlag("QuickToggleLayouts", ConfigManager.Flags.QuickToggleLayouts)
+	end
+
+	local function UpdateResizePanel(btn)
+		selectedHUDButton = btn
+		ResizeInputX.Text = tostring(btn.Size.X.Offset)
+		ResizeInputY.Text = tostring(btn.Size.Y.Offset)
+
+		local baseSize = 30
+		local maxSize = 150
+		local ratio = math.clamp((btn.Size.Y.Offset - baseSize) / (maxSize - baseSize), 0, 1)
+		ResizeSliderThumb.Position = UDim2.new(ratio, 0, 0.5, 0)
+
+		ResizePanel.Visible = true
+	end
+
+	ResizeInputX.FocusLost:Connect(ApplyInputResize)
+	ResizeInputY.FocusLost:Connect(ApplyInputResize)
+
+	EditBtn.Activated:Connect(function()
+		isEditMode = not isEditMode
+		if isEditMode then
+			ApplyColor(EditHighlight, "BackgroundColor3", GetColor("Primary"))
+			LightingBlur.Enabled = true
+			TweenService:Create(LightingBlur, TweenInfo.new(0.3), {Size = 15}):Play()
+
+			for _, btn in ipairs(HUDGui:GetChildren()) do
+				if btn:IsA("TextButton") then
+					btn.Draggable = true
+
+					-- Overwrite click to open resize panel instead of toggling
+					local clickConn
+					clickConn = btn.Activated:Connect(function()
+						if isEditMode then
+							UpdateResizePanel(btn)
+						else
+							clickConn:Disconnect()
+						end
+					end)
+				end
+			end
+		else
+			ApplyColor(EditHighlight, "BackgroundColor3", GetColor("ThemeHighlight"))
+			TweenService:Create(LightingBlur, TweenInfo.new(0.3), {Size = 0}):Play()
+			ResizePanel.Visible = false
+			task.wait(0.3)
+			LightingBlur.Enabled = false
+
+			for _, btn in ipairs(HUDGui:GetChildren()) do
+				if btn:IsA("TextButton") then
+					btn.Draggable = false
+					-- Save position
+					local flagName = btn.Name:gsub("^HUD_", "")
+					if not ConfigManager.Flags.QuickToggleLayouts then ConfigManager.Flags.QuickToggleLayouts = {} end
+
+					local currentSaved = ConfigManager.Flags.QuickToggleLayouts[flagName] or {}
+					ConfigManager.Flags.QuickToggleLayouts[flagName] = {
+						Position = {X = {Scale = btn.Position.X.Scale, Offset = btn.Position.X.Offset}, Y = {Scale = btn.Position.Y.Scale, Offset = btn.Position.Y.Offset}},
+						Size = currentSaved.Size or {X = {Scale = btn.Size.X.Scale, Offset = btn.Size.X.Offset}, Y = {Scale = btn.Size.Y.Scale, Offset = btn.Size.Y.Offset}}
+					}
+				end
+			end
+			ConfigManager:UpdateFlag("QuickToggleLayouts", ConfigManager.Flags.QuickToggleLayouts)
+		end
+	end)
+
 	MinimizedIcon.Image = _G.MinIcon or "rbxassetid://94513440833543"
+
 	MinimizedIcon.Size = UDim2.new(0, 55, 0, 50)
 	MinimizedIcon.Position = UDim2.new(0.1021, 0, 0.0743, 0)
 	MinimizedIcon.BackgroundTransparency = 1 
-    MinimizedIcon.BackgroundColor3 = Colours.ThemeHighlight 
+    ApplyColor(MinimizedIcon, "BackgroundColor3", GetColor("ThemeHighlight"))
 	MinimizedIcon.Parent = ScreenGui
 	MinimizedIcon.Draggable = true
 	MinimizedIcon.Visible = false
-	MinimizedIcon.BorderColor3 = Colours.ThemeHighlight
+	ApplyColor(MinimizedIcon, "BorderColor3", GetColor("ThemeHighlight"))
 	Min.Activated:Connect(function()
 		CircleClick(Min, Mouse.X, Mouse.Y)
 		DropShadowHolder.Visible = false
@@ -898,7 +1361,7 @@ function UBHubLib:MakeGui(GuiConfig)
 	local DropPageLayout = Instance.new("UIPageLayout");
 
 	DropdownSelect.AnchorPoint = Vector2.new(1, 0.5)
-	DropdownSelect.BackgroundColor3 = Colours.Primary
+	ApplyColor(DropdownSelect, "BackgroundColor3", GetColor("Primary"))
 	DropdownSelect.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	DropdownSelect.BorderSizePixel = 0
 	DropdownSelect.LayoutOrder = 1
@@ -949,6 +1412,67 @@ function UBHubLib:MakeGui(GuiConfig)
 	local Tabs = {}
 	local CountTab = 0
 	local CountDropdown = 0
+
+	local ElementRegistry = {}
+	Tabs.ConfigManager = ConfigManager
+	Tabs.ElementRegistry = ElementRegistry
+
+	function Tabs:AddTabCategory(CategoryName)
+		local CatLabel = Instance.new("TextLabel")
+		FontManager:Set(CatLabel, "Default")
+		CatLabel.Text = string.upper(CategoryName)
+		ApplyColor(CatLabel, "TextColor3", GetColor("Text"))
+		CatLabel.TextTransparency = 0.5
+		CatLabel.TextSize = 11
+		CatLabel.TextXAlignment = Enum.TextXAlignment.Left
+		CatLabel.BackgroundTransparency = 1
+		CatLabel.Size = UDim2.new(1, -10, 0, 20)
+		CatLabel.Position = UDim2.new(0, 10, 0, 0)
+		CatLabel.LayoutOrder = CountTab
+		CatLabel.Name = "Category_" .. CategoryName
+		CatLabel.Parent = ScrollTab
+		CountTab = CountTab + 1
+	end
+
+	function Tabs:AddTabDivider()
+		local Div = Instance.new("Frame")
+		Div.Size = UDim2.new(1, -20, 0, 1)
+		ApplyColor(Div, "BackgroundColor3", GetColor("Stroke"))
+		Div.BackgroundTransparency = 0.5
+		Div.Position = UDim2.new(0, 10, 0, 0)
+		Div.LayoutOrder = CountTab
+		Div.Name = "TabDivider"
+		Div.Parent = ScrollTab
+		CountTab = CountTab + 1
+	end
+
+	function Tabs:AddStaticTab(TabConfig)
+		local TabFunc = self:CreateTab(TabConfig)
+		task.spawn(function()
+			task.wait() -- Wait for the tab to be actually created and parented to ScrollTab
+			-- Find the newly created tab frame. It will have the highest LayoutOrder.
+			local targetTab
+			local maxOrder = -1
+			for _, child in ipairs(ScrollTab:GetChildren()) do
+				if child:IsA("Frame") and child.Name == "Tab" and child.LayoutOrder > maxOrder then
+					maxOrder = child.LayoutOrder
+					targetTab = child
+				end
+			end
+
+			if targetTab then
+				-- We want it fixed to the bottom of LayersTab, not inside ScrollTab
+				targetTab.Parent = LayersTab
+				targetTab.AnchorPoint = Vector2.new(0, 1)
+				targetTab.Position = UDim2.new(0, 0, 1, -10) -- 10px from bottom
+				-- Resize ScrollTab so it doesn't overlap the static tab
+				ScrollTab.Size = UDim2.new(1, 0, 1, -60)
+			end
+		end)
+		return TabFunc
+	end
+
+
 	function Tabs:CreateTab(TabConfig)
 		local TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "Tab"
@@ -981,11 +1505,11 @@ function UBHubLib:MakeGui(GuiConfig)
 		local UIStroke2 = Instance.new("UIStroke");
 		local UICorner4 = Instance.new("UICorner");
 
-		Tab.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		if CountTab == 0 then
-			Tab.BackgroundTransparency = 0.9200000166893005
+		ApplyColor(Tab, "BackgroundColor3", GetColor("Primary"))
+		if CountTab == 0 or (CountTab == 1 and ScrollTab:FindFirstChild("Tab") == nil) then -- Adjust for categories
+			Tab.BackgroundTransparency = 0.8
 		else
-			Tab.BackgroundTransparency = 0.9990000128746033
+			Tab.BackgroundTransparency = 1
 		end
 		Tab.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Tab.BorderSizePixel = 0
@@ -997,7 +1521,7 @@ function UBHubLib:MakeGui(GuiConfig)
 		UICorner3.CornerRadius = UDim.new(0, 4)
 		UICorner3.Parent = Tab
 
-		TabButton.Font = Enum.Font.GothamBold
+		FontManager:Set(TabButton, "Default")
 		TabButton.Text = ""
 		TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 		TabButton.TextSize = 13
@@ -1010,34 +1534,41 @@ function UBHubLib:MakeGui(GuiConfig)
 		TabButton.Name = "TabButton"
 		TabButton.Parent = Tab
 
-		TabName.Font = Enum.Font.GothamBold
+		FontManager:Set(TabName, "Default")
 		TabName.Text = TabConfig.Name
-		TabName.TextColor3 = Color3.fromRGB(255, 255, 255)
+		ApplyColor(TabName, "TextColor3", GetColor("Text"))
 		TabName.TextSize = 13
 		TabName.TextXAlignment = Enum.TextXAlignment.Left
-		TabName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		TabName.BackgroundTransparency = 0.9990000128746033
-		TabName.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		TabName.BorderSizePixel = 0
+		TabName.BackgroundTransparency = 1
 		TabName.Size = UDim2.new(1, 0, 1, 0)
 		TabName.Position = UDim2.new(0, 30, 0, 0)
 		TabName.Name = "TabName"
 		TabName.Parent = Tab
 
-		FeatureImg.Image = TabConfig.Icon
-		FeatureImg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		FeatureImg.BackgroundTransparency = 0.9990000128746033
-		FeatureImg.BorderColor3 = Color3.fromRGB(0, 0, 0)
-		FeatureImg.BorderSizePixel = 0
+		if TabConfig.Icon ~= "" then
+			local iconId = GetIcon("lucide", TabConfig.Icon)
+			if type(iconId) == "table" then FeatureImg.Image = iconId[1] else FeatureImg.Image = iconId end
+		end
+		FeatureImg.BackgroundTransparency = 1
 		FeatureImg.Position = UDim2.new(0, 9, 0, 7)
 		FeatureImg.Size = UDim2.new(0, 16, 0, 16)
 		FeatureImg.Name = "FeatureImg"
 		FeatureImg.Parent = Tab
-		if CountTab == 0 then
+
+		-- Assume first real tab is selected
+		local hasOtherTabs = false
+		for _, child in ipairs(ScrollTab:GetChildren()) do
+			if child:IsA("Frame") and child.Name == "Tab" and child ~= Tab then
+				hasOtherTabs = true
+				break
+			end
+		end
+
+		if not hasOtherTabs then
 			LayersPageLayout:JumpToIndex(0)
 			NameTab.Text = TabConfig.Name
 			local ChooseFrame = Instance.new("Frame");
-			ChooseFrame.BackgroundColor3 = Colours.ThemeHighlight
+			ApplyColor(ChooseFrame, "BackgroundColor3", GetColor("ThemeHighlight"))
 			ChooseFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			ChooseFrame.BorderSizePixel = 0
 			ChooseFrame.Position = UDim2.new(0, 2, 0, 9)
@@ -1069,14 +1600,15 @@ function UBHubLib:MakeGui(GuiConfig)
 			if FrameChoose ~= nil and Tab.LayoutOrder ~= LayersPageLayout.CurrentPage.LayoutOrder then
 				for _, TabFrame in ipairs(ScrollTab:GetChildren()) do
 					if TabFrame.Name == "Tab" then
-						TweenService:Create(TabFrame,TweenInfo.new(0.001, Enum.EasingStyle.Linear),{BackgroundTransparency = 0.9990000128746033}):Play()
+						TweenService:Create(TabFrame,TweenInfo.new(0.1, Enum.EasingStyle.Linear),{BackgroundTransparency = 1}):Play()
 					end    
 				end
-				TweenService:Create(Tab, TweenInfo.new(0.001, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.92}):Play()
-				TweenService:Create(FrameChoose,TweenInfo.new(0.01, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 2, 0, 9 + (33 * Tab.LayoutOrder))}):Play()
+				TweenService:Create(Tab, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.8}):Play()
+				-- Calculate the exact Y offset of the tab for the choose frame
+				local tabOffsetY = Tab.AbsolutePosition.Y - ScrollTab.AbsolutePosition.Y + ScrollTab.CanvasPosition.Y
+				TweenService:Create(FrameChoose,TweenInfo.new(0.1, Enum.EasingStyle.Linear),{Position = UDim2.new(0, 2, 0, tabOffsetY + 9)}):Play()
 				LayersPageLayout:JumpToIndex(Tab.LayoutOrder)
 				NameTab.Text = TabConfig.Name
-				TweenService:Create(FrameChoose,TweenInfo.new(0.01, Enum.EasingStyle.Linear),{Size = UDim2.new(0, 1, 0, 20)}):Play()
 			end
 		end)
 		--// Section 
@@ -1155,7 +1687,7 @@ function UBHubLib:MakeGui(GuiConfig)
 			FeatureImg_Section.Name = "FeatureImg"
 			FeatureImg_Section.Parent = FeatureFrame
 
-			SectionTitle.Font = Enum.Font.GothamBold
+			FontManager:Set(SectionTitle, "Default")
 			SectionTitle.Text = Title
 			SectionTitle.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
 			SectionTitle.TextSize = 13
@@ -1184,9 +1716,9 @@ function UBHubLib:MakeGui(GuiConfig)
             UICorner1_Section.CornerRadius = UDim.new(0,2) 
 
 			UIGradient.Color = ColorSequence.new{
-				ColorSequenceKeypoint.new(0, Colours.Primary),
+				ColorSequenceKeypoint.new(0, GetColor("Primary")),
 				ColorSequenceKeypoint.new(0.5, GuiConfig.Color),
-				ColorSequenceKeypoint.new(1, Colours.Primary)
+				ColorSequenceKeypoint.new(1, GetColor("Primary"))
 			}
 			UIGradient.Parent = SectionDecideFrame
 			--// Section Add
@@ -1269,12 +1801,10 @@ function UBHubLib:MakeGui(GuiConfig)
                 DividerConfig = DividerConfig or {}
                 local text = DividerConfig.Text or DividerConfig.Title or ""
                 local thickness = DividerConfig.Thickness or 1
-                local vPadding = DividerConfig.VerticalPadding or 5 -- Default vertical padding for text
-                local lineColor = DividerConfig.Color or Colours.Accent
-                local textColor = DividerConfig.TextColor or Colours.Text
+                local vPadding = DividerConfig.VerticalPadding or 5
+                local lineColor = DividerConfig.Color or GetColor("Accent")
+                local textColor = DividerConfig.TextColor or GetColor("Text")
                 local textSize = DividerConfig.TextSize or 12
-                local lineEndsPadding = DividerConfig.LineEndsPadding or 10
-                local textToLineSpacing = DividerConfig.TextToLineSpacing or 5
 
                 local DivParent = Instance.new("Frame")
                 DivParent.Name = "DividerContainer"
@@ -1283,29 +1813,54 @@ function UBHubLib:MakeGui(GuiConfig)
                 DivParent.LayoutOrder = CountItem
                 DivParent.Parent = SectionAdd
                 
+                local listLayout = Instance.new("UIListLayout")
+                listLayout.FillDirection = Enum.FillDirection.Horizontal
+                listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+                listLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+                listLayout.Padding = UDim.new(0, 8)
+                listLayout.Parent = DivParent
+
                 if text ~= "" then
+                    local line1 = Instance.new("Frame")
+                    line1.Size = UDim2.new(0.5, -50, 0, thickness)
+                    line1.BackgroundColor3 = lineColor
+                    line1.BorderSizePixel = 0
+                    line1.Parent = DivParent
+
                     local DividerText = Instance.new("TextLabel")
                     DividerText.Name = "DividerText"
-                    DividerText.Font = Enum.Font.GothamBold
-                    DividerText.Text = "- [ " .. text .. " ] -"
+                    FontManager:Set(DividerText, "Default")
+                    DividerText.Text = text
                     DividerText.TextColor3 = textColor
                     DividerText.TextSize = textSize
-                    DividerText.TextXAlignment = Enum.TextXAlignment.Center
-                    DividerText.TextYAlignment = Enum.TextYAlignment.Center
                     DividerText.BackgroundTransparency = 1
-                    DividerText.Size = UDim2.new(1, 0, 1, 0)
-                    DividerText.Position = UDim2.new(0.5, 0, 0.5, 0)
-                    DividerText.AnchorPoint = Vector2.new(0.5, 0.5)
+                    DividerText.AutomaticSize = Enum.AutomaticSize.X
+                    DividerText.Size = UDim2.new(0, 0, 1, 0)
                     DividerText.Parent = DivParent
+
+                    local line2 = Instance.new("Frame")
+                    line2.Size = UDim2.new(0.5, -50, 0, thickness)
+                    line2.BackgroundColor3 = lineColor
+                    line2.BorderSizePixel = 0
+                    line2.Parent = DivParent
+
                     DivParent.Size = UDim2.new(1,0,0, DividerText.TextBounds.Y + vPadding * 2)
+
+                    -- Dynamically fill space
+                    task.spawn(function()
+                        task.wait()
+                        local totalWidth = DivParent.AbsoluteSize.X
+                        local textWidth = DividerText.AbsoluteSize.X
+                        local lineWidth = (totalWidth - textWidth - 16) / 2
+                        line1.Size = UDim2.new(0, lineWidth, 0, thickness)
+                        line2.Size = UDim2.new(0, lineWidth, 0, thickness)
+                    end)
                 else
                     local DividerLine = Instance.new("Frame")
                     DividerLine.Name = "DividerLine"
                     DividerLine.BackgroundColor3 = lineColor
                     DividerLine.BorderSizePixel = 0
-                    DividerLine.Size = UDim2.new(1, -lineEndsPadding * 2, 0, thickness)
-                    DividerLine.Position = UDim2.new(0, lineEndsPadding, 0.5, 0)
-                    DividerLine.AnchorPoint = Vector2.new(0, 0.5)
+                    DividerLine.Size = UDim2.new(1, -20, 0, thickness)
                     DividerLine.Parent = DivParent
                 end
 
@@ -1315,6 +1870,8 @@ function UBHubLib:MakeGui(GuiConfig)
 				local ParagraphConfig = ParagraphConfig or {}
 				ParagraphConfig.Title = ParagraphConfig.Title or "Title"
 				ParagraphConfig.Content = ParagraphConfig.Content or "Content"
+				ParagraphConfig.Image = ParagraphConfig.Image or ""
+				ParagraphConfig.Buttons = ParagraphConfig.Buttons or {}
 				local ParagraphFunc = {}
 				
 				local Paragraph = Instance.new("Frame");
@@ -1333,28 +1890,91 @@ function UBHubLib:MakeGui(GuiConfig)
 				UICorner14.CornerRadius = UDim.new(0, 4)
 				UICorner14.Parent = Paragraph
 
-				ParagraphTitle.Font = Enum.Font.GothamBold
+				local imageOffset = 0
+				local ParagraphImg = nil
+				if ParagraphConfig.Image ~= "" then
+					imageOffset = 40
+					ParagraphImg = Instance.new("ImageLabel")
+					ParagraphImg.Name = "ParagraphImage"
+					ParagraphImg.Size = UDim2.new(0, 32, 0, 32)
+					ParagraphImg.Position = UDim2.new(0, 10, 0, 10)
+					ParagraphImg.BackgroundTransparency = 1
+					local isHttp = ParagraphConfig.Image:match("^http")
+					local isAsset = ParagraphConfig.Image:match("^rbxassetid")
+					if isHttp or isAsset then
+						ParagraphImg.Image = ParagraphConfig.Image
+					else
+						local iconId = GetIcon("lucide", ParagraphConfig.Image)
+						if type(iconId) == "table" then ParagraphImg.Image = iconId[1] else ParagraphImg.Image = iconId end
+					end
+					ParagraphImg.Parent = Paragraph
+				end
+
+				FontManager:Set(ParagraphTitle, "Default")
 				ParagraphTitle.Text = ParagraphConfig.Title .. " | " .. ParagraphConfig.Content
-				ParagraphTitle.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
+				ApplyColor(ParagraphTitle, "TextColor3", GetColor("Text"))
 				ParagraphTitle.TextSize = 13
                 ParagraphTitle.TextWrapped = true
 				ParagraphTitle.TextXAlignment = Enum.TextXAlignment.Left
 				ParagraphTitle.TextYAlignment = Enum.TextYAlignment.Top
 				ParagraphTitle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-				ParagraphTitle.BackgroundTransparency = 0.9990000128746033
+				ParagraphTitle.BackgroundTransparency = 1
 				ParagraphTitle.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				ParagraphTitle.BorderSizePixel = 0
-				ParagraphTitle.Position = UDim2.new(0, 10, 0, 10)
-				ParagraphTitle.Size = UDim2.new(1, -20, 0, 13) 
+				ParagraphTitle.Position = UDim2.new(0, 10 + imageOffset, 0, 10)
+				ParagraphTitle.Size = UDim2.new(1, -20 - imageOffset, 0, 13)
 				ParagraphTitle.Name = "ParagraphTitle"
 				ParagraphTitle.Parent = Paragraph
 				
+				local buttonsContainer = nil
+				if #ParagraphConfig.Buttons > 0 then
+					buttonsContainer = Instance.new("Frame")
+					buttonsContainer.Name = "ButtonsContainer"
+					buttonsContainer.BackgroundTransparency = 1
+					buttonsContainer.Size = UDim2.new(1, -20, 0, 0)
+					buttonsContainer.Position = UDim2.new(0, 10, 0, 0) -- Y updated dynamically
+					buttonsContainer.Parent = Paragraph
+
+					local uiList = Instance.new("UIListLayout")
+					uiList.FillDirection = Enum.FillDirection.Horizontal
+					uiList.Padding = UDim.new(0, 5)
+					uiList.Parent = buttonsContainer
+
+					for _, btnConf in ipairs(ParagraphConfig.Buttons) do
+						local pBtn = Instance.new("TextButton")
+						pBtn.Name = "ParagraphButton_" .. (btnConf.Title or "Btn")
+						pBtn.Size = UDim2.new(0, 100, 0, 26)
+						ApplyColor(pBtn, "BackgroundColor3", GetColor("Secondary"))
+						local pCorner = Instance.new("UICorner")
+						pCorner.CornerRadius = UDim.new(0, 4)
+						pCorner.Parent = pBtn
+						FontManager:Set(pBtn, "Medium")
+						pBtn.Text = btnConf.Title or "Button"
+						ApplyColor(pBtn, "TextColor3", GetColor("Text"))
+						pBtn.TextSize = 12
+						pBtn.Parent = buttonsContainer
+
+						pBtn.Activated:Connect(function()
+							CircleClick(pBtn, Mouse.X, Mouse.Y)
+							if btnConf.Callback then btnConf.Callback() end
+						end)
+					end
+				end
+
                 local function UpdateParagraphSize()
                     task.wait()
                     local textBounds = ParagraphTitle.TextBounds
-                    local newHeight = textBounds.Y + 20 
+                    local newHeight = textBounds.Y + 20
+					if ParagraphImg and newHeight < 52 then newHeight = 52 end
+
+					if buttonsContainer then
+						buttonsContainer.Position = UDim2.new(0, 10, 0, newHeight)
+						buttonsContainer.Size = UDim2.new(1, -20, 0, 26)
+						newHeight = newHeight + 26 + 10
+					end
+
                     Paragraph.Size = UDim2.new(1, 0, 0, math.max(newHeight, 46))
-                    ParagraphTitle.Size = UDim2.new(1, -20, 0, textBounds.Y) 
+                    ParagraphTitle.Size = UDim2.new(1, -20 - imageOffset, 0, textBounds.Y)
                     UpdateSizeSection()
                 end
                 
@@ -1371,7 +1991,437 @@ function UBHubLib:MakeGui(GuiConfig)
 				CountItem = CountItem + 1
 				return ParagraphFunc
 			end
+
+			function Items:ShowDialog(DialogConfig)
+				local DialogConfig = DialogConfig or {}
+				DialogConfig.Title = DialogConfig.Title or "Dialog"
+				DialogConfig.Content = DialogConfig.Content or "Content"
+				DialogConfig.Buttons = DialogConfig.Buttons or {}
+
+				local Overlay = Instance.new("Frame")
+				Overlay.Name = "DialogOverlay"
+				Overlay.Size = UDim2.new(1,0,1,0)
+				ApplyColor(Overlay, "BackgroundColor3", GetColor("Background"))
+				Overlay.BackgroundTransparency = 0.5
+				Overlay.ZIndex = 200
+				Overlay.Parent = Main
+
+				local Dialog = Instance.new("Frame")
+				Dialog.Name = "DialogFrame"
+				Dialog.Size = UDim2.new(0, 300, 0, 150)
+				Dialog.AnchorPoint = Vector2.new(0.5, 0.5)
+				Dialog.Position = UDim2.new(0.5, 0, 0.5, 0)
+				ApplyColor(Dialog, "BackgroundColor3", GetColor("WindowBackground"))
+				Dialog.ZIndex = 201
+				Dialog.Parent = Overlay
+
+				local dCorner = Instance.new("UICorner")
+				dCorner.CornerRadius = UDim.new(0, 8)
+				dCorner.Parent = Dialog
+
+				local dTitle = Instance.new("TextLabel")
+				dTitle.Name = "DialogTitle"
+				FontManager:Set(dTitle, "Default")
+				dTitle.Text = DialogConfig.Title
+				ApplyColor(dTitle, "TextColor3", GetColor("Text"))
+				dTitle.TextSize = 16
+				dTitle.TextXAlignment = Enum.TextXAlignment.Left
+				dTitle.BackgroundTransparency = 1
+				dTitle.Size = UDim2.new(1, -20, 0, 30)
+				dTitle.Position = UDim2.new(0, 10, 0, 10)
+				dTitle.ZIndex = 202
+				dTitle.Parent = Dialog
+
+				local dContent = Instance.new("TextLabel")
+				dContent.Name = "DialogContent"
+				FontManager:Set(dContent, "Medium")
+				dContent.Text = DialogConfig.Content
+				ApplyColor(dContent, "TextColor3", GetColor("Text"))
+				dContent.TextTransparency = 0.3
+				dContent.TextSize = 13
+				dContent.TextWrapped = true
+				dContent.TextXAlignment = Enum.TextXAlignment.Left
+				dContent.TextYAlignment = Enum.TextYAlignment.Top
+				dContent.BackgroundTransparency = 1
+				dContent.Size = UDim2.new(1, -20, 0, 50)
+				dContent.Position = UDim2.new(0, 10, 0, 45)
+				dContent.ZIndex = 202
+				dContent.Parent = Dialog
+
+				local dButtons = Instance.new("Frame")
+				dButtons.Name = "DialogButtons"
+				dButtons.BackgroundTransparency = 1
+				dButtons.Size = UDim2.new(1, -20, 0, 35)
+				dButtons.Position = UDim2.new(0, 10, 1, -45)
+				dButtons.ZIndex = 202
+				dButtons.Parent = Dialog
+
+				local uiList = Instance.new("UIListLayout")
+				uiList.FillDirection = Enum.FillDirection.Horizontal
+				uiList.HorizontalAlignment = Enum.HorizontalAlignment.Right
+				uiList.Padding = UDim.new(0, 10)
+				uiList.Parent = dButtons
+
+				for _, btnConf in ipairs(DialogConfig.Buttons) do
+					local btn = Instance.new("TextButton")
+					btn.Size = UDim2.new(0, 80, 1, 0)
+					local bCorner = Instance.new("UICorner")
+					bCorner.CornerRadius = UDim.new(0, 4)
+					bCorner.Parent = btn
+
+					FontManager:Set(btn, "Default")
+					btn.Text = btnConf.Title or "Btn"
+					btn.TextSize = 14
+					btn.ZIndex = 203
+
+					if btnConf.Variant == "Primary" then
+						ApplyColor(btn, "BackgroundColor3", GetColor("Primary"))
+						ApplyColor(btn, "TextColor3", GetColor("Text"))
+					elseif btnConf.Variant == "Secondary" then
+						btn.BackgroundTransparency = 1
+						ApplyColor(btn, "TextColor3", GetColor("Text"))
+						local stroke = Instance.new("UIStroke")
+						stroke.Thickness = 1
+						ApplyColor(stroke, "Color", GetColor("Stroke"))
+						stroke.Parent = btn
+					else
+						btn.BackgroundTransparency = 1
+						ApplyColor(btn, "TextColor3", GetColor("Text"))
+						btn.TextTransparency = 0.3
+					end
+
+					btn.Parent = dButtons
+
+					btn.Activated:Connect(function()
+						CircleClick(btn, Mouse.X, Mouse.Y)
+						Overlay:Destroy()
+						if btnConf.Callback then btnConf.Callback() end
+					end)
+				end
+			end
+
+			function Items:AddColorPicker(ColorPickerConfig)
+				local ColorPickerConfig = ColorPickerConfig or {}
+				ColorPickerConfig.Title = ColorPickerConfig.Title or "Color Picker"
+				ColorPickerConfig.Default = ColorPickerConfig.Default or Color3.new(1,1,1)
+				ColorPickerConfig.Callback = ColorPickerConfig.Callback or function() end
+
+				local PickerFunc = {Value = ColorPickerConfig.Default, Object = nil}
+
+				local Container = Instance.new("Frame")
+				Container.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Container.BackgroundTransparency = 0.935
+				Container.BorderSizePixel = 0
+				Container.LayoutOrder = CountItem
+				Container.Size = UDim2.new(1, 0, 0, 46)
+				Container.Name = "ColorPickerContainer"
+				Container.Parent = SectionAdd
+                PickerFunc.Object = Container
+
+				table.insert(ElementRegistry, {
+					Title = ColorPickerConfig.Title,
+					Description = "Color Picker Element",
+					TabOrder = Tab.LayoutOrder,
+					Frame = Container,
+					Type = "ColorPicker",
+					Activate = function() end
+				})
+
+				local UICorner = Instance.new("UICorner")
+				UICorner.CornerRadius = UDim.new(0, 4)
+				UICorner.Parent = Container
+
+				local Title = Instance.new("TextLabel")
+				FontManager:Set(Title, "Default")
+				Title.Text = ColorPickerConfig.Title
+				ApplyColor(Title, "TextColor3", GetColor("Text"))
+				Title.TextSize = 13
+				Title.TextXAlignment = Enum.TextXAlignment.Left
+				Title.TextYAlignment = Enum.TextYAlignment.Center
+				Title.BackgroundTransparency = 1
+				Title.Position = UDim2.new(0, 10, 0, 0)
+				Title.Size = UDim2.new(1, -60, 1, 0)
+				Title.Parent = Container
+
+				local ColorPreviewBtn = Instance.new("TextButton")
+				ColorPreviewBtn.Text = ""
+				ColorPreviewBtn.Size = UDim2.new(0, 40, 0, 26)
+				ColorPreviewBtn.AnchorPoint = Vector2.new(1, 0.5)
+				ColorPreviewBtn.Position = UDim2.new(1, -10, 0.5, 0)
+				ColorPreviewBtn.BackgroundColor3 = PickerFunc.Value
+				local prevCorner = Instance.new("UICorner")
+				prevCorner.CornerRadius = UDim.new(0, 4)
+				prevCorner.Parent = ColorPreviewBtn
+				local prevStroke = Instance.new("UIStroke")
+				prevStroke.Thickness = 1
+				ApplyColor(prevStroke, "Color", GetColor("Stroke"))
+				prevStroke.Parent = ColorPreviewBtn
+				ColorPreviewBtn.Parent = Container
+
+				ColorPreviewBtn.Activated:Connect(function()
+					CircleClick(ColorPreviewBtn, Mouse.X, Mouse.Y)
+
+					-- Floating Color Picker UI
+					if Main:FindFirstChild("FloatingColorPicker") then
+						Main.FloatingColorPicker:Destroy()
+					end
+
+					local PickerPopup = Instance.new("Frame")
+					PickerPopup.Name = "FloatingColorPicker"
+					PickerPopup.Size = UDim2.new(0, 250, 0, 300)
+					ApplyColor(PickerPopup, "BackgroundColor3", GetColor("WindowBackground"))
+					PickerPopup.Position = UDim2.new(0.5, 0, 0.5, 0)
+					PickerPopup.AnchorPoint = Vector2.new(0.5, 0.5)
+					PickerPopup.ZIndex = 300
+					PickerPopup.Active = true
+					PickerPopup.Draggable = true
+					PickerPopup.Parent = Main
+
+					local ppCorner = Instance.new("UICorner")
+					ppCorner.CornerRadius = UDim.new(0, 8)
+					ppCorner.Parent = PickerPopup
+
+					local ppStroke = Instance.new("UIStroke")
+					ppStroke.Thickness = 1
+					ApplyColor(ppStroke, "Color", GetColor("Stroke"))
+					ppStroke.Parent = PickerPopup
+
+					local pTitle = Instance.new("TextLabel")
+					FontManager:Set(pTitle, "Default")
+					pTitle.Text = "Edit Color: " .. ColorPickerConfig.Title
+					ApplyColor(pTitle, "TextColor3", GetColor("Text"))
+					pTitle.TextSize = 14
+					pTitle.TextXAlignment = Enum.TextXAlignment.Left
+					pTitle.BackgroundTransparency = 1
+					pTitle.Size = UDim2.new(1, -20, 0, 30)
+					pTitle.Position = UDim2.new(0, 10, 0, 5)
+					pTitle.ZIndex = 301
+					pTitle.Parent = PickerPopup
+
+					local closeBtn = Instance.new("TextButton")
+					closeBtn.Text = "X"
+					ApplyColor(closeBtn, "TextColor3", GetColor("Text"))
+					closeBtn.BackgroundTransparency = 1
+					closeBtn.Size = UDim2.new(0, 30, 0, 30)
+					closeBtn.AnchorPoint = Vector2.new(1,0)
+					closeBtn.Position = UDim2.new(1, 0, 0, 5)
+					closeBtn.ZIndex = 302
+					closeBtn.Parent = PickerPopup
+
+					closeBtn.Activated:Connect(function()
+						PickerPopup:Destroy()
+					end)
+
+					-- Color Wheel/Hue Map
+					local ColorMap = Instance.new("ImageButton")
+					ColorMap.Size = UDim2.new(0, 180, 0, 180)
+					ColorMap.Position = UDim2.new(0, 10, 0, 40)
+					ColorMap.Image = "rbxassetid://4155801252"
+					ColorMap.BackgroundColor3 = Color3.fromHSV(0, 1, 1)
+					local cmCorner = Instance.new("UICorner")
+					cmCorner.CornerRadius = UDim.new(0, 4)
+					cmCorner.Parent = ColorMap
+					ColorMap.ZIndex = 301
+					ColorMap.Parent = PickerPopup
+
+					local MapCursor = Instance.new("Frame")
+					MapCursor.Size = UDim2.new(0, 8, 0, 8)
+					MapCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+					MapCursor.Position = UDim2.new(0.5, 0, 0.5, 0)
+					MapCursor.BackgroundColor3 = Color3.new(1,1,1)
+					local mcCorner = Instance.new("UICorner")
+					mcCorner.CornerRadius = UDim.new(1, 0)
+					mcCorner.Parent = MapCursor
+					MapCursor.ZIndex = 302
+					MapCursor.Parent = ColorMap
+
+					-- Hue Slider
+					local HueSlider = Instance.new("ImageButton")
+					HueSlider.Size = UDim2.new(0, 30, 0, 180)
+					HueSlider.Position = UDim2.new(0, 200, 0, 40)
+					HueSlider.AutoButtonColor = false
+
+					local UIGradient = Instance.new("UIGradient")
+					UIGradient.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 1, 1)),
+						ColorSequenceKeypoint.new(0.167, Color3.fromHSV(0.167, 1, 1)),
+						ColorSequenceKeypoint.new(0.333, Color3.fromHSV(0.333, 1, 1)),
+						ColorSequenceKeypoint.new(0.5, Color3.fromHSV(0.5, 1, 1)),
+						ColorSequenceKeypoint.new(0.667, Color3.fromHSV(0.667, 1, 1)),
+						ColorSequenceKeypoint.new(0.833, Color3.fromHSV(0.833, 1, 1)),
+						ColorSequenceKeypoint.new(1, Color3.fromHSV(1, 1, 1))
+					})
+					UIGradient.Rotation = 90
+					UIGradient.Parent = HueSlider
+					local hsCorner = Instance.new("UICorner")
+					hsCorner.CornerRadius = UDim.new(0, 4)
+					hsCorner.Parent = HueSlider
+					HueSlider.ZIndex = 301
+					HueSlider.Parent = PickerPopup
+
+					local HueCursor = Instance.new("Frame")
+					HueCursor.Size = UDim2.new(1, 4, 0, 4)
+					HueCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+					HueCursor.Position = UDim2.new(0.5, 0, 0, 0)
+					HueCursor.BackgroundColor3 = Color3.new(1,1,1)
+					HueCursor.ZIndex = 302
+					HueCursor.Parent = HueSlider
+
+					-- RGB inputs below
+					local rBox = Instance.new("TextBox")
+					rBox.Text = tostring(math.floor(PickerFunc.Value.R * 255))
+					rBox.Size = UDim2.new(0, 50, 0, 20)
+					rBox.Position = UDim2.new(0, 10, 0, 230)
+					ApplyColor(rBox, "BackgroundColor3", GetColor("Secondary"))
+					ApplyColor(rBox, "TextColor3", GetColor("Text"))
+					rBox.ZIndex = 301
+					rBox.Parent = PickerPopup
+
+					local gBox = Instance.new("TextBox")
+					gBox.Text = tostring(math.floor(PickerFunc.Value.G * 255))
+					gBox.Size = UDim2.new(0, 50, 0, 20)
+					gBox.Position = UDim2.new(0, 70, 0, 230)
+					ApplyColor(gBox, "BackgroundColor3", GetColor("Secondary"))
+					ApplyColor(gBox, "TextColor3", GetColor("Text"))
+					gBox.ZIndex = 301
+					gBox.Parent = PickerPopup
+
+					local bBox = Instance.new("TextBox")
+					bBox.Text = tostring(math.floor(PickerFunc.Value.B * 255))
+					bBox.Size = UDim2.new(0, 50, 0, 20)
+					bBox.Position = UDim2.new(0, 130, 0, 230)
+					ApplyColor(bBox, "BackgroundColor3", GetColor("Secondary"))
+					ApplyColor(bBox, "TextColor3", GetColor("Text"))
+					bBox.ZIndex = 301
+					bBox.Parent = PickerPopup
+
+					local hexBox = Instance.new("TextBox")
+					hexBox.Text = PickerFunc.Value:ToHex()
+					hexBox.Size = UDim2.new(0, 50, 0, 20)
+					hexBox.Position = UDim2.new(0, 190, 0, 230)
+					ApplyColor(hexBox, "BackgroundColor3", GetColor("Secondary"))
+					ApplyColor(hexBox, "TextColor3", GetColor("Text"))
+					hexBox.ZIndex = 301
+					hexBox.Parent = PickerPopup
+
+					-- Eyedropper stub
+					local dropperBtn = Instance.new("TextButton")
+					dropperBtn.Text = "Dropper"
+					dropperBtn.Size = UDim2.new(0, 220, 0, 25)
+					dropperBtn.Position = UDim2.new(0, 10, 0, 260)
+					ApplyColor(dropperBtn, "BackgroundColor3", GetColor("Primary"))
+					ApplyColor(dropperBtn, "TextColor3", GetColor("Text"))
+					dropperBtn.ZIndex = 301
+					dropperBtn.Parent = PickerPopup
+
+					local h, s, v = Color3.toHSV(PickerFunc.Value)
+
+					local function UpdateColor()
+						local col = Color3.fromHSV(h, s, v)
+						ColorMap.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+						PickerFunc:Set(col)
+
+						rBox.Text = tostring(math.floor(col.R * 255))
+						gBox.Text = tostring(math.floor(col.G * 255))
+						bBox.Text = tostring(math.floor(col.B * 255))
+						hexBox.Text = col:ToHex()
+					end
+
+					-- Basic Drag logic for Map
+					local mapDragging = false
+					ColorMap.InputBegan:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+							mapDragging = true
+							s = math.clamp((input.Position.X - ColorMap.AbsolutePosition.X) / ColorMap.AbsoluteSize.X, 0, 1)
+							v = 1 - math.clamp((input.Position.Y - ColorMap.AbsolutePosition.Y) / ColorMap.AbsoluteSize.Y, 0, 1)
+							MapCursor.Position = UDim2.new(s, 0, 1 - v, 0)
+							UpdateColor()
+						end
+					end)
+					UserInputService.InputChanged:Connect(function(input)
+						if mapDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+							s = math.clamp((input.Position.X - ColorMap.AbsolutePosition.X) / ColorMap.AbsoluteSize.X, 0, 1)
+							v = 1 - math.clamp((input.Position.Y - ColorMap.AbsolutePosition.Y) / ColorMap.AbsoluteSize.Y, 0, 1)
+							MapCursor.Position = UDim2.new(s, 0, 1 - v, 0)
+							UpdateColor()
+						end
+					end)
+					UserInputService.InputEnded:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+							mapDragging = false
+						end
+					end)
+
+					-- Basic Drag logic for Hue
+					local hueDragging = false
+					HueSlider.InputBegan:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+							hueDragging = true
+							h = 1 - math.clamp((input.Position.Y - HueSlider.AbsolutePosition.Y) / HueSlider.AbsoluteSize.Y, 0, 1)
+							HueCursor.Position = UDim2.new(0.5, 0, 1 - h, 0)
+							UpdateColor()
+						end
+					end)
+					UserInputService.InputChanged:Connect(function(input)
+						if hueDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+							h = 1 - math.clamp((input.Position.Y - HueSlider.AbsolutePosition.Y) / HueSlider.AbsoluteSize.Y, 0, 1)
+							HueCursor.Position = UDim2.new(0.5, 0, 1 - h, 0)
+							UpdateColor()
+						end
+					end)
+					UserInputService.InputEnded:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+							hueDragging = false
+						end
+					end)
+
+					local function UpdateFromRGB()
+						local r = tonumber(rBox.Text) or 255
+						local g = tonumber(gBox.Text) or 255
+						local b = tonumber(bBox.Text) or 255
+						local newCol = Color3.fromRGB(r,g,b)
+						h, s, v = Color3.toHSV(newCol)
+						MapCursor.Position = UDim2.new(s, 0, 1 - v, 0)
+						HueCursor.Position = UDim2.new(0.5, 0, 1 - h, 0)
+						UpdateColor()
+					end
+
+					rBox.FocusLost:Connect(UpdateFromRGB)
+					gBox.FocusLost:Connect(UpdateFromRGB)
+					bBox.FocusLost:Connect(UpdateFromRGB)
+
+					hexBox.FocusLost:Connect(function()
+						local success, c = pcall(function() return Color3.fromHex(hexBox.Text) end)
+						if success and c then
+							h, s, v = Color3.toHSV(c)
+							MapCursor.Position = UDim2.new(s, 0, 1 - v, 0)
+							HueCursor.Position = UDim2.new(0.5, 0, 1 - h, 0)
+							UpdateColor()
+						end
+					end)
+				end)
+
+				function PickerFunc:Set(Color)
+					PickerFunc.Value = Color
+					ColorPreviewBtn.BackgroundColor3 = Color
+					ColorPickerConfig.Callback(Color)
+					if ColorPickerConfig.Flag and typeof(ColorPickerConfig.Flag) == "string" then
+						ConfigManager:UpdateFlag(ColorPickerConfig.Flag, Color:ToHex())
+					end
+				end
+
+				local savedVal = ConfigManager.Flags[ColorPickerConfig.Flag]
+				if savedVal then
+					local s, c = pcall(function() return Color3.fromHex(savedVal) end)
+					if s and c then PickerFunc:Set(c) end
+				end
+
+				CountItem = CountItem + 1
+				return PickerFunc
+			end
+
 			function Items:AddButton(ButtonConfig)
+
 				local ButtonConfig = ButtonConfig or {}
 				ButtonConfig.Title = ButtonConfig.Title or "Title"
 				ButtonConfig.Content = ButtonConfig.Content or "Content"
@@ -1389,7 +2439,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 				Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 				Button.BackgroundTransparency = 0.9350000023841858
-				Button.BorderColor3 = Colours.Secondary
+				ApplyColor(Button, "BorderColor3", GetColor("Secondary"))
 				Button.BorderSizePixel = 0
 				Button.LayoutOrder = CountItem
 				Button.Size = UDim2.new(1, 0, 0, 46)
@@ -1399,7 +2449,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				UICorner9.CornerRadius = UDim.new(0, 4)
 				UICorner9.Parent = Button
 
-				ButtonTitle.Font = Enum.Font.GothamBold
+				FontManager:Set(ButtonTitle, "Default")
 				ButtonTitle.Text = ButtonConfig.Title
 				ButtonTitle.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
 				ButtonTitle.TextSize = 13
@@ -1414,7 +2464,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				ButtonTitle.Name = "ButtonTitle"
 				ButtonTitle.Parent = Button
 
-				ButtonContent.Font = Enum.Font.GothamBold
+				FontManager:Set(ButtonContent, "Default")
 				ButtonContent.Text = ButtonConfig.Content
 				ButtonContent.TextColor3 = Color3.fromRGB(255, 255, 255)
 				ButtonContent.TextSize = 12
@@ -1491,15 +2541,67 @@ function UBHubLib:MakeGui(GuiConfig)
 				local ToggleFunc = {Value = ToggleConfig.Default}
 
 				local Toggle = Instance.new("Frame");
+
+				table.insert(ElementRegistry, {
+					Title = ToggleConfig.Title,
+					Description = ToggleConfig.Content,
+					TabOrder = Tab.LayoutOrder,
+					Frame = Toggle,
+					Type = "Toggle",
+					Activate = function() ToggleFunc:Set(not ToggleFunc.Value) end
+				})
 				local UICorner20 = Instance.new("UICorner");
 				local ToggleTitle = Instance.new("TextLabel");
 				local ToggleContent = Instance.new("TextLabel");
 				local ToggleButton = Instance.new("TextButton");
-				local FeatureFrame2 = Instance.new("Frame");
-				local UICorner22 = Instance.new("UICorner");
-				local UIStroke8 = Instance.new("UIStroke");
-				local ToggleCircle = Instance.new("Frame");
-				local UICorner23 = Instance.new("UICorner");
+				local FeatureFrame2 = nil
+				local UICorner22 = nil
+				local UIStroke8 = nil
+				local ToggleCircle = nil
+				local UICorner23 = nil
+
+				local CheckboxFrame = nil
+				local CheckboxIcon = nil
+
+				local ToggleIcon = nil
+				local titleOffset = 10
+				if ToggleConfig.Icon then
+					titleOffset = 36
+					ToggleIcon = Instance.new("ImageLabel")
+					ToggleIcon.Name = "ToggleIcon"
+					ToggleIcon.Size = UDim2.new(0, 16, 0, 16)
+					ToggleIcon.Position = UDim2.new(0, 10, 0, 10)
+					ToggleIcon.BackgroundTransparency = 1
+					local iconId = GetIcon("lucide", ToggleConfig.Icon)
+					if type(iconId) == "table" then ToggleIcon.Image = iconId[1] else ToggleIcon.Image = iconId end
+					ToggleIcon.Parent = Toggle
+				end
+
+				local CreatorBtn = nil
+				if ToggleConfig.CanQuickToggle then
+					titleOffset = titleOffset + 24
+					CreatorBtn = Instance.new("ImageButton")
+					CreatorBtn.Name = "CreatorBtn"
+					CreatorBtn.Size = UDim2.new(0, 18, 0, 18)
+					CreatorBtn.Position = UDim2.new(0, titleOffset - 24, 0, 10)
+					CreatorBtn.BackgroundTransparency = 1
+					local editIconId = GetIcon("lucide", "edit")
+					if type(editIconId) == "table" then CreatorBtn.Image = editIconId[1] else CreatorBtn.Image = editIconId end
+					ApplyColor(CreatorBtn, "ImageColor3", GetColor("Text"))
+					CreatorBtn.ImageTransparency = 0.5
+					CreatorBtn.Parent = Toggle
+
+					CreatorBtn.Activated:Connect(function()
+						ToggleFunc.IsQuickToggleActive = not ToggleFunc.IsQuickToggleActive
+						if ToggleFunc.IsQuickToggleActive then
+							ApplyColor(CreatorBtn, "ImageColor3", GetColor("ThemeHighlight"))
+							CreatorBtn.ImageTransparency = 0
+						else
+							ApplyColor(CreatorBtn, "ImageColor3", GetColor("Text"))
+							CreatorBtn.ImageTransparency = 0.5
+						end
+					end)
+				end
 
 				Toggle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 				Toggle.BackgroundTransparency = 0.9350000023841858
@@ -1513,7 +2615,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				UICorner20.CornerRadius = UDim.new(0, 4)
 				UICorner20.Parent = Toggle
 
-				ToggleTitle.Font = Enum.Font.GothamBold
+				FontManager:Set(ToggleTitle, "Default")
 				ToggleTitle.Text = ToggleConfig.Title
 				ToggleTitle.TextSize = 13
 				ToggleTitle.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
@@ -1523,12 +2625,12 @@ function UBHubLib:MakeGui(GuiConfig)
 				ToggleTitle.BackgroundTransparency = 0.9990000128746033
 				ToggleTitle.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				ToggleTitle.BorderSizePixel = 0
-				ToggleTitle.Position = UDim2.new(0, 10, 0, 10)
+				ToggleTitle.Position = UDim2.new(0, titleOffset, 0, 10)
 				ToggleTitle.Size = UDim2.new(1, -100, 0, 13)
 				ToggleTitle.Name = "ToggleTitle"
 				ToggleTitle.Parent = Toggle
 
-				ToggleContent.Font = Enum.Font.GothamBold
+				FontManager:Set(ToggleContent, "Default")
 				ToggleContent.Text = ToggleConfig.Content
 				ToggleContent.TextColor3 = Color3.fromRGB(255, 255, 255)
 				ToggleContent.TextSize = 12
@@ -1540,7 +2642,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				ToggleContent.BackgroundTransparency = 0.9990000128746033
 				ToggleContent.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				ToggleContent.BorderSizePixel = 0
-				ToggleContent.Position = UDim2.new(0, 10, 0, 23)
+				ToggleContent.Position = UDim2.new(0, titleOffset, 0, 23)
 				ToggleContent.Size = UDim2.new(1, -100, 0, 12)
 				ToggleContent.Name = "ToggleContent"
 				ToggleContent.Parent = Toggle
@@ -1568,59 +2670,211 @@ function UBHubLib:MakeGui(GuiConfig)
 				ToggleButton.Name = "ToggleButton"
 				ToggleButton.Parent = Toggle
 
-				FeatureFrame2.AnchorPoint = Vector2.new(1, 0.5)
-				FeatureFrame2.BackgroundColor3 = Colours.Secondary
-				FeatureFrame2.BackgroundTransparency = 0.9200000166893005
-				FeatureFrame2.BorderColor3 = Color3.fromRGB(0, 0, 0)
-				FeatureFrame2.BorderSizePixel = 0
-				FeatureFrame2.Position = UDim2.new(1, -30, 0.5, 0)
-				FeatureFrame2.Size = UDim2.new(0, 30, 0, 15)
-				FeatureFrame2.Name = "FeatureFrame"
-				FeatureFrame2.Parent = Toggle
+				if ToggleConfig.Style == "Switch" then
+					FeatureFrame2 = Instance.new("Frame")
+					UICorner22 = Instance.new("UICorner")
+					UIStroke8 = Instance.new("UIStroke")
+					ToggleCircle = Instance.new("Frame")
+					UICorner23 = Instance.new("UICorner")
 
-				UICorner22.Parent = FeatureFrame2
-                UICorner22.CornerRadius = UDim.new(0,8) 
+					FeatureFrame2.AnchorPoint = Vector2.new(1, 0.5)
+					ApplyColor(FeatureFrame2, "BackgroundColor3", GetColor("Secondary"))
+					FeatureFrame2.BackgroundTransparency = 0.9200000166893005
+					FeatureFrame2.BorderColor3 = Color3.fromRGB(0, 0, 0)
+					FeatureFrame2.BorderSizePixel = 0
+					FeatureFrame2.Position = UDim2.new(1, -30, 0.5, 0)
+					FeatureFrame2.Size = UDim2.new(0, 30, 0, 15)
+					FeatureFrame2.Name = "FeatureFrame"
+					FeatureFrame2.Parent = Toggle
 
-				UIStroke8.Color = Color3.fromRGB(255, 255, 255)
-				UIStroke8.Thickness = 2
-				UIStroke8.Transparency = 0.9
-				UIStroke8.Parent = FeatureFrame2
+					UICorner22.Parent = FeatureFrame2
+					UICorner22.CornerRadius = UDim.new(0,8)
 
-				ToggleCircle.BackgroundColor3 = Color3.fromRGB(230.00000149011612, 230.00000149011612, 230.00000149011612)
-				ToggleCircle.BorderColor3 = Color3.fromRGB(0, 0, 0)
-				ToggleCircle.BorderSizePixel = 0
-				ToggleCircle.Size = UDim2.new(0, 14, 0, 14)
-                ToggleCircle.AnchorPoint = Vector2.new(0,0.5)
-                ToggleCircle.Position = UDim2.new(0,0.5,0.5,0) 
-				ToggleCircle.Name = "ToggleCircle"
-				ToggleCircle.Parent = FeatureFrame2
+					UIStroke8.Color = Color3.fromRGB(255, 255, 255)
+					UIStroke8.Thickness = 2
+					UIStroke8.Transparency = 0.9
+					UIStroke8.Parent = FeatureFrame2
 
-				UICorner23.CornerRadius = UDim.new(0, 15)
-				UICorner23.Parent = ToggleCircle
+					ToggleCircle.BackgroundColor3 = Color3.fromRGB(230.00000149011612, 230.00000149011612, 230.00000149011612)
+					ToggleCircle.BorderColor3 = Color3.fromRGB(0, 0, 0)
+					ToggleCircle.BorderSizePixel = 0
+					ToggleCircle.Size = UDim2.new(0, 14, 0, 14)
+					ToggleCircle.AnchorPoint = Vector2.new(0,0.5)
+					ToggleCircle.Position = UDim2.new(0,0.5,0.5,0)
+					ToggleCircle.Name = "ToggleCircle"
+					ToggleCircle.Parent = FeatureFrame2
+
+					UICorner23.CornerRadius = UDim.new(0, 15)
+					UICorner23.Parent = ToggleCircle
+				else -- Checkbox style
+					CheckboxFrame = Instance.new("Frame")
+					CheckboxFrame.Size = UDim2.new(0, 18, 0, 18)
+					CheckboxFrame.AnchorPoint = Vector2.new(1, 0.5)
+					CheckboxFrame.Position = UDim2.new(1, -30, 0.5, 0)
+					ApplyColor(CheckboxFrame, "BackgroundColor3", GetColor("Secondary"))
+					local cbCorner = Instance.new("UICorner")
+					cbCorner.CornerRadius = UDim.new(0, 4)
+					cbCorner.Parent = CheckboxFrame
+					local cbStroke = Instance.new("UIStroke")
+					cbStroke.Thickness = 1
+					cbStroke.Color = Color3.new(1,1,1)
+					cbStroke.Transparency = 0.8
+					cbStroke.Parent = CheckboxFrame
+					CheckboxFrame.Parent = Toggle
+
+					CheckboxIcon = Instance.new("ImageLabel")
+					local chkIconId = GetIcon("lucide", "check")
+					if type(chkIconId) == "table" then CheckboxIcon.Image = chkIconId[1] else CheckboxIcon.Image = chkIconId end
+					CheckboxIcon.Size = UDim2.new(0, 14, 0, 14)
+					CheckboxIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+					CheckboxIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+					CheckboxIcon.BackgroundTransparency = 1
+					CheckboxIcon.ImageTransparency = 1
+					CheckboxIcon.Parent = CheckboxFrame
+				end
+
+				local QuickToggleHUD = nil
+				local HUDGui = CoreGui:FindFirstChild("UBHub_QuickToggles") or LocalPlayer.PlayerGui:FindFirstChild("UBHub_QuickToggles")
 				
 				ToggleButton.Activated:Connect(function()
-					CircleClick(ToggleButton, Mouse.X, Mouse.Y) 
-					ToggleFunc.Value = not ToggleFunc.Value
-					ToggleFunc:Set(ToggleFunc.Value)
-					if ToggleConfig.Flag and typeof(ToggleConfig.Flag) == "string" then
-                        SaveFile(ToggleConfig.Flag, ToggleFunc.Value)
-                    end
+					CircleClick(ToggleButton, Mouse.X, Mouse.Y)
+
+					if ToggleFunc.IsQuickToggleActive then
+						-- Create/Destroy Quick Toggle HUD Button
+						if QuickToggleHUD then
+							QuickToggleHUD:Destroy()
+							QuickToggleHUD = nil
+						else
+							QuickToggleHUD = Instance.new("TextButton")
+							QuickToggleHUD.Name = "HUD_" .. (ToggleConfig.Title or "Toggle")
+							QuickToggleHUD.Size = UDim2.new(0, 120, 0, 30)
+
+							-- Load saved layout
+							local layout = Flags.QuickToggleLayouts and Flags.QuickToggleLayouts[ToggleConfig.Flag]
+							if layout then
+								QuickToggleHUD.Position = UDim2.new(layout.Position.X.Scale, layout.Position.X.Offset, layout.Position.Y.Scale, layout.Position.Y.Offset)
+								QuickToggleHUD.Size = UDim2.new(layout.Size.X.Scale, layout.Size.X.Offset, layout.Size.Y.Scale, layout.Size.Y.Offset)
+							else
+								QuickToggleHUD.Position = UDim2.new(0.5, 0, 0.8, 0)
+							end
+
+							FontManager:Set(QuickToggleHUD, "Default")
+							QuickToggleHUD.Text = ToggleConfig.Title
+							QuickToggleHUD.TextSize = 14
+							ApplyColor(QuickToggleHUD, "TextColor3", GetColor("Text"))
+							local qc = Instance.new("UICorner")
+							qc.CornerRadius = UDim.new(0, 4)
+							qc.Parent = QuickToggleHUD
+
+							if ToggleFunc.Value then
+								ApplyColor(QuickToggleHUD, "BackgroundColor3", GetColor("ThemeHighlight"))
+							else
+								ApplyColor(QuickToggleHUD, "BackgroundColor3", GetColor("Primary"))
+							end
+
+							QuickToggleHUD.Parent = HUDGui
+
+							QuickToggleHUD.Activated:Connect(function()
+								-- When not in edit mode
+								local blur = game:GetService("Lighting"):FindFirstChild("BlurEffect")
+								if blur and blur.Enabled then return end -- In Edit mode, do nothing on click except maybe select for resize (handled elsewhere)
+
+								ToggleFunc.Value = not ToggleFunc.Value
+								ToggleFunc:Set(ToggleFunc.Value, true)
+								if ToggleConfig.Flag and typeof(ToggleConfig.Flag) == "string" then
+									ConfigManager:UpdateFlag(ToggleConfig.Flag, ToggleFunc.Value)
+								end
+								if ToggleFunc.Value then
+									ApplyColor(QuickToggleHUD, "BackgroundColor3", GetColor("ThemeHighlight"))
+								else
+									ApplyColor(QuickToggleHUD, "BackgroundColor3", GetColor("Primary"))
+								end
+							end)
+						end
+					else
+						ToggleFunc.Value = not ToggleFunc.Value
+						ToggleFunc:Set(ToggleFunc.Value)
+						if ToggleConfig.Flag and typeof(ToggleConfig.Flag) == "string" then
+							ConfigManager:UpdateFlag(ToggleConfig.Flag, ToggleFunc.Value)
+						end
+					end
 				end)
-				function ToggleFunc:Set(Value)
-					ToggleConfig.Callback(Value)
+				function ToggleFunc:Set(Value, skipCallback)
+					if not skipCallback then ToggleConfig.Callback(Value) end
                     local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 					if Value then
 						TweenService:Create(ToggleTitle, tweenInfo, {TextColor3 = GuiConfig.Color}):Play()
-						TweenService:Create(ToggleCircle, tweenInfo, {Position = UDim2.new(1, -ToggleCircle.AbsoluteSize.X - 0.5, 0.5, 0)}):Play()
-						TweenService:Create(UIStroke8, tweenInfo, {Color = GuiConfig.Color, Transparency = 0}):Play()
-						TweenService:Create(FeatureFrame2, tweenInfo, {BackgroundColor3 = GuiConfig.Color, BackgroundTransparency = 0}):Play()
+						if ToggleConfig.Style == "Switch" then
+							TweenService:Create(ToggleCircle, tweenInfo, {Position = UDim2.new(1, -ToggleCircle.AbsoluteSize.X - 0.5, 0.5, 0)}):Play()
+							TweenService:Create(UIStroke8, tweenInfo, {Color = GuiConfig.Color, Transparency = 0}):Play()
+							TweenService:Create(FeatureFrame2, tweenInfo, {BackgroundColor3 = GuiConfig.Color, BackgroundTransparency = 0}):Play()
+						else
+							TweenService:Create(CheckboxFrame, tweenInfo, {BackgroundColor3 = GuiConfig.Color}):Play()
+							TweenService:Create(CheckboxIcon, tweenInfo, {ImageTransparency = 0}):Play()
+						end
 					else
 						TweenService:Create(ToggleTitle, tweenInfo, {TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)}):Play()
-						TweenService:Create(ToggleCircle, tweenInfo, {Position = UDim2.new(0, 0.5, 0.5, 0)}):Play()
-						TweenService:Create(UIStroke8, tweenInfo, {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.9}):Play()
-						TweenService:Create(FeatureFrame2, tweenInfo, {BackgroundColor3 = Colours.Secondary, BackgroundTransparency = 0.9200000166893005}):Play()
+						if ToggleConfig.Style == "Switch" then
+							TweenService:Create(ToggleCircle, tweenInfo, {Position = UDim2.new(0, 0.5, 0.5, 0)}):Play()
+							TweenService:Create(UIStroke8, tweenInfo, {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.9}):Play()
+							TweenService:Create(FeatureFrame2, tweenInfo, {BackgroundColor3 = GetColor("Secondary"), BackgroundTransparency = 0.9200000166893005}):Play()
+						else
+							TweenService:Create(CheckboxFrame, tweenInfo, {BackgroundColor3 = GetColor("Secondary")}):Play()
+							TweenService:Create(CheckboxIcon, tweenInfo, {ImageTransparency = 1}):Play()
+						end
 					end
 				end
+
+				ToggleFunc.Object = Toggle
+
+				local OriginalSet = ToggleFunc.Set
+				function ToggleFunc:ApplyDependency(depConfig)
+					if depConfig and depConfig.Element then
+						local targetValue = depConfig.Value
+						if targetValue == nil then targetValue = true end
+						local prop = depConfig.Property or "Visible"
+
+						local function updateDep(val)
+							local isMatch = (val == targetValue)
+							if prop == "Visible" then
+								if isMatch then
+									Toggle.Visible = true
+									TweenService:Create(Toggle, TweenInfo.new(0.2), {BackgroundTransparency = 0.935}):Play()
+									if ToggleTitle then TweenService:Create(ToggleTitle, TweenInfo.new(0.2), {TextTransparency = 0}):Play() end
+								else
+									TweenService:Create(Toggle, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+									if ToggleTitle then TweenService:Create(ToggleTitle, TweenInfo.new(0.2), {TextTransparency = 1}):Play() end
+									task.delay(0.2, function() Toggle.Visible = false end)
+								end
+							elseif prop == "Locked" then
+								ToggleButton.Active = not isMatch
+								if isMatch then
+									Toggle.BackgroundTransparency = 0.98
+									ToggleTitle.TextTransparency = 0.6
+								else
+									Toggle.BackgroundTransparency = 0.935
+									ToggleTitle.TextTransparency = 0
+								end
+							end
+						end
+
+						-- Need a way to hook into the OtherToggleObject changes.
+						-- We will override its Set function to fire our update.
+						local otherSet = depConfig.Element.Set
+						depConfig.Element.Set = function(self, val, skip)
+							otherSet(self, val, skip)
+							updateDep(val)
+						end
+
+						-- Initial check
+						updateDep(depConfig.Element.Value)
+					end
+				end
+
+				if ToggleConfig.Dependency then
+					ToggleFunc:ApplyDependency(ToggleConfig.Dependency)
+				end
+
 				ToggleFunc:Set(ToggleFunc.Value)
 				CountItem = CountItem + 1
 				return ToggleFunc
@@ -1637,6 +2891,15 @@ function UBHubLib:MakeGui(GuiConfig)
 				local SliderFunc = {Value = SliderConfig.Default}
 	
 				local Slider = Instance.new("Frame");
+
+				table.insert(ElementRegistry, {
+					Title = SliderConfig.Title,
+					Description = SliderConfig.Content,
+					TabOrder = Tab.LayoutOrder,
+					Frame = Slider,
+					Type = "Slider",
+					Activate = function() end
+				})
 				local UICorner15 = Instance.new("UICorner");
 				local SliderTitle = Instance.new("TextLabel");
 				local SliderContent = Instance.new("TextLabel");
@@ -1663,7 +2926,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				UICorner15.CornerRadius = UDim.new(0, 4)
 				UICorner15.Parent = Slider
 
-				SliderTitle.Font = Enum.Font.GothamBold
+				FontManager:Set(SliderTitle, "Default")
 				SliderTitle.Text = SliderConfig.Title
 				SliderTitle.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
 				SliderTitle.TextSize = 13
@@ -1678,7 +2941,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				SliderTitle.Name = "SliderTitle"
 				SliderTitle.Parent = Slider
 
-				SliderContent.Font = Enum.Font.GothamBold
+				FontManager:Set(SliderContent, "Default")
 				SliderContent.Text = SliderConfig.Content
 				SliderContent.TextColor3 = Color3.fromRGB(255, 255, 255)
 				SliderContent.TextSize = 12
@@ -1707,7 +2970,7 @@ function UBHubLib:MakeGui(GuiConfig)
 
 
 				SliderInput.AnchorPoint = Vector2.new(0, 0.5)
-				SliderInput.BackgroundColor3 = Colours.Accent
+				ApplyColor(SliderInput, "BackgroundColor3", GetColor("Accent"))
 				SliderInput.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				SliderInput.BorderSizePixel = 0
 				SliderInput.Position = UDim2.new(1, -155, 0.5, 0)
@@ -1718,7 +2981,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				UICorner16.CornerRadius = UDim.new(0, 2)
 				UICorner16.Parent = SliderInput
 
-				TextBox.Font = Enum.Font.GothamBold
+				FontManager:Set(TextBox, "Default")
 				TextBox.Text = tostring(SliderConfig.Default)
 				TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 				TextBox.TextSize = 13
@@ -1745,7 +3008,7 @@ function UBHubLib:MakeGui(GuiConfig)
                 UICorner17.CornerRadius = UDim.new(0,3) 
 
 				SliderDraggable.AnchorPoint = Vector2.new(0, 0.5)
-				SliderDraggable.BackgroundColor3 = Colours.Accent
+				ApplyColor(SliderDraggable, "BackgroundColor3", GetColor("Accent"))
 				SliderDraggable.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				SliderDraggable.BorderSizePixel = 0
 				SliderDraggable.Position = UDim2.new(0, 0, 0.5, 0)
@@ -1757,7 +3020,7 @@ function UBHubLib:MakeGui(GuiConfig)
                 UICorner18.CornerRadius = UDim.new(0,3) 
 
 				SliderCircle.AnchorPoint = Vector2.new(1, 0.5)
-				SliderCircle.BackgroundColor3 = Colours.ThemeHighlight
+				ApplyColor(SliderCircle, "BackgroundColor3", GetColor("ThemeHighlight"))
 				SliderCircle.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				SliderCircle.BorderSizePixel = 0
 				SliderCircle.Position = UDim2.new(1, 4, 0.5, 0)
@@ -1799,7 +3062,7 @@ function UBHubLib:MakeGui(GuiConfig)
 						end
 						SliderConfig.Callback(SliderFunc.Value)
                         if SliderConfig.Flag and typeof(SliderConfig.Flag) == "string" then
-                            SaveFile(SliderConfig.Flag, SliderFunc.Value)
+                            ConfigManager:UpdateFlag(SliderConfig.Flag, SliderFunc.Value)
                         end
 					end
 				end
@@ -1865,6 +3128,45 @@ function UBHubLib:MakeGui(GuiConfig)
                     end
 				end)
 				SliderFunc:Set(tonumber(SliderConfig.Default), true) 
+
+				local OriginalSet = SliderFunc.Set
+				function SliderFunc:ApplyDependency(depConfig)
+					if depConfig and depConfig.Element then
+						local targetValue = depConfig.Value
+						if targetValue == nil then targetValue = true end
+						local prop = depConfig.Property or "Visible"
+
+						local function updateDep(val)
+							local isMatch = (val == targetValue)
+							if prop == "Visible" then
+								Slider.Visible = isMatch
+							elseif prop == "Locked" then
+								-- Generic lock logic
+								if SliderButton then SliderButton.Active = not isMatch end
+								if isMatch then
+									Slider.BackgroundTransparency = 0.98
+									if SliderTitle then SliderTitle.TextTransparency = 0.6 end
+								else
+									Slider.BackgroundTransparency = 0.935
+									if SliderTitle then SliderTitle.TextTransparency = 0 end
+								end
+							end
+						end
+
+						local otherSet = depConfig.Element.Set
+						depConfig.Element.Set = function(self, val, skip)
+							otherSet(self, val, skip)
+							updateDep(val)
+						end
+
+						updateDep(depConfig.Element.Value)
+					end
+				end
+
+				if SliderConfig.Dependency then
+					SliderFunc:ApplyDependency(SliderConfig.Dependency)
+				end
+
 				CountItem = CountItem + 1
 				return SliderFunc
 			end
@@ -1876,6 +3178,15 @@ function UBHubLib:MakeGui(GuiConfig)
 				InputConfig.Callback = InputConfig.Callback or function() end
 				local InputFunc = {Value = InputConfig.Default}
 				local Input = Instance.new("Frame");
+
+				table.insert(ElementRegistry, {
+					Title = InputConfig.Title,
+					Description = InputConfig.Content,
+					TabOrder = Tab.LayoutOrder,
+					Frame = Input,
+					Type = "Input",
+					Activate = function() end
+				})
 				local UICorner12 = Instance.new("UICorner");
 				local InputTitle = Instance.new("TextLabel");
 				local InputContent = Instance.new("TextLabel");
@@ -1895,7 +3206,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				UICorner12.CornerRadius = UDim.new(0, 4)
 				UICorner12.Parent = Input
 
-				InputTitle.Font = Enum.Font.GothamBold
+				FontManager:Set(InputTitle, "Default")
 				InputTitle.Text = InputConfig.Title
 				InputTitle.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
 				InputTitle.TextSize = 13
@@ -1910,7 +3221,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				InputTitle.Name = "InputTitle"
 				InputTitle.Parent = Input
 
-				InputContent.Font = Enum.Font.GothamBold
+				FontManager:Set(InputContent, "Default")
 				InputContent.Text = InputConfig.Content
 				InputContent.TextColor3 = Color3.fromRGB(255, 255, 255)
 				InputContent.TextSize = 12
@@ -1953,7 +3264,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				UICorner13.Parent = InputFrame
 
 				InputTextBox.CursorPosition = -1
-				InputTextBox.Font = Enum.Font.GothamBold
+				FontManager:Set(InputTextBox, "Default")
 				InputTextBox.PlaceholderColor3 = Color3.fromRGB(120.00000044703484, 120.00000044703484, 120.00000044703484)
 				InputTextBox.PlaceholderText = "Write your input there"
 				InputTextBox.Text = tostring(InputFunc.Value)
@@ -1974,7 +3285,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					InputFunc.Value = Value 
 					InputConfig.Callback(Value)
 					if InputConfig.Flag and typeof(InputConfig.Flag) == "string" then
-						SaveFile(InputConfig.Flag,InputFunc.Value)
+						ConfigManager:UpdateFlag(InputConfig.Flag, InputFunc.Value)
 					end
 				end
 				InputTextBox.FocusLost:Connect(function(enterPressed)
@@ -2004,6 +3315,15 @@ function UBHubLib:MakeGui(GuiConfig)
 				local DropdownFunc = {Value = DropdownConfig.Default, Options = DropdownConfig.Options}
 	
 				local Dropdown = Instance.new("Frame");
+
+				table.insert(ElementRegistry, {
+					Title = DropdownConfig.Title,
+					Description = DropdownConfig.Content,
+					TabOrder = Tab.LayoutOrder,
+					Frame = Dropdown,
+					Type = "Dropdown",
+					Activate = function() end
+				})
 				local DropdownButton = Instance.new("TextButton");
 				local UICorner10 = Instance.new("UICorner");
 				local DropdownTitle = Instance.new("TextLabel");
@@ -2037,7 +3357,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				UICorner10.CornerRadius = UDim.new(0, 4)
 				UICorner10.Parent = Dropdown
 
-				DropdownTitle.Font = Enum.Font.GothamBold
+				FontManager:Set(DropdownTitle, "Default")
 				DropdownTitle.Text = DropdownConfig.Title
 				DropdownTitle.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
 				DropdownTitle.TextSize = 13
@@ -2052,7 +3372,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				DropdownTitle.Name = "DropdownTitle"
 				DropdownTitle.Parent = Dropdown
 
-				DropdownContent.Font = Enum.Font.GothamBold
+				FontManager:Set(DropdownContent, "Default")
 				DropdownContent.Text = DropdownConfig.Content
 				DropdownContent.TextColor3 = Color3.fromRGB(255, 255, 255)
 				DropdownContent.TextSize = 12
@@ -2108,7 +3428,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					end
 				end)
 
-				OptionSelecting.Font = Enum.Font.GothamBold
+				FontManager:Set(OptionSelecting, "Default")
 				OptionSelecting.Text = ""
 				OptionSelecting.TextColor3 = Color3.fromRGB(255, 255, 255)
 				OptionSelecting.TextSize = 12
@@ -2154,18 +3474,18 @@ function UBHubLib:MakeGui(GuiConfig)
 				ScrollSelect.Parent = DropdownFolder
 
 				-- local SearchBar = Instance.new("TextBox") -- Already declared above
-				SearchBar.Font = Enum.Font.GothamBold
+				FontManager:Set(SearchBar, "Default")
 				SearchBar.PlaceholderText = "Search 🔎" 
 				SearchBar.PlaceholderColor3 = Color3.fromRGB(150, 150, 150) 
 				SearchBar.Text = ""
 				SearchBar.TextColor3 = Color3.fromRGB(255, 255, 255)
 				SearchBar.TextSize = 12
-				SearchBar.BackgroundColor3 = Colours.Secondary 
+				ApplyColor(SearchBar, "BackgroundColor3", GetColor("Secondary"))
 				SearchBar.BackgroundTransparency = 0.5
-				SearchBar.BorderColor3 = Colours.Stroke
+				ApplyColor(SearchBar, "BorderColor3", GetColor("Stroke"))
 				SearchBar.BorderSizePixel = 1
 				SearchBar.Size = UDim2.new(1, 0, 0, 20)
-                SearchBar.LayoutOrder = -1 
+				SearchBar.LayoutOrder = -1000 -- Prioritize dropdown search bar
 				SearchBar.Parent = ScrollSelect
 
 				SearchBar:GetPropertyChangedSignal("Text"):Connect(function()
@@ -2205,6 +3525,7 @@ function UBHubLib:MakeGui(GuiConfig)
 				function DropdownFunc:AddOption(OptionName, IsDefault)
 					OptionName = OptionName or "Option"
 					local Option = Instance.new("Frame");
+                    Option:SetAttribute("CreationOrder", DropCount)
                     Option.InitialLayoutOrder = DropCount 
 					local UICorner37 = Instance.new("UICorner");
 					local OptionButton = Instance.new("TextButton");
@@ -2225,7 +3546,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					UICorner37.CornerRadius = UDim.new(0, 3)
 					UICorner37.Parent = Option
 				
-					OptionButton.Font = Enum.Font.GothamBold
+					FontManager:Set(OptionButton, "Default")
 					OptionButton.Text = ""
 					OptionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 					OptionButton.TextSize = 13
@@ -2238,7 +3559,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					OptionButton.Name = "OptionButton"
 					OptionButton.Parent = Option
 
-					OptionText.Font = Enum.Font.GothamBold
+					FontManager:Set(OptionText, "Default")
 					OptionText.Text = OptionName
 					OptionText.TextSize = 13
 					OptionText.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
@@ -2255,7 +3576,7 @@ function UBHubLib:MakeGui(GuiConfig)
 					OptionText.Parent = Option
 	
 					ChooseFrame.AnchorPoint = Vector2.new(0, 0.5)
-					ChooseFrame.BackgroundColor3 = Colours.ThemeHighlight
+					ApplyColor(ChooseFrame, "BackgroundColor3", GetColor("ThemeHighlight"))
 					ChooseFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					ChooseFrame.BorderSizePixel = 0
 					ChooseFrame.Position = UDim2.new(0, 2, 0.5, 0)
@@ -2318,12 +3639,10 @@ function UBHubLib:MakeGui(GuiConfig)
 							TweenService:Create(Drop.ChooseFrame.UIStroke, tweenInfoInOut, {Transparency = StrokeTransparency}):Play()
 							TweenService:Create(Drop, tweenInfoInOut, {BackgroundTransparency = BackgroundTransparency}):Play()
 
-                            if DropdownConfig.Multi then 
-                                if isSelected then
-                                    Drop.LayoutOrder = -10000 + Drop.InitialLayoutOrder 
-                                else
-                                    Drop.LayoutOrder = Drop.InitialLayoutOrder 
-                                end
+                            if isSelected then
+                                Drop.LayoutOrder = -1
+                            else
+                                Drop.LayoutOrder = Drop:GetAttribute("CreationOrder") or Drop.InitialLayoutOrder
                             end
 						end
 					end
@@ -2351,7 +3670,7 @@ function UBHubLib:MakeGui(GuiConfig)
                         else
                             valueToSave = {DropdownFunc.Value} 
                         end
-                        SaveFile(DropdownConfig.Flag, valueToSave)
+                        ConfigManager:UpdateFlag(DropdownConfig.Flag, valueToSave)
                     end
 				end
 				function DropdownFunc:Refresh(RefreshList, Selecting)
@@ -2376,6 +3695,45 @@ function UBHubLib:MakeGui(GuiConfig)
 					DropdownFunc:Set(Selecting)
 				end
 				DropdownFunc:Refresh(DropdownFunc.Options, DropdownFunc.Value)
+
+				local OriginalSet = DropdownFunc.Set
+				function DropdownFunc:ApplyDependency(depConfig)
+					if depConfig and depConfig.Element then
+						local targetValue = depConfig.Value
+						if targetValue == nil then targetValue = true end
+						local prop = depConfig.Property or "Visible"
+
+						local function updateDep(val)
+							local isMatch = (val == targetValue)
+							if prop == "Visible" then
+								Dropdown.Visible = isMatch
+							elseif prop == "Locked" then
+								-- Generic lock logic
+								if DropdownButton then DropdownButton.Active = not isMatch end
+								if isMatch then
+									Dropdown.BackgroundTransparency = 0.98
+									if DropdownTitle then DropdownTitle.TextTransparency = 0.6 end
+								else
+									Dropdown.BackgroundTransparency = 0.935
+									if DropdownTitle then DropdownTitle.TextTransparency = 0 end
+								end
+							end
+						end
+
+						local otherSet = depConfig.Element.Set
+						depConfig.Element.Set = function(self, val, skip)
+							otherSet(self, val, skip)
+							updateDep(val)
+						end
+
+						updateDep(depConfig.Element.Value)
+					end
+				end
+
+				if DropdownConfig.Dependency then
+					DropdownFunc:ApplyDependency(DropdownConfig.Dependency)
+				end
+
 				CountItem = CountItem + 1
 				CountDropdown = CountDropdown + 1
 				return DropdownFunc
@@ -2386,6 +3744,158 @@ function UBHubLib:MakeGui(GuiConfig)
 		CountTab = CountTab + 1
 		return Sections
 	end
+		-- Automatic Customize Panel creation inside MakeGui
+		do
+			local CustTab = Tabs:AddStaticTab({
+				Name = "Customize",
+				Icon = "settings"
+			})
+
+			local configCat = CustTab:AddSection("Configuration")
+
+			local currentConfigs = ConfigManager:AllConfigs()
+			if #currentConfigs == 0 then table.insert(currentConfigs, "default") end
+
+			configCat:AddInput({
+				Title = "New Config Name",
+				Content = "Enter a name for the new config",
+				Flag = "TempNewConfigName",
+				Default = "default"
+			})
+
+			configCat:AddButton({
+				Title = "Create / Overwrite Config",
+				Content = "Saves current state to the specified config",
+				Icon = "save",
+				Callback = function()
+					local name = Flags["TempNewConfigName"] or "default"
+					ConfigManager:Create(name)
+					UBHubLib:MakeNotify({
+						Title = "Config Saved",
+						Content = "Successfully saved config: " .. name,
+						Time = 3
+					})
+				end
+			})
+
+			configCat:AddDropdown({
+				Title = "Load Config",
+				Content = "Select a config to load",
+				Options = currentConfigs,
+				Callback = function(val)
+					if val and val ~= "" then
+						if ConfigManager:Load(val) then
+							UBHubLib:MakeNotify({
+								Title = "Config Loaded",
+								Content = "Successfully loaded config: " .. val,
+								Time = 3
+							})
+						end
+					end
+				end
+			})
+
+			configCat:AddButton({
+				Title = "Export Config",
+				Content = "Copies the current config to your clipboard",
+				Icon = "copy",
+				Callback = function()
+					if ConfigManager:ExportConfig() then
+						UBHubLib:MakeNotify({
+							Title = "Exported",
+							Content = "Config copied to clipboard!",
+							Time = 3
+						})
+					end
+				end
+			})
+
+			configCat:AddToggle({
+				Title = "Legacy Autosave Mode",
+				Content = "Automatically saves config when elements change",
+				Default = (ConfigManager.Mode == "Legacy"),
+				Callback = function(val)
+					ConfigManager.Mode = val and "Legacy" or "Normal"
+					ConfigManager:SaveSettings()
+				end
+			})
+
+			local themeCat = CustTab:AddSection("Theming")
+			local availableThemes = {}
+			for k, _ in pairs(Themes) do table.insert(availableThemes, k) end
+
+			themeCat:AddDropdown({
+				Title = "Select Theme",
+				Content = "Choose from built-in theme presets",
+				Options = availableThemes,
+				Default = CurrentTheme,
+				Callback = function(val)
+					if Themes[val] then
+						CurrentTheme = val
+						-- We would ideally loop over all active elements and re-apply colors here
+						-- For now, we apply immediately to core frames since live update is complex
+						-- without a robust registry re-render loop
+						ApplyColor(Main, "BackgroundColor3", GetColor("WindowBackground"))
+						ApplyColor(Top, "BackgroundColor3", GetColor("Primary"))
+					end
+				end
+			})
+
+			themeCat:AddButton({
+				Title = "Save Custom Colors",
+				Content = "Save live color edits to your CustomUserThemes preset",
+				Icon = "palette",
+				Callback = function()
+					-- Take the active theme colors and store them in custom
+					local custom = {}
+					for colorName, colorVal in pairs(Themes[CurrentTheme].Colors) do
+						custom[colorName] = typeof(colorVal) == "Color3" and colorVal:ToHex() or nil
+					end
+					ConfigManager.CustomUserThemes = custom
+					ConfigManager:Save()
+					UBHubLib:MakeNotify({
+						Title = "Custom Theme Saved",
+						Content = "Colors saved to config profile.",
+						Time = 3
+					})
+				end
+			})
+
+			local colorCat = CustTab:AddSection("Live Color Editor")
+			local colorsToEdit = {"Primary", "Secondary", "Accent", "ThemeHighlight", "Text", "WindowBackground"}
+			for _, colorName in ipairs(colorsToEdit) do
+				local functionToEdit = colorCat:AddParagraph({
+					Title = colorName,
+					Content = "Edit " .. colorName .. " color.",
+					Image = "palette",
+					Buttons = {
+						{
+							Title = "Edit",
+							Callback = function()
+								-- Create a temporary color picker via the Custom API
+								local tempPicker = colorCat:AddColorPicker({
+									Title = "Editing: " .. colorName,
+									Default = GetColor(colorName),
+									Callback = function(newColor)
+										Themes[CurrentTheme].Colors[colorName] = newColor
+									end
+								})
+								-- Fire it to open the floating menu immediately,
+								-- but wait for UI to render
+								task.spawn(function()
+									task.wait()
+									-- Cleanup the dummy container since we just want the popup
+									if tempPicker.Object then
+										tempPicker.Object.Parent.Parent:Destroy()
+									end
+								end)
+							end
+						}
+					}
+				})
+			end
+		end
+
 	return Tabs
 end
 return UBHubLib
